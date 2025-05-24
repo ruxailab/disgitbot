@@ -1,0 +1,48 @@
+# Credentials and environment files
+discord_bot/credentials.json
+.env
+*.pem
+*_key.json
+*_credentials.json
+secrets/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+venv/
+ENV/
+.venv/
+
+# Logs
+*.log
+logs/
+
+# Project specific
+contributions.json
+contributions_progress.json
+
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
