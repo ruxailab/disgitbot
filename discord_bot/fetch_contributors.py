@@ -9,6 +9,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 GITHUB_API_URL = "https://api.github.com"
+ORG_NAME = os.getenv("ORG_NAME", "ruxailab")
+# Keep legacy variables for backward compatibility
 REPO_OWNER = os.getenv("REPO_OWNER", "ruxailab")
 REPO_NAME = os.getenv("REPO_NAME", "RUXAILAB")
 
@@ -147,9 +149,43 @@ def make_github_request(url, headers, request_type='search', retries=3, retry_de
     
     return None
 
+def fetch_org_repositories():
+    """Fetch all repositories in the organization."""
+    headers = get_github_headers()
+    repos = []
+    page = 1
+    per_page = 100
+    
+    while True:
+        repos_url = f"{GITHUB_API_URL}/orgs/{ORG_NAME}/repos?per_page={per_page}&page={page}"
+        response = make_github_request(repos_url, headers, 'core')
+        
+        if not response or response.status_code != 200:
+            print(f"Failed to fetch repositories for page {page}.")
+            break
+            
+        repo_page = response.json()
+        if not repo_page:  # Empty page means we've reached the end
+            break
+            
+        for repo in repo_page:
+            repos.append({
+                "name": repo["name"],
+                "owner": repo["owner"]["login"]
+            })
+        
+        page += 1
+        
+        # If we got less than per_page results, we've reached the end
+        if len(repo_page) < per_page:
+            break
+    
+    print(f"Found {len(repos)} repositories in the {ORG_NAME} organization.")
+    return repos
+
 def get_time_based_metrics(username, contribution_type, headers, time_ranges):
     """
-    Generic function to fetch time-based metrics for any contribution type.
+    Generic function to fetch time-based metrics for any contribution type across all organization repos.
     
     Args:
         username: GitHub username
@@ -168,52 +204,70 @@ def get_time_based_metrics(username, contribution_type, headers, time_ranges):
         query_type = 'type:issue'
         time_field = 'created'
     elif contribution_type == 'commit':
-        # Commits have a different API endpoint
-        if contribution_type == 'commit':
-            # All-time commits
-            commits_url = f"{GITHUB_API_URL}/search/commits?q=repo:{REPO_OWNER}/{REPO_NAME}+author:{username}"
-            print(f"DEBUG - Commit URL: {commits_url}")
+        # Get list of organization repositories
+        org_repos = fetch_org_repositories()
+        
+        # All-time commits across all repos
+        all_time = 0
+        for repo in org_repos:
+            commits_url = f"{GITHUB_API_URL}/search/commits?q=repo:{repo['owner']}/{repo['name']}+author:{username}"
+            print(f"DEBUG - Commit URL for {repo['name']}: {commits_url}")
             commits_response = make_github_request(commits_url, headers, 'search')
             
-            all_time = commits_response.json().get("total_count", 0) if commits_response and commits_response.status_code == 200 else 0
-            
-            # GitHub API limitations make time-based commit queries more complex
-            # For simplicity, we'll use the all-time count for each time range
-            # In a production app, you would use pagination and analyze commit dates
-            return {
-                'daily': 0,
-                'weekly': 0,
-                'monthly': 0,
-                'all_time': all_time
-            }
+            if commits_response and commits_response.status_code == 200:
+                all_time += commits_response.json().get("total_count", 0)
+        
+        # GitHub API limitations make time-based commit queries more complex
+        # For simplicity, we'll use the all-time count for each time range
+        return {
+            'daily': 0,
+            'weekly': 0,
+            'monthly': 0,
+            'all_time': all_time
+        }
     
-    # Get all-time count
-    all_time_url = f"{GITHUB_API_URL}/search/issues?q=repo:{REPO_OWNER}/{REPO_NAME}+{query_type}+author:{username}"
-    print(f"DEBUG - All-time {contribution_type} URL: {all_time_url}")
-    all_time_response = make_github_request(all_time_url, headers, 'search')
+    # Get list of organization repositories
+    org_repos = fetch_org_repositories()
     
-    all_time = all_time_response.json().get("total_count", 0) if all_time_response and all_time_response.status_code == 200 else 0
+    # Initialize counters
+    all_time = 0
+    daily = 0
+    weekly = 0
+    monthly = 0
     
-    # Get daily count - Use 24 hours ago instead of today's date
-    daily_url = f"{GITHUB_API_URL}/search/issues?q=repo:{REPO_OWNER}/{REPO_NAME}+{query_type}+author:{username}+{time_field}:>={time_ranges['yesterday']}"
-    print(f"DEBUG - Daily {contribution_type} URL: {daily_url}")
-    daily_response = make_github_request(daily_url, headers, 'search')
-    
-    daily = daily_response.json().get("total_count", 0) if daily_response and daily_response.status_code == 200 else 0
-    
-    # Get weekly count
-    weekly_url = f"{GITHUB_API_URL}/search/issues?q=repo:{REPO_OWNER}/{REPO_NAME}+{query_type}+author:{username}+{time_field}:>={time_ranges['week_ago']}"
-    print(f"DEBUG - Weekly {contribution_type} URL: {weekly_url}")
-    weekly_response = make_github_request(weekly_url, headers, 'search')
-    
-    weekly = weekly_response.json().get("total_count", 0) if weekly_response and weekly_response.status_code == 200 else 0
-    
-    # Get monthly count
-    monthly_url = f"{GITHUB_API_URL}/search/issues?q=repo:{REPO_OWNER}/{REPO_NAME}+{query_type}+author:{username}+{time_field}:>={time_ranges['month_ago']}"
-    print(f"DEBUG - Monthly {contribution_type} URL: {monthly_url}")
-    monthly_response = make_github_request(monthly_url, headers, 'search')
-    
-    monthly = monthly_response.json().get("total_count", 0) if monthly_response and monthly_response.status_code == 200 else 0
+    # Query each repository and sum the results
+    for repo in org_repos:
+        # Get all-time count
+        all_time_url = f"{GITHUB_API_URL}/search/issues?q=repo:{repo['owner']}/{repo['name']}+{query_type}+author:{username}"
+        print(f"DEBUG - All-time {contribution_type} URL for {repo['name']}: {all_time_url}")
+        all_time_response = make_github_request(all_time_url, headers, 'search')
+        
+        if all_time_response and all_time_response.status_code == 200:
+            all_time += all_time_response.json().get("total_count", 0)
+        
+        # Get daily count - Use 24 hours ago instead of today's date
+        daily_url = f"{GITHUB_API_URL}/search/issues?q=repo:{repo['owner']}/{repo['name']}+{query_type}+author:{username}+{time_field}:>={time_ranges['yesterday']}"
+        print(f"DEBUG - Daily {contribution_type} URL for {repo['name']}: {daily_url}")
+        daily_response = make_github_request(daily_url, headers, 'search')
+        
+        if daily_response and daily_response.status_code == 200:
+            daily += daily_response.json().get("total_count", 0)
+        
+        # Get weekly count
+        weekly_url = f"{GITHUB_API_URL}/search/issues?q=repo:{repo['owner']}/{repo['name']}+{query_type}+author:{username}+{time_field}:>={time_ranges['week_ago']}"
+        print(f"DEBUG - Weekly {contribution_type} URL for {repo['name']}: {weekly_url}")
+        weekly_response = make_github_request(weekly_url, headers, 'search')
+        
+        if weekly_response and weekly_response.status_code == 200:
+            weekly += weekly_response.json().get("total_count", 0)
+        
+        # Get monthly count
+        monthly_url = f"{GITHUB_API_URL}/search/issues?q=repo:{repo['owner']}/{repo['name']}+{query_type}+author:{username}+{time_field}:>={time_ranges['month_ago']}"
+        print(f"DEBUG - Monthly {contribution_type} URL for {repo['name']}: {monthly_url}")
+        monthly_response = make_github_request(monthly_url, headers, 'search')
+        
+        if monthly_response and monthly_response.status_code == 200:
+            monthly += monthly_response.json().get("total_count", 0)
     
     return {
         'daily': daily,
@@ -224,7 +278,7 @@ def get_time_based_metrics(username, contribution_type, headers, time_ranges):
 
 def calculate_streaks(username, contribution_type, headers, month_ago_date):
     """
-    Calculate contribution streaks for any contribution type.
+    Calculate contribution streaks for any contribution type across all organization repos.
     
     Args:
         username: GitHub username
@@ -252,57 +306,72 @@ def calculate_streaks(username, contribution_type, headers, month_ago_date):
         time_field = 'created'
         date_field = 'created_at'
     
-    # Get contribution data for the last 30 days
-    streak_url = f"{GITHUB_API_URL}/search/issues?q=repo:{REPO_OWNER}/{REPO_NAME}+{query_type}+author:{username}+{time_field}:>={month_ago_date}&sort={time_field}&order=desc&per_page=100"
-    streak_response = make_github_request(streak_url, headers, 'search')
+    # Get list of organization repositories
+    org_repos = fetch_org_repositories()
     
+    # Collect contributions across all repos
+    all_contributions = []
+    
+    for repo in org_repos:
+        # Get contribution data for the last 30 days
+        streak_url = f"{GITHUB_API_URL}/search/issues?q=repo:{repo['owner']}/{repo['name']}+{query_type}+author:{username}+{time_field}:>={month_ago_date}&sort={time_field}&order=desc&per_page=100"
+        streak_response = make_github_request(streak_url, headers, 'search')
+        
+        if streak_response and streak_response.status_code == 200 and 'items' in streak_response.json():
+            items = streak_response.json()['items']
+            for item in items:
+                if contribution_type == 'pr' and not item.get("pull_request"):
+                    continue
+                
+                date_str = item.get(date_field, '').split('T')[0]  # Extract date part
+                if date_str:
+                    all_contributions.append(date_str)
+    
+    # Calculate streaks based on the combined contribution dates
     current_streak = 0
     longest_streak = 0
     
-    if streak_response and streak_response.status_code == 200:
-        items = streak_response.json().get("items", [])
+    if all_contributions:
+        # Remove duplicates and sort dates (most recent first)
+        unique_dates = list(set(all_contributions))
+        unique_dates.sort(reverse=True)  # Most recent first
         
-        # Get dates when contributions occurred
-        dates = []
-        for item in items:
-            if contribution_type == 'pr' and not item.get("pull_request"):
-                continue
-                
-            date_str = item.get(date_field, "").split("T")[0]  # Get just the date part
-            if date_str:
-                dates.append(date_str)
+        # Calculate current streak
+        last_date = datetime.strptime(unique_dates[0], '%Y-%m-%d')
+        current_streak = 1
         
-        # Calculate streaks
-        dates.sort(reverse=True)  # Most recent first
+        for i in range(1, len(unique_dates)):
+            date = datetime.strptime(unique_dates[i], '%Y-%m-%d')
+            if (last_date - date).days <= 1:  # Consecutive days
+                current_streak += 1
+            else:
+                break
+            last_date = date
         
-        if dates:
-            # Calculate current streak
-            last_date = datetime.strptime(dates[0], '%Y-%m-%d')
-            current_streak = 1
+        # Calculate longest streak
+        # Re-sort dates in ascending order for proper streak calculation
+        unique_dates.sort()  # Oldest first
+        
+        # Group dates by consecutive days
+        streaks = []
+        current_group = [unique_dates[0]]
+        
+        for i in range(1, len(unique_dates)):
+            prev_date = datetime.strptime(current_group[-1], '%Y-%m-%d')
+            curr_date = datetime.strptime(unique_dates[i], '%Y-%m-%d')
             
-            for i in range(1, len(dates)):
-                date = datetime.strptime(dates[i], '%Y-%m-%d')
-                if (last_date - date).days <= 1:  # Consecutive days
-                    current_streak += 1
-                else:
-                    break
-                last_date = date
-            
-            # Calculate longest streak
-            longest_streak = 1
-            temp_streak = 1
-            
-            for i in range(1, len(dates)):
-                prev_date = datetime.strptime(dates[i-1], '%Y-%m-%d')
-                curr_date = datetime.strptime(dates[i], '%Y-%m-%d')
-                
-                if (prev_date - curr_date).days <= 1:  # Consecutive days
-                    temp_streak += 1
-                else:
-                    longest_streak = max(longest_streak, temp_streak)
-                    temp_streak = 1
-            
-            longest_streak = max(longest_streak, temp_streak)
+            if (curr_date - prev_date).days <= 1:  # Consecutive days
+                current_group.append(unique_dates[i])
+            else:
+                streaks.append(current_group)
+                current_group = [unique_dates[i]]
+        
+        # Add the last group
+        if current_group:
+            streaks.append(current_group)
+        
+        # Find the longest streak
+        longest_streak = max([len(streak) for streak in streaks]) if streaks else 0
     
     return {
         'current_streak': current_streak,
@@ -388,15 +457,23 @@ def get_contributions(username):
     }
 
 def fetch_all_contributors():
-    """Fetch all contributors to the repository."""
+    """Fetch all contributors across all organization repositories."""
     headers = get_github_headers()
-    contributors_url = f"{GITHUB_API_URL}/repos/{REPO_OWNER}/{REPO_NAME}/contributors"
-    response = make_github_request(contributors_url, headers, 'core')
-    if response and response.status_code == 200:
-        return [contributor['login'] for contributor in response.json()]
-    else:
-        print(f"Failed to fetch contributors.")
-        return []
+    all_contributors = set()
+    
+    # Get all repos in the organization
+    org_repos = fetch_org_repositories()
+    
+    # Fetch contributors for each repo
+    for repo in org_repos:
+        contributors_url = f"{GITHUB_API_URL}/repos/{repo['owner']}/{repo['name']}/contributors"
+        response = make_github_request(contributors_url, headers, 'core')
+        
+        if response and response.status_code == 200:
+            repo_contributors = [contributor['login'] for contributor in response.json()]
+            all_contributors.update(repo_contributors)
+    
+    return list(all_contributors)
 
 def calculate_rankings(all_contributions):
     """Calculate rankings for each contributor across different metrics."""

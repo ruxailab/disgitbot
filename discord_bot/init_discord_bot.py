@@ -168,7 +168,7 @@ async def getstats(interaction: discord.Interaction, type: str = "pr"):
             # Create enhanced embed
             embed = discord.Embed(
                 title=f"GitHub Contribution Metrics for {github_username}",
-                description=f"Stats refreshed daily at {stats.get('tracking_since', 'March 24, 2025')}, 00:00:00 PDT",
+                description=f"Stats tracked across all RUXAILAB repositories. Updated daily at {stats.get('tracking_since', 'March 24, 2025')}, 00:00:00 PDT",
                 color=discord.Color.blue()
             )
             
