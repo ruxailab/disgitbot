@@ -285,6 +285,68 @@ def calculate_streaks(username, contribution_type, headers, month_ago_date):
         'longest_streak': longest_streak
     }
 
+def calculate_streaks_from_dates(dates):
+    """
+    Calculate streaks from a list of contribution dates.
+    
+    Args:
+        dates: List of dates in 'YYYY-MM-DD' format
+    
+    Returns:
+        Dictionary with current_streak and longest_streak
+    """
+    if not dates:
+        return {
+            'current_streak': 0,
+            'longest_streak': 0
+        }
+    
+    # Remove duplicates and sort dates (most recent first)
+    unique_dates = list(set(dates))
+    unique_dates.sort(reverse=True)  # Most recent first
+    
+    # Calculate current streak
+    last_date = datetime.strptime(unique_dates[0], '%Y-%m-%d')
+    current_streak = 1
+    
+    for i in range(1, len(unique_dates)):
+        date = datetime.strptime(unique_dates[i], '%Y-%m-%d')
+        if (last_date - date).days <= 1:  # Consecutive days
+            current_streak += 1
+        else:
+            break
+        last_date = date
+    
+    # Calculate longest streak
+    # Re-sort dates in ascending order for proper streak calculation
+    unique_dates.sort()  # Oldest first
+    
+    # Group dates by consecutive days
+    streaks = []
+    current_group = [unique_dates[0]]
+    
+    for i in range(1, len(unique_dates)):
+        prev_date = datetime.strptime(current_group[-1], '%Y-%m-%d')
+        curr_date = datetime.strptime(unique_dates[i], '%Y-%m-%d')
+        
+        if (curr_date - prev_date).days <= 1:  # Consecutive days
+            current_group.append(unique_dates[i])
+        else:
+            streaks.append(current_group)
+            current_group = [unique_dates[i]]
+    
+    # Add the last group
+    if current_group:
+        streaks.append(current_group)
+    
+    # Find the longest streak
+    longest_streak = max([len(streak) for streak in streaks]) if streaks else 0
+    
+    return {
+        'current_streak': current_streak,
+        'longest_streak': longest_streak
+    }
+
 def calculate_rankings(all_contributions):
     """Calculate rankings for each contributor across different metrics."""
     contributors = list(all_contributions.keys())
@@ -433,6 +495,8 @@ if __name__ == "__main__":
                         "pr_count": 0,
                         "issues_count": 0,
                         "commits_count": 0,
+                        "pr_dates": [],
+                        "issue_dates": [],
                         "stats": {
                             "tracking_since": "March 24, 2025",
                             "current_month": current_month,
@@ -466,6 +530,12 @@ if __name__ == "__main__":
                         }
                     }
                     print(f"  Initialized new contributor: {username}")
+                    
+                # Make sure date lists exist
+                if "pr_dates" not in all_contributions[username]:
+                    all_contributions[username]["pr_dates"] = []
+                if "issue_dates" not in all_contributions[username]:
+                    all_contributions[username]["issue_dates"] = []
                 
                 # Only query PR stats if this user has made PRs in this repo
                 if username in pr_authors:
@@ -482,8 +552,26 @@ if __name__ == "__main__":
                         pr_count = pr_response.json().get("total_count", 0)
                         all_contributions[username]["pr_count"] += pr_count
                         all_contributions[username]["stats"]["prs"]["all_time"] += pr_count
-                        if pr_count > 0:
-                            print(f"  Found {pr_count} PRs for {username} in {repo_name}")
+                        
+                        # Collect PR dates for streak calculation
+                        if pr_count > 0 and 'items' in pr_response.json():
+                            pr_items = pr_response.json()['items']
+                            for item in pr_items:
+                                if not item.get('pull_request'):
+                                    continue
+                                    
+                                # Get the date
+                                merged_date = item.get('merged_at', '')
+                                if not merged_date:
+                                    merged_date = item.get('closed_at', '')
+                                if not merged_date:
+                                    merged_date = item.get('created_at', '')
+                                
+                                if merged_date:
+                                    date_str = merged_date.split('T')[0]  # Extract date part
+                                    all_contributions[username]["pr_dates"].append(date_str)
+                            
+                            print(f"  Found {pr_count} PRs for {username} in {repo_name}, collected {len(pr_items)} dates")
                     
                     # Daily PRs
                     pr_daily_url = f"{GITHUB_API_URL}/search/issues?q=repo:{repo_owner}/{repo_name}+{pr_query_type}+author:{username}+{pr_time_field}:>={time_ranges['yesterday']}"
@@ -539,8 +627,22 @@ if __name__ == "__main__":
                         issue_count = issue_response.json().get("total_count", 0)
                         all_contributions[username]["issues_count"] += issue_count
                         all_contributions[username]["stats"]["issues"]["all_time"] += issue_count
-                        if issue_count > 0:
-                            print(f"  Found {issue_count} issues for {username} in {repo_name}")
+                        
+                        # Collect issue dates for streak calculation
+                        if issue_count > 0 and 'items' in issue_response.json():
+                            issue_items = issue_response.json()['items']
+                            for item in issue_items:
+                                if item.get('pull_request'):  # Skip PRs
+                                    continue
+                                    
+                                # Get the date
+                                created_date = item.get('created_at', '')
+                                
+                                if created_date:
+                                    date_str = created_date.split('T')[0]  # Extract date part
+                                    all_contributions[username]["issue_dates"].append(date_str)
+                            
+                            print(f"  Found {issue_count} issues for {username} in {repo_name}, collected {len(issue_items)} dates")
                     
                     # Daily Issues
                     issue_daily_url = f"{GITHUB_API_URL}/search/issues?q=repo:{repo_owner}/{repo_name}+{issue_query_type}+author:{username}+{issue_time_field}:>={time_ranges['yesterday']}"
@@ -648,19 +750,33 @@ if __name__ == "__main__":
         # Check API rate limits after processing
         check_rate_limit()
         
-        # Calculate streaks for all users after all repos are processed
-        # This is still needed to get accurate streak calculations across all repos
+        # Calculate streaks for all users from collected dates
         print("\n========== Calculating streaks for all contributors ==========")
         
         for username in all_contributions:
             print(f"Calculating streaks for {username}...")
-            # Calculate PR streaks
-            pr_streaks = calculate_streaks(username, 'pr', headers, month_ago_date)
+            
+            # Calculate PR streaks from collected dates
+            pr_dates = all_contributions[username].get("pr_dates", [])
+            if pr_dates:
+                print(f"  Using {len(pr_dates)} collected PR dates for streak calculation")
+                pr_streaks = calculate_streaks_from_dates(pr_dates)
+            else:
+                print(f"  No PR dates collected, setting streak to 0")
+                pr_streaks = {"current_streak": 0, "longest_streak": 0}
+            
             all_contributions[username]["stats"]["prs"]["current_streak"] = pr_streaks["current_streak"]
             all_contributions[username]["stats"]["prs"]["longest_streak"] = pr_streaks["longest_streak"]
             
-            # Calculate Issue streaks
-            issue_streaks = calculate_streaks(username, 'issue', headers, month_ago_date)
+            # Calculate Issue streaks from collected dates
+            issue_dates = all_contributions[username].get("issue_dates", [])
+            if issue_dates:
+                print(f"  Using {len(issue_dates)} collected issue dates for streak calculation")
+                issue_streaks = calculate_streaks_from_dates(issue_dates)
+            else:
+                print(f"  No issue dates collected, setting streak to 0")
+                issue_streaks = {"current_streak": 0, "longest_streak": 0}
+            
             all_contributions[username]["stats"]["issues"]["current_streak"] = issue_streaks["current_streak"]
             all_contributions[username]["stats"]["issues"]["longest_streak"] = issue_streaks["longest_streak"]
             
