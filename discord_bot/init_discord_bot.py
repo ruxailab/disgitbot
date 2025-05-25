@@ -135,11 +135,15 @@ async def getstats(interaction: discord.Interaction, type: str = "pr"):
             )
             return
 
-        # Pass the required data to determine_role
+        # Ensure 'stats' and necessary sub-fields exist before trying to access them for role determination
+        pr_all_time = user_data.get("stats", {}).get("prs", {}).get("all_time", 0)
+        issues_all_time = user_data.get("stats", {}).get("issues", {}).get("all_time", 0)
+        commits_all_time = user_data.get("stats", {}).get("commits", {}).get("all_time", 0)
+
         pr_role, issue_role, commit_role = determine_role(
-            user_data["pr_count"],
-            user_data["issues_count"],
-            user_data["commits_count"]
+            pr_all_time,
+            issues_all_time,
+            commits_all_time
         )
 
         # Set up type-specific variables

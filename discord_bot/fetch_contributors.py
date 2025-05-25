@@ -696,9 +696,42 @@ if __name__ == "__main__":
                         all_contributions[username]["stats"]["commits"]["all_time"] += commit_count
                         if commit_count > 0:
                             print(f"  Found {commit_count} commits for {username} in {repo_name}")
+
+                    # Daily Commits
+                    commit_daily_url = f"{GITHUB_API_URL}/search/commits?q=repo:{repo_owner}/{repo_name}+author:{username}+committer-date:>={time_ranges['yesterday']}"
+                    print(f"  DEBUG - {username} Daily Commit URL: {commit_daily_url}")
+                    commit_daily_response = make_github_request(commit_daily_url, headers, 'search')
+                    if commit_daily_response and commit_daily_response.status_code == 200:
+                        commit_daily_count = commit_daily_response.json().get("total_count", 0)
+                        all_contributions[username]["stats"]["commits"]["daily"] += commit_daily_count
+                        if commit_daily_count > 0:
+                            print(f"  Found {commit_daily_count} daily commits for {username} in {repo_name}")
+
+                    # Weekly Commits
+                    commit_weekly_url = f"{GITHUB_API_URL}/search/commits?q=repo:{repo_owner}/{repo_name}+author:{username}+committer-date:>={time_ranges['week_ago']}"
+                    print(f"  DEBUG - {username} Weekly Commit URL: {commit_weekly_url}")
+                    commit_weekly_response = make_github_request(commit_weekly_url, headers, 'search')
+                    if commit_weekly_response and commit_weekly_response.status_code == 200:
+                        commit_weekly_count = commit_weekly_response.json().get("total_count", 0)
+                        all_contributions[username]["stats"]["commits"]["weekly"] += commit_weekly_count
+                        if commit_weekly_count > 0:
+                            print(f"  Found {commit_weekly_count} weekly commits for {username} in {repo_name}")
+
+                    # Monthly Commits
+                    commit_monthly_url = f"{GITHUB_API_URL}/search/commits?q=repo:{repo_owner}/{repo_name}+author:{username}+committer-date:>={time_ranges['month_ago']}"
+                    print(f"  DEBUG - {username} Monthly Commit URL: {commit_monthly_url}")
+                    commit_monthly_response = make_github_request(commit_monthly_url, headers, 'search')
+                    if commit_monthly_response and commit_monthly_response.status_code == 200:
+                        commit_monthly_count = commit_monthly_response.json().get("total_count", 0)
+                        all_contributions[username]["stats"]["commits"]["monthly"] += commit_monthly_count
+                        if commit_monthly_count > 0:
+                            print(f"  Found {commit_monthly_count} monthly commits for {username} in {repo_name}")
                 else:
                     print(f"  Skipping commit stats for {username} (no commits in this repo)")
                     commit_count = 0
+                    commit_daily_count = 0
+                    commit_weekly_count = 0
+                    commit_monthly_count = 0
                 
                 # Print summary for this user in this repo
                 print(f"\n  Summary for {username} in {repo_name}:")
@@ -714,7 +747,7 @@ if __name__ == "__main__":
                 
                 if username in commit_contributors:
                     stats_found = True
-                    print(f"    Commits: {commit_count if 'commit_count' in locals() else 0}")
+                    print(f"    Commits: {commit_count if 'commit_count' in locals() else 0} (Daily: {commit_daily_count if 'commit_daily_count' in locals() else 0}, Weekly: {commit_weekly_count if 'commit_weekly_count' in locals() else 0}, Monthly: {commit_monthly_count if 'commit_monthly_count' in locals() else 0})")
                 
                 if not stats_found:
                     print("    No contributions found (user may have been removed from items during processing)")
