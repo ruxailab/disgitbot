@@ -167,22 +167,23 @@ async def getstats(interaction: discord.Interaction, type: str = "pr"):
             
             # Create enhanced embed
             embed = discord.Embed(
-                title=f"GitHub Stats for {github_username}",
-                description=f"Daily stats tracking at {stats.get('tracking_since', 'March 24, 2025')}, at 00:00:00 PDT (Pacific Daylight Time)",
+                title=f"GitHub Contribution Metrics for {github_username}",
+                description=f"Stats refreshed daily at {stats.get('tracking_since', 'March 24, 2025')}, 00:00:00 PDT",
                 color=discord.Color.blue()
             )
             
-            # Create stats table
-            stats_table = f"```\n{title_prefix}s         Count    Place\n"
-            stats_table += f"Daily:         {type_stats['daily']}        #{user_data.get('rankings', {}).get(f'{stats_type}_daily', 0)}\n"
-            stats_table += f"Weekly:        {type_stats['weekly']}        #{user_data.get('rankings', {}).get(f'{stats_type}_weekly', 0)}\n"
-            stats_table += f"Monthly:       {type_stats['monthly']}       #{user_data.get('rankings', {}).get(f'{stats_type}_monthly', 0)}\n"
-            stats_table += f"All-time:      {type_stats['all_time']}       #{user_data.get('rankings', {}).get(stats_type, 0)}\n\n"
+            # Create stats table with customized format
+            display_prefix = f"{title_prefix}s{' ' * (12 - len(title_prefix + 's'))}"
+            stats_table = f"```\n{display_prefix}   Volume   Ranking\n"
+            stats_table += f"24h:           {type_stats['daily']}        #{user_data.get('rankings', {}).get(f'{stats_type}_daily', 0)}\n"
+            stats_table += f"7 days:        {type_stats['weekly']}        #{user_data.get('rankings', {}).get(f'{stats_type}_weekly', 0)}\n"
+            stats_table += f"30 days:       {type_stats['monthly']}       #{user_data.get('rankings', {}).get(f'{stats_type}_monthly', 0)}\n"
+            stats_table += f"Lifetime:      {type_stats['all_time']}       #{user_data.get('rankings', {}).get(stats_type, 0)}\n\n"
             
-            # Add averages and streaks
-            stats_table += f"Average/day ({stats.get('current_month', 'March')}): {type_stats.get('avg_per_day', 0)} {title_prefix}s\n\n"
-            stats_table += f"Current {title_prefix} streak: {type_stats.get('current_streak', 0)} {title_prefix}s\n"
-            stats_table += f"Longest {title_prefix} streak: {type_stats.get('longest_streak', 0)} {title_prefix}s\n```"
+            # Add averages and streaks with customized wording
+            stats_table += f"Daily Average ({stats.get('current_month', 'March')}): {type_stats.get('avg_per_day', 0)} {title_prefix}s\n\n"
+            stats_table += f"Active {title_prefix} Streak: {type_stats.get('current_streak', 0)} {title_prefix}s\n"
+            stats_table += f"Best {title_prefix} Streak: {type_stats.get('longest_streak', 0)} {title_prefix}s\n```"
             
             # Add level information based on role
             embed.add_field(name="Statistics", value=stats_table, inline=False)

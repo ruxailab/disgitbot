@@ -36,9 +36,8 @@ ENV/
 logs/
 
 # Project specific
+credentials.json
 contributions.json
-contributions_progress.json
-
 # IDE specific files
 .idea/
 .vscode/
@@ -46,3 +45,7 @@ contributions_progress.json
 *.swo
 *~
 .DS_Store
+
+runbot.sh
+activate.sh 
+run_workflow.sh
