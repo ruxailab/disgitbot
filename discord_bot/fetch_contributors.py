@@ -387,7 +387,7 @@ if __name__ == "__main__":
         for repo in remaining_repos:
             repo_name = repo['name']
             repo_owner = repo['owner']
-            print(f"\nProcessing repository: {repo_owner}/{repo_name}")
+            print(f"\n========== Processing repository: {repo_owner}/{repo_name} ==========")
             
             # 1. Get all contributors for this repository
             repo_contributors = []
@@ -399,7 +399,7 @@ if __name__ == "__main__":
             if response and response.status_code == 200:
                 commit_contributors = [contributor['login'] for contributor in response.json()]
                 repo_contributors.extend(commit_contributors)
-                print(f"Found {len(commit_contributors)} commit contributors")
+                print(f"Found {len(commit_contributors)} commit contributors in {repo_name}")
             
             # 1.2 PR authors
             pr_url = f"{GITHUB_API_URL}/search/issues?q=repo:{repo_owner}/{repo_name}+type:pr+is:merged"
@@ -408,7 +408,7 @@ if __name__ == "__main__":
             if pr_response and pr_response.status_code == 200 and 'items' in pr_response.json():
                 pr_authors = [item['user']['login'] for item in pr_response.json()['items'] if item.get('user')]
                 repo_contributors.extend(pr_authors)
-                print(f"Found {len(pr_authors)} PR authors")
+                print(f"Found {len(pr_authors)} PR authors in {repo_name}")
             
             # 1.3 Issue creators
             issue_url = f"{GITHUB_API_URL}/search/issues?q=repo:{repo_owner}/{repo_name}+type:issue"
@@ -417,7 +417,7 @@ if __name__ == "__main__":
             if issue_response and issue_response.status_code == 200 and 'items' in issue_response.json():
                 issue_creators = [item['user']['login'] for item in issue_response.json()['items'] if item.get('user')]
                 repo_contributors.extend(issue_creators)
-                print(f"Found {len(issue_creators)} issue creators")
+                print(f"Found {len(issue_creators)} issue creators in {repo_name}")
             
             # Remove duplicates
             unique_contributors = list(set(repo_contributors))
@@ -425,7 +425,7 @@ if __name__ == "__main__":
             
             # 2. For each contributor in this repo, get their stats
             for username in unique_contributors:
-                print(f"  Processing {username} in {repo_name}")
+                print(f"\n  Processing user: {username} in {repo_name}")
                 
                 # Initialize user if not exists
                 if username not in all_contributions:
@@ -465,6 +465,7 @@ if __name__ == "__main__":
                             }
                         }
                     }
+                    print(f"  Initialized new contributor: {username}")
                 
                 # 2.1 Get PR stats for this repo
                 pr_query_type = 'type:pr+is:merged'
@@ -472,36 +473,48 @@ if __name__ == "__main__":
                 
                 # All-time PRs
                 pr_url = f"{GITHUB_API_URL}/search/issues?q=repo:{repo_owner}/{repo_name}+{pr_query_type}+author:{username}"
+                print(f"  DEBUG - {username} PR URL: {pr_url}")
                 pr_response = make_github_request(pr_url, headers, 'search')
                 
                 if pr_response and pr_response.status_code == 200:
                     pr_count = pr_response.json().get("total_count", 0)
                     all_contributions[username]["pr_count"] += pr_count
                     all_contributions[username]["stats"]["prs"]["all_time"] += pr_count
+                    if pr_count > 0:
+                        print(f"  Found {pr_count} PRs for {username} in {repo_name}")
                 
                 # Daily PRs
                 pr_daily_url = f"{GITHUB_API_URL}/search/issues?q=repo:{repo_owner}/{repo_name}+{pr_query_type}+author:{username}+{pr_time_field}:>={time_ranges['yesterday']}"
+                print(f"  DEBUG - {username} Daily PR URL: {pr_daily_url}")
                 pr_daily_response = make_github_request(pr_daily_url, headers, 'search')
                 
                 if pr_daily_response and pr_daily_response.status_code == 200:
                     pr_daily_count = pr_daily_response.json().get("total_count", 0)
                     all_contributions[username]["stats"]["prs"]["daily"] += pr_daily_count
+                    if pr_daily_count > 0:
+                        print(f"  Found {pr_daily_count} daily PRs for {username} in {repo_name}")
                 
                 # Weekly PRs
                 pr_weekly_url = f"{GITHUB_API_URL}/search/issues?q=repo:{repo_owner}/{repo_name}+{pr_query_type}+author:{username}+{pr_time_field}:>={time_ranges['week_ago']}"
+                print(f"  DEBUG - {username} Weekly PR URL: {pr_weekly_url}")
                 pr_weekly_response = make_github_request(pr_weekly_url, headers, 'search')
                 
                 if pr_weekly_response and pr_weekly_response.status_code == 200:
                     pr_weekly_count = pr_weekly_response.json().get("total_count", 0)
                     all_contributions[username]["stats"]["prs"]["weekly"] += pr_weekly_count
+                    if pr_weekly_count > 0:
+                        print(f"  Found {pr_weekly_count} weekly PRs for {username} in {repo_name}")
                 
                 # Monthly PRs
                 pr_monthly_url = f"{GITHUB_API_URL}/search/issues?q=repo:{repo_owner}/{repo_name}+{pr_query_type}+author:{username}+{pr_time_field}:>={time_ranges['month_ago']}"
+                print(f"  DEBUG - {username} Monthly PR URL: {pr_monthly_url}")
                 pr_monthly_response = make_github_request(pr_monthly_url, headers, 'search')
                 
                 if pr_monthly_response and pr_monthly_response.status_code == 200:
                     pr_monthly_count = pr_monthly_response.json().get("total_count", 0)
                     all_contributions[username]["stats"]["prs"]["monthly"] += pr_monthly_count
+                    if pr_monthly_count > 0:
+                        print(f"  Found {pr_monthly_count} monthly PRs for {username} in {repo_name}")
                 
                 # 2.2 Get Issue stats for this repo
                 issue_query_type = 'type:issue'
@@ -509,50 +522,75 @@ if __name__ == "__main__":
                 
                 # All-time Issues
                 issue_url = f"{GITHUB_API_URL}/search/issues?q=repo:{repo_owner}/{repo_name}+{issue_query_type}+author:{username}"
+                print(f"  DEBUG - {username} Issue URL: {issue_url}")
                 issue_response = make_github_request(issue_url, headers, 'search')
                 
                 if issue_response and issue_response.status_code == 200:
                     issue_count = issue_response.json().get("total_count", 0)
                     all_contributions[username]["issues_count"] += issue_count
                     all_contributions[username]["stats"]["issues"]["all_time"] += issue_count
+                    if issue_count > 0:
+                        print(f"  Found {issue_count} issues for {username} in {repo_name}")
                 
                 # Daily Issues
                 issue_daily_url = f"{GITHUB_API_URL}/search/issues?q=repo:{repo_owner}/{repo_name}+{issue_query_type}+author:{username}+{issue_time_field}:>={time_ranges['yesterday']}"
+                print(f"  DEBUG - {username} Daily Issue URL: {issue_daily_url}")
                 issue_daily_response = make_github_request(issue_daily_url, headers, 'search')
                 
                 if issue_daily_response and issue_daily_response.status_code == 200:
                     issue_daily_count = issue_daily_response.json().get("total_count", 0)
                     all_contributions[username]["stats"]["issues"]["daily"] += issue_daily_count
+                    if issue_daily_count > 0:
+                        print(f"  Found {issue_daily_count} daily issues for {username} in {repo_name}")
                 
                 # Weekly Issues
                 issue_weekly_url = f"{GITHUB_API_URL}/search/issues?q=repo:{repo_owner}/{repo_name}+{issue_query_type}+author:{username}+{issue_time_field}:>={time_ranges['week_ago']}"
+                print(f"  DEBUG - {username} Weekly Issue URL: {issue_weekly_url}")
                 issue_weekly_response = make_github_request(issue_weekly_url, headers, 'search')
                 
                 if issue_weekly_response and issue_weekly_response.status_code == 200:
                     issue_weekly_count = issue_weekly_response.json().get("total_count", 0)
                     all_contributions[username]["stats"]["issues"]["weekly"] += issue_weekly_count
+                    if issue_weekly_count > 0:
+                        print(f"  Found {issue_weekly_count} weekly issues for {username} in {repo_name}")
                 
                 # Monthly Issues
                 issue_monthly_url = f"{GITHUB_API_URL}/search/issues?q=repo:{repo_owner}/{repo_name}+{issue_query_type}+author:{username}+{issue_time_field}:>={time_ranges['month_ago']}"
+                print(f"  DEBUG - {username} Monthly Issue URL: {issue_monthly_url}")
                 issue_monthly_response = make_github_request(issue_monthly_url, headers, 'search')
                 
                 if issue_monthly_response and issue_monthly_response.status_code == 200:
                     issue_monthly_count = issue_monthly_response.json().get("total_count", 0)
                     all_contributions[username]["stats"]["issues"]["monthly"] += issue_monthly_count
+                    if issue_monthly_count > 0:
+                        print(f"  Found {issue_monthly_count} monthly issues for {username} in {repo_name}")
                 
                 # 2.3 Get Commit stats for this repo
                 commit_url = f"{GITHUB_API_URL}/search/commits?q=repo:{repo_owner}/{repo_name}+author:{username}"
+                print(f"  DEBUG - {username} Commit URL: {commit_url}")
                 commit_response = make_github_request(commit_url, headers, 'search')
                 
                 if commit_response and commit_response.status_code == 200:
                     commit_count = commit_response.json().get("total_count", 0)
                     all_contributions[username]["commits_count"] += commit_count
                     all_contributions[username]["stats"]["commits"]["all_time"] += commit_count
+                    if commit_count > 0:
+                        print(f"  Found {commit_count} commits for {username} in {repo_name}")
+                
+                # Print summary for this user in this repo
+                print(f"\n  Summary for {username} in {repo_name}:")
+                print(f"    PRs: {pr_count} (Daily: {pr_daily_count if 'pr_daily_count' in locals() else 0}, Weekly: {pr_weekly_count if 'pr_weekly_count' in locals() else 0}, Monthly: {pr_monthly_count if 'pr_monthly_count' in locals() else 0})")
+                print(f"    Issues: {issue_count if 'issue_count' in locals() else 0} (Daily: {issue_daily_count if 'issue_daily_count' in locals() else 0}, Weekly: {issue_weekly_count if 'issue_weekly_count' in locals() else 0}, Monthly: {issue_monthly_count if 'issue_monthly_count' in locals() else 0})")
+                print(f"    Commits: {commit_count if 'commit_count' in locals() else 0}")
                 
                 # Check if we're close to rate limits after each user
                 if not wait_for_rate_limit('search'):
                     print("Rate limits reached. Saving progress and exiting.")
                     break
+            
+            # Print summary for this repo
+            print(f"\n========== Summary for {repo_owner}/{repo_name} ==========")
+            print(f"Processed {len(unique_contributors)} contributors")
             
             # Mark this repo as processed
             processed_repos.append(repo_name)
@@ -567,7 +605,8 @@ if __name__ == "__main__":
             with open("contributions_progress.json", "w") as f:
                 json.dump(progress_data, f, indent=2)
             
-            print(f"Progress saved: {len(processed_repos)}/{len(org_repos)} repositories processed.")
+            print(f"Progress saved: {len(processed_repos)}/{len(org_repos)} repositories processed ({len(processed_repos)/len(org_repos)*100:.1f}%)")
+            print(f"Repositories remaining: {len(org_repos) - len(processed_repos)}")
             
     except KeyboardInterrupt:
         print("\nOperation interrupted by user. Saving progress...")
@@ -577,9 +616,10 @@ if __name__ == "__main__":
         
         # Calculate streaks for all users after all repos are processed
         # This is still needed to get accurate streak calculations across all repos
-        print("Calculating streaks for all contributors...")
+        print("\n========== Calculating streaks for all contributors ==========")
         
         for username in all_contributions:
+            print(f"Calculating streaks for {username}...")
             # Calculate PR streaks
             pr_streaks = calculate_streaks(username, 'pr', headers, month_ago_date)
             all_contributions[username]["stats"]["prs"]["current_streak"] = pr_streaks["current_streak"]
@@ -601,7 +641,13 @@ if __name__ == "__main__":
             all_contributions[username]["stats"]["commits"]["avg_per_day"] = round(
                 all_contributions[username]["stats"]["commits"]["monthly"] / max(days_this_month, 1), 1
             )
+            
+            # Print streak and average info
+            print(f"  PR Streaks: Current {pr_streaks['current_streak']}, Longest {pr_streaks['longest_streak']}")
+            print(f"  Issue Streaks: Current {issue_streaks['current_streak']}, Longest {issue_streaks['longest_streak']}")
+            print(f"  Averages: PRs {all_contributions[username]['stats']['prs']['avg_per_day']}/day, Issues {all_contributions[username]['stats']['issues']['avg_per_day']}/day, Commits {all_contributions[username]['stats']['commits']['avg_per_day']}/day")
         
+        print("\n========== Calculating rankings for all contributors ==========")
         # Calculate and add rankings for all contributors
         all_contributions = calculate_rankings(all_contributions)
         
@@ -609,6 +655,8 @@ if __name__ == "__main__":
         with open("contributions.json", "w") as f:
             json.dump(all_contributions, f, indent=2)
         
+        print("\n========== Process Complete ==========")
+        print(f"Found {len(all_contributions)} total contributors across all repositories")
         print("Contribution data saved to contributions.json")
         
         # If we have processed all repos, remove the progress file
