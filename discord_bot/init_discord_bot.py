@@ -178,11 +178,11 @@ async def getstats(interaction: discord.Interaction, type: str = "pr"):
             
             # Create stats table with customized format
             display_prefix = f"{title_prefix}s{' ' * (12 - len(title_prefix + 's'))}"
-            stats_table = f"```\n{display_prefix}   Volume   Ranking\n"
-            stats_table += f"24h:           {type_stats['daily']}        #{user_data.get('rankings', {}).get(f'{stats_type}_daily', 0)}\n"
-            stats_table += f"7 days:        {type_stats['weekly']}        #{user_data.get('rankings', {}).get(f'{stats_type}_weekly', 0)}\n"
-            stats_table += f"30 days:       {type_stats['monthly']}       #{user_data.get('rankings', {}).get(f'{stats_type}_monthly', 0)}\n"
-            stats_table += f"Lifetime:      {type_stats['all_time']}       #{user_data.get('rankings', {}).get(stats_type, 0)}\n\n"
+            stats_table = f"```\n{display_prefix}   Count   Ranking\n"
+            stats_table += f"24h:           {type_stats['daily']:<8}#{user_data.get('rankings', {}).get(f'{stats_type}_daily', 0)}\n"
+            stats_table += f"7 days:        {type_stats['weekly']:<8}#{user_data.get('rankings', {}).get(f'{stats_type}_weekly', 0)}\n"
+            stats_table += f"30 days:       {type_stats['monthly']:<8}#{user_data.get('rankings', {}).get(f'{stats_type}_monthly', 0)}\n"
+            stats_table += f"Lifetime:      {type_stats['all_time']:<8}#{user_data.get('rankings', {}).get(stats_type, 0)}\n\n"
             
             # Add averages and streaks with customized wording
             stats_table += f"Daily Average ({stats.get('current_month', 'March')}): {type_stats.get('avg_per_day', 0)} {title_prefix}s\n\n"
