@@ -834,6 +834,14 @@ if __name__ == "__main__":
         # Calculate and add rankings for all contributors
         all_contributions = calculate_rankings(all_contributions)
         
+        # Add last updated timestamp in UTC
+        current_time_utc = datetime.now().astimezone(datetime.timezone.utc)
+        formatted_time = current_time_utc.strftime('%Y-%m-%d %H:%M:%S UTC')
+        
+        # Add the timestamp to each user's stats
+        for username in all_contributions:
+            all_contributions[username]["stats"]["last_updated"] = formatted_time
+        
         # Save to a JSON file for the Discord bot to use
         with open("contributions.json", "w") as f:
             json.dump(all_contributions, f, indent=2)

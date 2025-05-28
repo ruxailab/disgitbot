@@ -12,6 +12,7 @@ import threading
 from firestore import load_data_from_firestore
 from role_utils import determine_role, get_next_role
 from auth import get_github_username, wait_for_username, start_flask
+import datetime
 
 # Load env vars
 load_dotenv()
@@ -102,7 +103,12 @@ async def unlink(interaction: discord.Interaction):
 
 
 @bot.tree.command(name="getstats", description="Displays your GitHub stats and current role")
-@app_commands.describe(type="Type of stats to display: pr, issue, or commit (default: pr)")
+@app_commands.describe(type="Type of stats to display")
+@app_commands.choices(type=[
+    app_commands.Choice(name="Pull Requests", value="pr"),
+    app_commands.Choice(name="Issues", value="issue"),
+    app_commands.Choice(name="Commits", value="commit")
+])
 async def getstats(interaction: discord.Interaction, type: str = "pr"): 
     contributions, user_mappings = load_data_from_firestore()
     print(f"getstats - type: {type}")
@@ -172,7 +178,7 @@ async def getstats(interaction: discord.Interaction, type: str = "pr"):
             # Create enhanced embed
             embed = discord.Embed(
                 title=f"GitHub Contribution Metrics for {github_username}",
-                description=f"Stats tracked across all RUXAILAB repositories. Updated daily at {stats.get('tracking_since', 'March 24, 2025')}, 00:00:00 PDT",
+                description=f"Stats tracked across all RUXAILAB repositories. Updated every 30 minutes. Last update: {stats.get('last_updated', datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC'))}",
                 color=discord.Color.blue()
             )
             
