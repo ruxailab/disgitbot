@@ -599,8 +599,8 @@ if __name__ == "__main__":
                         "pr_dates": [],
                         "issue_dates": [],
                         "stats": {
-                            "tracking_since": "March 24, 2025",
                             "current_month": current_month,
+                            "last_updated": datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC'),
                             "prs": {
                                 "daily": 0,
                                 "weekly": 0,
