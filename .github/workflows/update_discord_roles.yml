@@ -28,15 +28,15 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r discord_bot/discord_bot_requirements.txt
 
+      - name: Set up Google Credentials
+        run: echo "${{ secrets.GOOGLE_CREDENTIALS_JSON }}" | base64 --decode > credentials.json
+
       - name: Fetch GitHub contributions 
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
         run: | 
           python discord_bot/fetch_contributors.py   
         timeout-minutes: 10  # Set a timeout specifically for this step
-
-      - name: Set up Google Credentials
-        run: echo "${{ secrets.GOOGLE_CREDENTIALS_JSON }}" | base64 --decode > credentials.json
 
       - name: Update Firestore
         env:
