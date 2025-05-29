@@ -17,7 +17,6 @@ import datetime
 # Load env vars
 load_dotenv()
 TOKEN = os.getenv("DISCORD_BOT_TOKEN")
-STATS_CATEGORY_ID = os.getenv("STATS_CATEGORY_ID")  # Add this to your .env file
 
 # Firebase init
 if not firebase_admin._apps:
@@ -40,18 +39,6 @@ async def on_ready():
         print(f"{bot.user} is online! Synced {len(synced)} command(s).")
     except Exception as e:
         print(f"Failed to sync commands: {e}")
-    
-    # Try to load STATS_CATEGORY_ID from Firestore if not in environment variables
-    global STATS_CATEGORY_ID
-    if not STATS_CATEGORY_ID:
-        try:
-            doc_ref = db.collection('bot_config').document('voice_stats')
-            doc = doc_ref.get()
-            if doc.exists:
-                STATS_CATEGORY_ID = str(doc.to_dict().get('category_id'))
-                print(f"Loaded STATS_CATEGORY_ID from Firestore: {STATS_CATEGORY_ID}")
-        except Exception as e:
-            print(f"Failed to load STATS_CATEGORY_ID from Firestore: {e}")
     
     # Start the auto-update task
     bot.loop.create_task(auto_update_voice_stats())
@@ -264,16 +251,38 @@ async def getstats(interaction: discord.Interaction, type: str = "pr"):
             ephemeral=True
         )
 
+@bot.tree.command(name="setup_voice_stats", description="Sets up voice channels for repository stats display")
+async def setup_voice_stats(interaction: discord.Interaction):
+    """Sets up voice channels for repository stats display."""
+    await interaction.response.defer()
+    
+    try:
+        guild = interaction.guild
+        
+        # Check if a stats category already exists
+        existing_category = discord.utils.get(guild.categories, name="📊 REPOSITORY STATS")
+        
+        if existing_category:
+            # Category already exists, inform user
+            await interaction.followup.send("Repository stats display already exists! Refreshing stats now.")
+        else:
+            # Create a new category for stats
+            await guild.create_category("📊 REPOSITORY STATS")
+            await interaction.followup.send("Repository stats display created! Refreshing stats now.")
+        
+        # Update the stats
+        await update_voice_channel_stats()
+        
+    except Exception as e:
+        await interaction.followup.send(f"Error setting up voice stats: {str(e)}")
+        print(f"Error in setup_voice_stats: {e}")
+
+# Note: We use slash commands (/) as the primary interface for better Discord integration
+# and user experience. Traditional text commands (!) are not used for consistency.
+
 async def update_voice_channel_stats():
     """Update voice channel names to display repository stats on the sidebar."""
     try:
-        # Check if we have a stats category configured
-        if not STATS_CATEGORY_ID:
-            print("No STATS_CATEGORY_ID configured in environment variables. Voice channel stats display disabled.")
-            return
-            
-        category_id = int(STATS_CATEGORY_ID)
-        
         # Get the first guild (server) the bot is in
         guild = None
         for g in bot.guilds:
@@ -282,12 +291,6 @@ async def update_voice_channel_stats():
             
         if not guild:
             print("Bot is not in any guild. Cannot update voice channel stats.")
-            return
-            
-        # Get the category
-        category = discord.utils.get(guild.categories, id=category_id)
-        if not category:
-            print(f"Category with ID {category_id} not found. Cannot update voice channel stats.")
             return
             
         # Fetch repository data
@@ -325,8 +328,15 @@ async def update_voice_channel_stats():
             )
         }
         
+        # Try to find the stats category
+        stats_category = discord.utils.get(guild.categories, name="📊 REPOSITORY STATS")
+        
+        # Create it if it doesn't exist
+        if not stats_category:
+            stats_category = await guild.create_category("📊 REPOSITORY STATS")
+        
         # Get existing voice channels in the category
-        existing_channels = category.voice_channels
+        existing_channels = [c for c in guild.voice_channels if c.category == stats_category]
         
         # Create or update channels
         for i, name in enumerate(channel_names):
@@ -342,7 +352,7 @@ async def update_voice_channel_stats():
                 # Create new channel with private permissions
                 await guild.create_voice_channel(
                     name=name, 
-                    category=category,
+                    category=stats_category,
                     overwrites=private_overwrites
                 )
                 
@@ -355,78 +365,6 @@ async def update_voice_channel_stats():
             
     except Exception as e:
         print(f"Error updating voice channel stats: {e}")
-
-@bot.tree.command(name="setup_voice_stats", description="Sets up voice channels for repository stats display")
-async def setup_voice_stats(interaction: discord.Interaction):
-    """Sets up voice channels for repository stats display."""
-    await interaction.response.defer()
-    
-    try:
-        guild = interaction.guild
-        
-        # Check if this server already has a stats category in Firestore
-        server_doc_ref = db.collection('bot_config').document(f'voice_stats_{guild.id}')
-        server_doc = server_doc_ref.get()
-        
-        if server_doc.exists:
-            existing_category_id = server_doc.to_dict().get('category_id')
-            
-            # Check if the category still exists in Discord
-            existing_category = discord.utils.get(guild.categories, id=int(existing_category_id))
-            
-            if existing_category:
-                # Category exists, inform user and update stats
-                await interaction.followup.send(
-                    f"Repository stats display already exists in the '{existing_category.name}' category. "
-                    f"Refreshing stats now."
-                )
-                
-                # Update environment variable to use existing category
-                global STATS_CATEGORY_ID
-                STATS_CATEGORY_ID = str(existing_category_id)
-                
-                # Update the stats in the existing category
-                await update_voice_channel_stats()
-                return
-                
-            # If we're here, the category doesn't exist anymore, so we'll create a new one
-        
-        # Create a new category for stats
-        category = await guild.create_category("📊 REPOSITORY STATS")
-        
-        # Update the environment variable in memory
-        global STATS_CATEGORY_ID
-        STATS_CATEGORY_ID = str(category.id)
-        
-        # Save the category ID to global config
-        doc_ref = db.collection('bot_config').document('voice_stats')
-        doc_ref.set({
-            'category_id': category.id,
-            'guild_id': guild.id
-        })
-        
-        # Also save server-specific config to prevent duplicates
-        server_doc_ref.set({
-            'category_id': category.id,
-            'guild_id': guild.id,
-            'created_at': datetime.datetime.now().isoformat()
-        })
-        
-        # Add the category ID to .env suggestion
-        await interaction.followup.send(
-            f"Voice channel stats category created! Add this to your .env file:\n"
-            f"```\nSTATS_CATEGORY_ID={category.id}\n```"
-        )
-        
-        # Immediately update the stats
-        await update_voice_channel_stats()
-        
-    except Exception as e:
-        await interaction.followup.send(f"Error setting up voice stats: {str(e)}")
-        print(f"Error in setup_voice_stats: {e}")
-
-# Note: We use slash commands (/) as the primary interface for better Discord integration
-# and user experience. Traditional text commands (!) are not used for consistency.
 
 async def auto_update_voice_stats():
     """Background task to automatically update voice channel stats."""

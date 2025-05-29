@@ -68,7 +68,7 @@ Adds Discord commands:
 - `/link [GitHub username]`: Links Discord account to GitHub and updates Firestore  
 - `/unlink`: Unlinks account  
 - `/getstats`: Shows GitHub stats & Discord roles
-- `!setupvoicestats`: Creates a set of voice channels that display repository statistics in the server sidebar
+- `/setup_voice_stats`: Creates a set of voice channels that display repository statistics in the server sidebar
 
 #### `auth.py`:
 - Implements GitHub OAuth to verify user identity.
