@@ -939,12 +939,10 @@ if __name__ == "__main__":
         print("About to update timestamps...")
         
         try:
-            # Add last updated timestamp in UTC
+            # Add last updated timestamp using a simpler approach that works across Python versions
             print("Creating timestamp...")
-            current_time_utc = datetime.now().astimezone(datetime.timezone.utc)
-            print(f"Created current_time_utc: {current_time_utc}")
-            
-            formatted_time = current_time_utc.strftime('%Y-%m-%d %H:%M:%S UTC')
+            # Use UTC time with a simpler approach
+            formatted_time = time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime())
             print(f"Formatted timestamp: {formatted_time}")
             
             # Add the timestamp to each user's stats
@@ -961,6 +959,8 @@ if __name__ == "__main__":
             import traceback
             traceback.print_exc()
             print("Continuing despite timestamp error...")
+            # Ensure formatted_time exists even if there's an error
+            formatted_time = time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime())
         
         # Fetch repository metrics and store in repo_metrics.json
         print("\n========== DEBUG: Starting repository metrics fetch ==========")
