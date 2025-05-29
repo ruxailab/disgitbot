@@ -935,26 +935,81 @@ if __name__ == "__main__":
         # Calculate and add rankings for all contributors
         all_contributions = calculate_rankings(all_contributions)
         
-        # Add last updated timestamp in UTC
-        current_time_utc = datetime.now().astimezone(datetime.timezone.utc)
-        formatted_time = current_time_utc.strftime('%Y-%m-%d %H:%M:%S UTC')
+        print("\n========== DEBUG: After ranking calculation ==========")
+        print("About to update timestamps...")
         
-        # Add the timestamp to each user's stats
-        for username in all_contributions:
-            all_contributions[username]["stats"]["last_updated"] = formatted_time
+        try:
+            # Add last updated timestamp in UTC
+            print("Creating timestamp...")
+            current_time_utc = datetime.now().astimezone(datetime.timezone.utc)
+            print(f"Created current_time_utc: {current_time_utc}")
+            
+            formatted_time = current_time_utc.strftime('%Y-%m-%d %H:%M:%S UTC')
+            print(f"Formatted timestamp: {formatted_time}")
+            
+            # Add the timestamp to each user's stats
+            print(f"Updating timestamp for {len(all_contributions)} users...")
+            user_count = 0
+            for username in all_contributions:
+                user_count += 1
+                if user_count <= 3 or user_count >= len(all_contributions) - 2:  # Print first 3 and last 3 users
+                    print(f"  Updating user {user_count}/{len(all_contributions)}: {username}")
+                all_contributions[username]["stats"]["last_updated"] = formatted_time
+            print("Timestamp updates completed")
+        except Exception as e:
+            print(f"ERROR in timestamp update: {type(e).__name__}: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            print("Continuing despite timestamp error...")
         
         # Fetch repository metrics and store in repo_metrics.json
-        repo_metrics = get_repo_metrics(REPO_OWNER, REPO_NAME, get_github_headers())
-        repo_metrics['last_updated'] = formatted_time
-        
-        # Save repo metrics to JSON
-        with open("repo_metrics.json", "w") as f:
-            json.dump(repo_metrics, f, indent=2)
-        print("Repository metrics saved to repo_metrics.json")
+        print("\n========== DEBUG: Starting repository metrics fetch ==========")
+        try:
+            repo_metrics = get_repo_metrics(REPO_OWNER, REPO_NAME, get_github_headers())
+            print(f"Repository metrics retrieved: {repo_metrics}")
+            repo_metrics['last_updated'] = formatted_time
+            print("Added last_updated to repo_metrics")
+            
+            # Save repo metrics to JSON
+            print("Saving repo_metrics.json...")
+            with open("repo_metrics.json", "w") as f:
+                json.dump(repo_metrics, f, indent=2)
+            print("Repository metrics saved to repo_metrics.json")
+            
+            # Update metrics in Firestore if function is available
+            if 'update_repo_metrics_in_firestore' in globals():
+                print("Updating repo metrics in Firestore...")
+                update_repo_metrics_in_firestore(repo_metrics)
+                print("Firestore repo metrics update completed")
+        except Exception as e:
+            print(f"ERROR in repo metrics processing: {type(e).__name__}: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            print("Continuing despite repo metrics error...")
         
         # Save to a JSON file for the Discord bot to use
-        with open("contributions.json", "w") as f:
-            json.dump(all_contributions, f, indent=2)
+        print("\n========== DEBUG: Saving final contributions data ==========")
+        try:
+            print(f"Preparing to save data for {len(all_contributions)} users...")
+            print("Sample structure of first user:")
+            first_user = next(iter(all_contributions))
+            print(f"Keys for user {first_user}: {list(all_contributions[first_user].keys())}")
+            print(f"Stats keys: {list(all_contributions[first_user]['stats'].keys())}")
+            
+            # Verify JSON serialization before saving
+            print("Testing JSON serialization...")
+            test_json = json.dumps(all_contributions)
+            print(f"JSON serialization successful, size: {len(test_json)} bytes")
+            
+            print("Writing to contributions.json...")
+            with open("contributions.json", "w") as f:
+                json.dump(all_contributions, f, indent=2)
+            print("Contribution data saved to contributions.json")
+        except Exception as e:
+            print(f"ERROR in final data save: {type(e).__name__}: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            print("Failed to save contributions data")
         
         print("\n========== Process Complete ==========")
         print(f"Found {len(all_contributions)} total contributors across all repositories")
