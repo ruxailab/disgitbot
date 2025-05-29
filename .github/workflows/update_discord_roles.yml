@@ -8,7 +8,6 @@ on:
 jobs:
   update-roles:
     runs-on: ubuntu-latest
-    timeout-minutes: 15  # Set a timeout of 15 minutes for the entire job
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -43,7 +42,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
         run: | 
           python discord_bot/fetch_contributors.py   
-        timeout-minutes: 10  # Set a timeout specifically for this step
 
       - name: Update Firestore
         env:
