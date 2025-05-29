@@ -2,12 +2,13 @@ name: Update Discord Roles
 
 on:
   schedule:
-    - cron: '*/30 * * * *'  # Run every 30 minutes
+    - cron: '0 * * * *'  # Run hourly at minute 0
   workflow_dispatch:  # Allow manual trigger
 
 jobs:
   update-roles:
     runs-on: ubuntu-latest
+    timeout-minutes: 15  # Set a timeout of 15 minutes for the entire job
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -32,6 +33,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
         run: | 
           python discord_bot/fetch_contributors.py   
+        timeout-minutes: 10  # Set a timeout specifically for this step
 
       - name: Set up Google Credentials
         run: echo "${{ secrets.GOOGLE_CREDENTIALS_JSON }}" | base64 --decode > credentials.json

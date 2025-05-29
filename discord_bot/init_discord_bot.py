@@ -197,7 +197,7 @@ async def getstats(interaction: discord.Interaction, type: str = "pr"):
             # Create enhanced embed
             embed = discord.Embed(
                 title=f"GitHub Contribution Metrics for {github_username}",
-                description=f"Stats tracked across all RUXAILAB repositories. Updated every 30 minutes. Last update: {stats.get('last_updated', datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC'))}",
+                description=f"Stats tracked across all RUXAILAB repositories. Updated hourly. Last update: {stats.get('last_updated', datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC'))}",
                 color=discord.Color.blue()
             )
             
@@ -437,7 +437,7 @@ async def auto_update_voice_stats():
     
     while not bot.is_closed():
         try:
-            await asyncio.sleep(1800)  # 30 minutes
+            await asyncio.sleep(3600)  # 1 hour
             await update_voice_channel_stats()
         except Exception as e:
             print(f"Error in auto update voice stats task: {e}")
