@@ -4,6 +4,7 @@ import json
 import time
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
+from firestore import update_repo_metrics_in_firestore
 
 # Load environment variables
 load_dotenv()
@@ -374,6 +375,40 @@ def calculate_rankings(all_contributions):
             all_contributions[username]["rankings"][rank_type] = sorted_users.index(username) + 1
     
     return all_contributions
+
+def get_repo_metrics(repo_owner, repo_name, headers):
+    """
+    Fetch repository metrics like stars and forks count.
+    
+    Args:
+        repo_owner: Owner of the repository
+        repo_name: Name of the repository
+        headers: API request headers
+    
+    Returns:
+        Dictionary with repository metrics
+    """
+    repo_url = f"{GITHUB_API_URL}/repos/{repo_owner}/{repo_name}"
+    print(f"Fetching repository metrics for {repo_owner}/{repo_name}")
+    
+    response = make_github_request(repo_url, headers, 'core')
+    
+    if not response or response.status_code != 200:
+        print(f"Failed to fetch repository metrics for {repo_owner}/{repo_name}")
+        return {
+            'stars_count': 0,
+            'forks_count': 0
+        }
+    
+    repo_data = response.json()
+    metrics = {
+        'stars_count': repo_data.get('stargazers_count', 0),
+        'forks_count': repo_data.get('forks_count', 0),
+        'last_updated': datetime.now().isoformat()
+    }
+    
+    print(f"Repository metrics: Stars: {metrics['stars_count']}, Forks: {metrics['forks_count']}")
+    return metrics
 
 if __name__ == "__main__":
     # Check if GitHub token is available
@@ -841,6 +876,15 @@ if __name__ == "__main__":
         # Add the timestamp to each user's stats
         for username in all_contributions:
             all_contributions[username]["stats"]["last_updated"] = formatted_time
+        
+        # Fetch repository metrics and store in repo_metrics.json
+        repo_metrics = get_repo_metrics(REPO_OWNER, REPO_NAME, get_github_headers())
+        repo_metrics['last_updated'] = formatted_time
+        
+        # Save repo metrics to JSON
+        with open("repo_metrics.json", "w") as f:
+            json.dump(repo_metrics, f, indent=2)
+        print("Repository metrics saved to repo_metrics.json")
         
         # Save to a JSON file for the Discord bot to use
         with open("contributions.json", "w") as f:

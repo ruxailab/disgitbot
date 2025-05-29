@@ -9,7 +9,7 @@ from firebase_admin import credentials, firestore
 import json
 import asyncio
 import threading
-from firestore import load_data_from_firestore
+from firestore import load_data_from_firestore, load_repo_metrics_from_firestore
 from role_utils import determine_role, get_next_role
 from auth import get_github_username, wait_for_username, start_flask
 import datetime
@@ -17,6 +17,7 @@ import datetime
 # Load env vars
 load_dotenv()
 TOKEN = os.getenv("DISCORD_BOT_TOKEN")
+STATS_CATEGORY_ID = os.getenv("STATS_CATEGORY_ID")  # Add this to your .env file
 
 # Firebase init
 if not firebase_admin._apps:
@@ -34,8 +35,26 @@ verification_lock = threading.Lock()
 
 @bot.event
 async def on_ready():
-    await bot.tree.sync()
-    print(f"{bot.user} is online!")
+    try:
+        synced = await bot.tree.sync()
+        print(f"{bot.user} is online! Synced {len(synced)} command(s).")
+    except Exception as e:
+        print(f"Failed to sync commands: {e}")
+    
+    # Try to load STATS_CATEGORY_ID from Firestore if not in environment variables
+    global STATS_CATEGORY_ID
+    if not STATS_CATEGORY_ID:
+        try:
+            doc_ref = db.collection('bot_config').document('voice_stats')
+            doc = doc_ref.get()
+            if doc.exists:
+                STATS_CATEGORY_ID = str(doc.to_dict().get('category_id'))
+                print(f"Loaded STATS_CATEGORY_ID from Firestore: {STATS_CATEGORY_ID}")
+        except Exception as e:
+            print(f"Failed to load STATS_CATEGORY_ID from Firestore: {e}")
+    
+    # Start the auto-update task
+    bot.loop.create_task(auto_update_voice_stats())
 
 @bot.tree.command(name="link", description="Link your Discord to GitHub")
 async def link(interaction: discord.Interaction):
@@ -197,11 +216,15 @@ async def getstats(interaction: discord.Interaction, type: str = "pr"):
             
             # Add level information based on role
             embed.add_field(name="Statistics", value=stats_table, inline=False)
-            embed.add_field(name="Current level:", value=f"@{role}", inline=True)
+            embed.add_field(name="Current level:", value=f"{role}", inline=True)
             
             # Determine next level using role_utils instead of hardcoded logic
             next_level = get_next_role(role, stats_type)
             
+            # Remove @ if present in next_level
+            if next_level.startswith('@'):
+                next_level = next_level[1:]
+                
             embed.add_field(name="Next level:", value=next_level, inline=True)
             
             # Add info about other stat types
@@ -240,5 +263,184 @@ async def getstats(interaction: discord.Interaction, type: str = "pr"):
             f"An error occurred: {str(e)}",
             ephemeral=True
         )
+
+async def update_voice_channel_stats():
+    """Update voice channel names to display repository stats on the sidebar."""
+    try:
+        # Check if we have a stats category configured
+        if not STATS_CATEGORY_ID:
+            print("No STATS_CATEGORY_ID configured in environment variables. Voice channel stats display disabled.")
+            return
+            
+        category_id = int(STATS_CATEGORY_ID)
+        
+        # Get the first guild (server) the bot is in
+        guild = None
+        for g in bot.guilds:
+            guild = g
+            break
+            
+        if not guild:
+            print("Bot is not in any guild. Cannot update voice channel stats.")
+            return
+            
+        # Get the category
+        category = discord.utils.get(guild.categories, id=category_id)
+        if not category:
+            print(f"Category with ID {category_id} not found. Cannot update voice channel stats.")
+            return
+            
+        # Fetch repository data
+        contributions, _ = load_data_from_firestore()
+        
+        # Get repo metrics from Firestore
+        repo_metrics = load_repo_metrics_from_firestore()
+        
+        # Get stars and forks count from repo metrics
+        stars_count = repo_metrics.get('stars_count', 0)
+        forks_count = repo_metrics.get('forks_count', 0)
+        
+        # Count total PRs, issues, and commits across all users
+        total_prs = sum(user_data.get("pr_count", 0) for user_data in contributions.values())
+        total_issues = sum(user_data.get("issues_count", 0) for user_data in contributions.values())
+        total_commits = sum(user_data.get("commits_count", 0) for user_data in contributions.values())
+        total_contributors = len(contributions)
+        
+        # Define channel names with stats
+        channel_names = [
+            f"⭐ Stars: {stars_count}",
+            f"🍴 Forks: {forks_count}",
+            f"🎯 Issues: {total_issues}",
+            f"💼 PRs: {total_prs}",
+            f"👥 Contributors: {total_contributors}",
+            f"💻 Commits: {total_commits}"
+        ]
+        
+        # Set up permissions to make channels private
+        everyone_role = guild.default_role
+        private_overwrites = {
+            everyone_role: discord.PermissionOverwrite(
+                connect=False,  # Prevent users from joining
+                view_channel=True  # Still allow them to see the channel in sidebar
+            )
+        }
+        
+        # Get existing voice channels in the category
+        existing_channels = category.voice_channels
+        
+        # Create or update channels
+        for i, name in enumerate(channel_names):
+            if i < len(existing_channels):
+                # Update existing channel
+                channel = existing_channels[i]
+                if channel.name != name:
+                    await channel.edit(name=name)
+                
+                # Make sure permissions are set correctly
+                await channel.edit(overwrites=private_overwrites)
+            else:
+                # Create new channel with private permissions
+                await guild.create_voice_channel(
+                    name=name, 
+                    category=category,
+                    overwrites=private_overwrites
+                )
+                
+        # Delete extra channels if there are more than needed
+        if len(existing_channels) > len(channel_names):
+            for channel in existing_channels[len(channel_names):]:
+                await channel.delete()
+                
+        print(f"Updated voice channel stats at {datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}")
+            
+    except Exception as e:
+        print(f"Error updating voice channel stats: {e}")
+
+@bot.tree.command(name="setup_voice_stats", description="Sets up voice channels for repository stats display")
+async def setup_voice_stats(interaction: discord.Interaction):
+    """Sets up voice channels for repository stats display."""
+    await interaction.response.defer()
+    
+    try:
+        guild = interaction.guild
+        
+        # Check if this server already has a stats category in Firestore
+        server_doc_ref = db.collection('bot_config').document(f'voice_stats_{guild.id}')
+        server_doc = server_doc_ref.get()
+        
+        if server_doc.exists:
+            existing_category_id = server_doc.to_dict().get('category_id')
+            
+            # Check if the category still exists in Discord
+            existing_category = discord.utils.get(guild.categories, id=int(existing_category_id))
+            
+            if existing_category:
+                # Category exists, inform user and update stats
+                await interaction.followup.send(
+                    f"Repository stats display already exists in the '{existing_category.name}' category. "
+                    f"Refreshing stats now."
+                )
+                
+                # Update environment variable to use existing category
+                global STATS_CATEGORY_ID
+                STATS_CATEGORY_ID = str(existing_category_id)
+                
+                # Update the stats in the existing category
+                await update_voice_channel_stats()
+                return
+                
+            # If we're here, the category doesn't exist anymore, so we'll create a new one
+        
+        # Create a new category for stats
+        category = await guild.create_category("📊 REPOSITORY STATS")
+        
+        # Update the environment variable in memory
+        global STATS_CATEGORY_ID
+        STATS_CATEGORY_ID = str(category.id)
+        
+        # Save the category ID to global config
+        doc_ref = db.collection('bot_config').document('voice_stats')
+        doc_ref.set({
+            'category_id': category.id,
+            'guild_id': guild.id
+        })
+        
+        # Also save server-specific config to prevent duplicates
+        server_doc_ref.set({
+            'category_id': category.id,
+            'guild_id': guild.id,
+            'created_at': datetime.datetime.now().isoformat()
+        })
+        
+        # Add the category ID to .env suggestion
+        await interaction.followup.send(
+            f"Voice channel stats category created! Add this to your .env file:\n"
+            f"```\nSTATS_CATEGORY_ID={category.id}\n```"
+        )
+        
+        # Immediately update the stats
+        await update_voice_channel_stats()
+        
+    except Exception as e:
+        await interaction.followup.send(f"Error setting up voice stats: {str(e)}")
+        print(f"Error in setup_voice_stats: {e}")
+
+# Note: We use slash commands (/) as the primary interface for better Discord integration
+# and user experience. Traditional text commands (!) are not used for consistency.
+
+async def auto_update_voice_stats():
+    """Background task to automatically update voice channel stats."""
+    await bot.wait_until_ready()
+    
+    # Initial update
+    await update_voice_channel_stats()
+    
+    while not bot.is_closed():
+        try:
+            await asyncio.sleep(1800)  # 30 minutes
+            await update_voice_channel_stats()
+        except Exception as e:
+            print(f"Error in auto update voice stats task: {e}")
+            await asyncio.sleep(300)  # Wait 5 minutes on error
 
 bot.run(TOKEN)

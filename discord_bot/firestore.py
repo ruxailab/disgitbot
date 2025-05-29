@@ -62,6 +62,48 @@ def update_user_in_firestore(discord_id, user_data):
             'github_id': None
         })
 
+def update_repo_metrics_in_firestore(repo_metrics):
+    """
+    Update repository metrics (stars, forks) in Firestore.
+    
+    Args:
+        repo_metrics: Dictionary containing repository metrics like stars_count and forks_count
+    """
+    try:
+        # Ensure we have a metrics document
+        doc_ref = db.collection('repo_stats').document('metrics')
+        doc_ref.set(repo_metrics, merge=True)
+        print(f"Repository metrics updated in Firestore: Stars: {repo_metrics.get('stars_count', 0)}, Forks: {repo_metrics.get('forks_count', 0)}")
+        return True
+    except Exception as e:
+        print(f"Error updating repository metrics in Firestore: {e}")
+        return False
+
+def load_repo_metrics_from_firestore():
+    """
+    Load repository metrics from Firestore.
+    
+    Returns:
+        Dictionary containing repository metrics
+    """
+    try:
+        doc_ref = db.collection('repo_stats').document('metrics')
+        doc = doc_ref.get()
+        if doc.exists:
+            return doc.to_dict()
+        else:
+            print("No repository metrics found in Firestore")
+            return {
+                'stars_count': 0,
+                'forks_count': 0
+            }
+    except Exception as e:
+        print(f"Error loading repository metrics from Firestore: {e}")
+        return {
+            'stars_count': 0,
+            'forks_count': 0
+        }
+
 def load_data_from_firestore():
     contributions = {}
     user_mappings = {}
@@ -112,6 +154,20 @@ with open('contributions.json', 'r') as f:
     except json.JSONDecodeError:
         print("Invalid JSON format in contributions.json.")
         contributions = {}
+
+# ---------- Load Repository Metrics ----------
+if os.path.exists('repo_metrics.json'):
+    with open('repo_metrics.json', 'r') as f:
+        try:
+            repo_metrics = json.load(f)
+            # Update repository metrics in Firestore
+            doc_ref = db.collection('repo_stats').document('metrics')
+            doc_ref.set(repo_metrics, merge=True)
+            print(f"Repository metrics updated in Firestore: Stars: {repo_metrics.get('stars_count', 0)}, Forks: {repo_metrics.get('forks_count', 0)}")
+        except json.JSONDecodeError:
+            print("Invalid JSON format in repo_metrics.json.")
+else:
+    print("repo_metrics.json not found. Skipping repository metrics update.")
 
 # ---------- Sync to Firestore ----------
 for github_id, user_data in contributions.items():

@@ -19,6 +19,23 @@ To use this, set the following repository secrets:
 - `GH_TOKEN`: GitHub token with repo scope (needed for fetching contributions)
 - `GOOGLE_CREDENTIALS_JSON`: JSON credentials for Firebase service account
 
+### Discord Bot Permissions
+The bot requires the following permissions to function properly:
+
+- **Administrator** permission (simplest approach)
+- Or these specific permissions:
+  - Manage Channels (for creating and updating voice channel stats)
+  - Manage Roles (for assigning roles based on contributions)
+  - View Channels (for seeing all channels)
+  - Send Messages (for responding to commands)
+  - Read Message History (for command processing)
+
+You can add the bot with Administrator permissions using this URL format:
+```
+https://discord.com/api/oauth2/authorize?client_id=YOUR_CLIENT_ID&permissions=8&scope=bot%20applications.commands
+```
+(Replace YOUR_CLIENT_ID with your actual client ID)
+
 ## 🧠 How It Works
 
 ### 1. GitHub Workflow: `.github/workflows/update_discord_roles.yml`  
@@ -51,6 +68,7 @@ Adds Discord commands:
 - `/link [GitHub username]`: Links Discord account to GitHub and updates Firestore  
 - `/unlink`: Unlinks account  
 - `/getstats`: Shows GitHub stats & Discord roles
+- `!setupvoicestats`: Creates a set of voice channels that display repository statistics in the server sidebar
 
 #### `auth.py`:
 - Implements GitHub OAuth to verify user identity.
