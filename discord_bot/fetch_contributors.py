@@ -350,11 +350,14 @@ def calculate_streaks_from_dates(dates):
 
 def calculate_rankings(all_contributions):
     """Calculate rankings for each contributor across different metrics."""
+    print("\n----- Debug: Starting calculate_rankings -----")
     contributors = list(all_contributions.keys())
+    print(f"Total contributors to rank: {len(contributors)}")
     if not contributors:
         return all_contributions
         
     # Calculate rankings for all contribution types
+    print("Setting up ranking functions...")
     ranking_types = {
         "pr": lambda user: all_contributions[user]["pr_count"],
         "issue": lambda user: all_contributions[user]["issues_count"],
@@ -366,14 +369,77 @@ def calculate_rankings(all_contributions):
         ranking_types[f"issue_{time_period}"] = lambda user, period=time_period: all_contributions[user]["stats"]["issues"][period]
         ranking_types[f"commit_{time_period}"] = lambda user, period=time_period: all_contributions[user]["stats"]["commits"][period]
     
+    print(f"Created {len(ranking_types)} ranking types")
+    
     # Calculate and add all rankings
-    for username in contributors:
+    for i, username in enumerate(contributors):
+        print(f"\nProcessing rankings for user {i+1}/{len(contributors)}: {username}")
+        print(f"Keys in user data: {list(all_contributions[username].keys())}")
+        
+        # Check if stats exists for this user
+        if "stats" not in all_contributions[username]:
+            print(f"WARNING: 'stats' key missing for {username}")
+        elif "prs" not in all_contributions[username]["stats"]:
+            print(f"WARNING: 'prs' key missing in stats for {username}")
+        elif "issues" not in all_contributions[username]["stats"]:
+            print(f"WARNING: 'issues' key missing in stats for {username}")
+        elif "commits" not in all_contributions[username]["stats"]:
+            print(f"WARNING: 'commits' key missing in stats for {username}")
+        
+        # Create rankings dictionary for this user
         all_contributions[username]["rankings"] = {}
         
         for rank_type, key_func in ranking_types.items():
-            sorted_users = sorted(contributors, key=key_func, reverse=True)
-            all_contributions[username]["rankings"][rank_type] = sorted_users.index(username) + 1
+            print(f"  Processing ranking type: {rank_type}")
+            try:
+                # Debug: Test the key function for this user
+                try:
+                    user_value = key_func(username)
+                    print(f"  Value for {username}, {rank_type} = {user_value}")
+                except KeyError as ke:
+                    print(f"  ERROR: KeyError accessing {ke} for {username} with rank_type {rank_type}")
+                    # Print the user's data structure for debugging
+                    if "stats" in all_contributions[username]:
+                        print(f"  Stats structure exists: {list(all_contributions[username]['stats'].keys())}")
+                        if "prs" in all_contributions[username]["stats"]:
+                            print(f"  PR stats: {all_contributions[username]['stats']['prs']}")
+                        if "issues" in all_contributions[username]["stats"]:
+                            print(f"  Issue stats: {all_contributions[username]['stats']['issues']}")
+                        if "commits" in all_contributions[username]["stats"]:
+                            print(f"  Commit stats: {all_contributions[username]['stats']['commits']}")
+                    raise
+                
+                # Sort users and determine ranking
+                sorted_users = sorted(contributors, key=key_func, reverse=True)
+                all_contributions[username]["rankings"][rank_type] = sorted_users.index(username) + 1
+            except Exception as e:
+                print(f"  CRITICAL ERROR calculating {rank_type} ranking for {username}: {type(e).__name__}: {str(e)}")
+                # Try to identify which user/key is causing problems in the sorting
+                if isinstance(e, KeyError):
+                    print(f"  KeyError details: {str(e)}")
+                    problem_key = str(e).strip("'")
+                    print(f"  Checking all users for missing key: {problem_key}")
+                    for test_user in contributors[:5]:  # Check first 5 users
+                        if rank_type.startswith("pr_"):
+                            if problem_key in all_contributions[test_user]["stats"]["prs"]:
+                                print(f"    User {test_user} has the key")
+                            else:
+                                print(f"    User {test_user} is missing the key")
+                        elif rank_type.startswith("issue_"):
+                            if problem_key in all_contributions[test_user]["stats"]["issues"]:
+                                print(f"    User {test_user} has the key")
+                            else:
+                                print(f"    User {test_user} is missing the key")
+                        elif rank_type.startswith("commit_"):
+                            if problem_key in all_contributions[test_user]["stats"]["commits"]:
+                                print(f"    User {test_user} has the key")
+                            else:
+                                print(f"    User {test_user} is missing the key")
+                
+                # Raise the exception to stop processing
+                raise
     
+    print("----- Debug: Finished calculate_rankings -----")
     return all_contributions
 
 def get_repo_metrics(repo_owner, repo_name, headers):
