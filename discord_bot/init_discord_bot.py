@@ -9,7 +9,7 @@ from firebase_admin import credentials, firestore
 import json
 import asyncio
 import threading
-from firestore import load_data_from_firestore, load_repo_metrics_from_firestore
+from firestore import get_firestore_data
 from role_utils import determine_role, get_next_role
 from auth import get_github_username, wait_for_username, start_flask
 import datetime
@@ -138,7 +138,8 @@ async def unlink(interaction: discord.Interaction):
     app_commands.Choice(name="Commits", value="commit")
 ])
 async def getstats(interaction: discord.Interaction, type: str = "pr"): 
-    contributions, user_mappings = load_data_from_firestore()
+    # Get data from Firestore first (before we do any interaction response)
+    _, contributions, user_mappings = get_firestore_data()
     print(f"getstats - type: {type}")
     """Display user's GitHub stats and current role."""
     try:
@@ -251,7 +252,7 @@ async def getstats(interaction: discord.Interaction, type: str = "pr"):
                 inline=False
             )
             
-            await interaction.response.send_message(embed=embed)
+            await interaction.followup.send(embed=embed)
         else:
             # Use basic embed format if enhanced stats aren't available
             embed = discord.Embed(
@@ -265,18 +266,26 @@ async def getstats(interaction: discord.Interaction, type: str = "pr"):
             embed.add_field(name="Issue Role", value=issue_role if issue_role else "None", inline=True)
             embed.add_field(name="Commit Role", value=commit_role if commit_role else "None", inline=True)
 
-            await interaction.response.send_message(embed=embed)
+            await interaction.followup.send(embed=embed)
 
     except Exception as e:
-        await interaction.response.send_message(
-            f"An error occurred: {str(e)}",
-            ephemeral=True
-        )
+        print(f"Error in getstats command: {e}")
+        import traceback
+        traceback.print_exc()
+        # Try to respond with error if we haven't already responded
+        try:
+            await interaction.followup.send(
+                f"An error occurred: {str(e)}",
+                ephemeral=True
+            )
+        except Exception as follow_up_error:
+            print(f"Error sending followup: {follow_up_error}")
 
 @bot.tree.command(name="setup_voice_stats", description="Sets up voice channels for repository stats display")
 async def setup_voice_stats(interaction: discord.Interaction):
     """Sets up voice channels for repository stats display."""
-    await interaction.response.defer()
+    # Respond immediately to prevent timeout
+    await interaction.response.defer(ephemeral=True)
     
     try:
         guild = interaction.guild
@@ -298,6 +307,8 @@ async def setup_voice_stats(interaction: discord.Interaction):
     except Exception as e:
         await interaction.followup.send(f"Error setting up voice stats: {str(e)}")
         print(f"Error in setup_voice_stats: {e}")
+        import traceback
+        traceback.print_exc()
 
 # Note: We use slash commands (/) as the primary interface for better Discord integration
 # and user experience. Traditional text commands (!) are not used for consistency.
@@ -315,30 +326,22 @@ async def update_voice_channel_stats():
             print("Bot is not in any guild. Cannot update voice channel stats.")
             return
             
-        # Fetch repository data
-        discord_contributions, _ = load_data_from_firestore()
-        
-        # Get repo metrics from Firestore
-        repo_metrics = load_repo_metrics_from_firestore()
+        # Fetch all data from Firestore
+        repo_metrics, discord_contributions, _ = get_firestore_data()
         print(f"Retrieved repo metrics from Firestore: {repo_metrics}")
         
+        # If repo_metrics is empty, just use zeros (this should never happen in production)
+        if not repo_metrics:
+            print("WARNING: No repo metrics found in Firestore. Using zeros.")
+            repo_metrics = {"stars_count": 0, "forks_count": 0, "total_contributors": 0}
+            
         # Get stats from repo metrics
         stars_count = repo_metrics.get('stars_count', 0)
-        forks_count = repo_metrics.get('forks_count', 0)
-        
-        # Get total contributors from repo_metrics, which is stored during fetch_contributors.py execution
-        total_contributors = repo_metrics.get('total_contributors', 0)
-        print(f"Using total_contributors from Firestore: {total_contributors}")
-        
-        # If total_contributors is 0, fall back to counting Discord-linked contributors
-        if total_contributors == 0:
-            total_contributors = len(discord_contributions)
-            print(f"No contributors count in Firestore, falling back to Discord-linked users: {total_contributors}")
-        
-        # Count total PRs, issues, and commits across all users
-        total_prs = sum(user_data.get("pr_count", 0) for user_data in discord_contributions.values())
-        total_issues = sum(user_data.get("issues_count", 0) for user_data in discord_contributions.values())
-        total_commits = sum(user_data.get("commits_count", 0) for user_data in discord_contributions.values())
+        forks_count = repo_metrics.get('forks_count', 0) 
+        total_contributors = repo_metrics.get('total_contributors', 0)  
+        total_prs = repo_metrics.get('pr_count', 0)
+        total_issues = repo_metrics.get('issues_count', 0)
+        total_commits = repo_metrics.get('commits_count', 0)
         
         # Define channel names with stats
         channel_names = [

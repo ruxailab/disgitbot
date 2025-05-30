@@ -128,36 +128,29 @@ def update_repo_metrics_in_firestore(repo_metrics):
         traceback.print_exc()
         return False
 
-def load_repo_metrics_from_firestore():
+def get_firestore_data():
     """
-    Load repository metrics from Firestore.
+    A simplified function to get all necessary data from Firestore.
     
     Returns:
-        Dictionary containing repository metrics
+        tuple: (repo_metrics, contributions)
+            - repo_metrics: Dictionary with repository stats (stars, forks, etc.)
+            - contributions: Dictionary mapping GitHub usernames to their contribution data
     """
-    try:
-        doc_ref = db.collection('repo_stats').document('metrics')
-        doc = doc_ref.get()
-        if doc.exists:
-            return doc.to_dict()
-        else:
-            print("No repository metrics found in Firestore")
-            return {
-                'stars_count': 0,
-                'forks_count': 0
-            }
-    except Exception as e:
-        print(f"Error loading repository metrics from Firestore: {e}")
-        return {
-            'stars_count': 0,
-            'forks_count': 0
-        }
-
-def load_data_from_firestore():
+    repo_metrics = {}
     contributions = {}
     user_mappings = {}
-
+    
     try:
+        # 1. Get repository metrics
+        metrics_doc = db.collection('repo_stats').document('metrics').get()
+        if metrics_doc.exists:
+            repo_metrics = metrics_doc.to_dict()
+            print(f"Retrieved repo metrics from Firestore: {repo_metrics}")
+        else:
+            print("No repository metrics found in Firestore")
+        
+        # 2. Get user contributions
         docs = db.collection('discord').stream()
         for doc in docs:
             if not doc.exists:
@@ -189,8 +182,11 @@ def load_data_from_firestore():
             user_mappings[discord_id] = github_id
     except Exception as e:
         print(f"Firestore read error: {e}")
+        import traceback
+        traceback.print_exc()
 
-    return contributions, user_mappings
+    return repo_metrics, contributions, user_mappings
+ 
 
 # ---------- Load JSON Contributions ----------
 if not os.path.exists('contributions.json'):
