@@ -967,6 +967,12 @@ if __name__ == "__main__":
         try:
             repo_metrics = get_repo_metrics(REPO_OWNER, REPO_NAME, get_github_headers())
             print(f"Repository metrics retrieved: {repo_metrics}")
+            
+            # Add the total_contributors count to the repo metrics
+            total_contributors = len(all_contributions)
+            repo_metrics['total_contributors'] = total_contributors
+            print(f"Added total_contributors ({total_contributors}) to repo_metrics")
+            
             repo_metrics['last_updated'] = formatted_time
             print("Added last_updated to repo_metrics")
             

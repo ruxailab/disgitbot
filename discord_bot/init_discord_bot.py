@@ -298,29 +298,25 @@ async def update_voice_channel_stats():
         
         # Get repo metrics from Firestore
         repo_metrics = load_repo_metrics_from_firestore()
+        print(f"Retrieved repo metrics from Firestore: {repo_metrics}")
         
-        # Get stars and forks count from repo metrics
+        # Get stats from repo metrics
         stars_count = repo_metrics.get('stars_count', 0)
         forks_count = repo_metrics.get('forks_count', 0)
+        
+        # Get total contributors from repo_metrics, which is stored during fetch_contributors.py execution
+        total_contributors = repo_metrics.get('total_contributors', 0)
+        print(f"Using total_contributors from Firestore: {total_contributors}")
+        
+        # If total_contributors is 0, fall back to counting Discord-linked contributors
+        if total_contributors == 0:
+            total_contributors = len(discord_contributions)
+            print(f"No contributors count in Firestore, falling back to Discord-linked users: {total_contributors}")
         
         # Count total PRs, issues, and commits across all users
         total_prs = sum(user_data.get("pr_count", 0) for user_data in discord_contributions.values())
         total_issues = sum(user_data.get("issues_count", 0) for user_data in discord_contributions.values())
         total_commits = sum(user_data.get("commits_count", 0) for user_data in discord_contributions.values())
-        
-        # Get the full list of contributors from the contributions.json file
-        # This includes all GitHub contributors, not just those who linked Discord accounts
-        try:
-            print("Reading full contributor list from contributions.json...")
-            with open("contributions.json", "r") as f:
-                all_contributions = json.load(f)
-            total_contributors = len(all_contributions)
-            print(f"Found {total_contributors} total contributors in contributions.json")
-        except Exception as e:
-            print(f"Error reading contributions.json: {e}")
-            # Fallback to Discord-linked contributors if file read fails
-            total_contributors = len(discord_contributions)
-            print(f"Falling back to Discord-linked contributors: {total_contributors}")
         
         # Define channel names with stats
         channel_names = [
