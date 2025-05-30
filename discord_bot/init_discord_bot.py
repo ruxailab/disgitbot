@@ -13,10 +13,32 @@ from firestore import load_data_from_firestore, load_repo_metrics_from_firestore
 from role_utils import determine_role, get_next_role
 from auth import get_github_username, wait_for_username, start_flask
 import datetime
+import sys
+
+# Add startup logging
+print("="*50)
+print("Discord Bot Starting...")
+print(f"Python version: {sys.version}")
+print("Checking environment variables:")
+for env_var in ["DISCORD_BOT_TOKEN", "GITHUB_TOKEN", "GITHUB_CLIENT_ID", 
+                "GITHUB_CLIENT_SECRET", "REPO_OWNER", "REPO_NAME", 
+                "NGROK_DOMAIN", "NGROK_AUTHTOKEN"]:
+    value = os.getenv(env_var)
+    if value:
+        # Print first 5 chars and last 5 chars with ... in between for security
+        masked_value = value[:5] + "..." + value[-5:] if len(value) > 15 else "[SET]"
+        print(f"  ✅ {env_var}: {masked_value}")
+    else:
+        print(f"  ❌ {env_var}: Not set")
+print("="*50)
 
 # Load env vars
+print("Loading environment variables...")
 load_dotenv()
 TOKEN = os.getenv("DISCORD_BOT_TOKEN")
+if not TOKEN:
+    print("ERROR: DISCORD_BOT_TOKEN not found in environment variables!")
+    sys.exit(1)
 
 # Firebase init
 if not firebase_admin._apps:

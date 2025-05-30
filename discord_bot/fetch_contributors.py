@@ -476,6 +476,60 @@ def get_repo_metrics(repo_owner, repo_name, headers):
     print(f"Repository metrics: Stars: {metrics['stars_count']}, Forks: {metrics['forks_count']}")
     return metrics
 
+def get_org_metrics(org_repos, headers):
+    """
+    Fetch metrics across all repositories in the organization.
+    
+    Args:
+        org_repos: List of repositories in the organization
+        headers: API request headers
+    
+    Returns:
+        Dictionary with accumulated repository metrics
+    """
+    print(f"Fetching metrics across all {len(org_repos)} repositories in the organization")
+    
+    total_stars = 0
+    total_forks = 0
+    total_issues = 0
+    total_prs = 0
+    total_commits = 0
+    
+    for repo in org_repos:
+        repo_owner = repo['owner']
+        repo_name = repo['name']
+        
+        # Get stars and forks
+        repo_metrics = get_repo_metrics(repo_owner, repo_name, headers)
+        total_stars += repo_metrics.get('stars_count', 0)
+        total_forks += repo_metrics.get('forks_count', 0)
+        
+        # Get PR count
+        pr_url = f"{GITHUB_API_URL}/search/issues?q=repo:{repo_owner}/{repo_name}+type:pr"
+        pr_response = make_github_request(pr_url, headers, 'search')
+        if pr_response and pr_response.status_code == 200:
+            total_prs += pr_response.json().get('total_count', 0)
+            
+        # Get issue count
+        issue_url = f"{GITHUB_API_URL}/search/issues?q=repo:{repo_owner}/{repo_name}+type:issue"
+        issue_response = make_github_request(issue_url, headers, 'search')
+        if issue_response and issue_response.status_code == 200:
+            total_issues += issue_response.json().get('total_count', 0)
+            
+        # We don't have an easy way to get total commit count via API, so we'll skip it
+    
+    # Create organization metrics
+    org_metrics = {
+        'stars_count': total_stars,
+        'forks_count': total_forks,
+        'issues_count': total_issues,
+        'pr_count': total_prs,
+        'last_updated': datetime.now().isoformat()
+    }
+    
+    print(f"Organization metrics: Stars: {total_stars}, Forks: {total_forks}, Issues: {total_issues}, PRs: {total_prs}")
+    return org_metrics
+
 if __name__ == "__main__":
     # Check if GitHub token is available
     github_token = os.getenv('GITHUB_TOKEN')
@@ -965,13 +1019,19 @@ if __name__ == "__main__":
         # Fetch repository metrics and store in repo_metrics.json
         print("\n========== DEBUG: Starting repository metrics fetch ==========")
         try:
-            repo_metrics = get_repo_metrics(REPO_OWNER, REPO_NAME, get_github_headers())
-            print(f"Repository metrics retrieved: {repo_metrics}")
+            # Get organization-wide metrics instead of just one repository
+            repo_metrics = get_org_metrics(org_repos, get_github_headers())
+            print(f"Organization metrics retrieved: {repo_metrics}")
             
-            # Add the total_contributors count to the repo metrics
+            # Add the total_contributors count to the metrics
             total_contributors = len(all_contributions)
             repo_metrics['total_contributors'] = total_contributors
             print(f"Added total_contributors ({total_contributors}) to repo_metrics")
+            
+            # Calculate total commits by summing all contributors' commits
+            total_commits = sum(user_data.get("commits_count", 0) for user_data in all_contributions.values())
+            repo_metrics['commits_count'] = total_commits
+            print(f"Added total_commits ({total_commits}) to repo_metrics")
             
             repo_metrics['last_updated'] = formatted_time
             print("Added last_updated to repo_metrics")
