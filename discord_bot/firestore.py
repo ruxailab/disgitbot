@@ -7,55 +7,29 @@ from role_utils import determine_role
 # ---------- Firebase Initialization ----------
 try:
     if not firebase_admin._apps:
-        # Try multiple locations for credentials.json
         print("Initializing Firebase...")
-        possible_paths = [
-            "credentials.json",  # Current directory
-            "../credentials.json",  # Parent directory
-            "/app/credentials.json"  # Container app directory
-        ]
         
-        # Search for credentials file first
-        for path in possible_paths:
-            if os.path.exists(path):
-                print(f"Found credentials at: {path}")
-                cred = credentials.Certificate(path)
-                firebase_admin.initialize_app(cred)
-                break
+        # In production (Cloud Run), use the secret mount
+        secret_path = "/secret/firebase-credentials"
+        if os.path.exists(secret_path):
+            print(f"Using credentials from secret mount (production environment)")
+            cred = credentials.Certificate(secret_path)
+        
+        # In development, use local credentials.json
+        elif os.path.exists("credentials.json"):
+            print("Using credentials.json from current directory (development environment)")
+            cred = credentials.Certificate("credentials.json")
+        
+        # No other fallbacks - if we can't find credentials, fail clearly
         else:
-            # If we get here, none of the paths worked
-            print("Could not find credentials.json file, falling back to environment variable")
+            print("ERROR: No valid credentials found.")
+            print("In production: Mount secret to /secret/firebase-credentials")
+            print("In development: Place credentials.json in the current directory")
+            exit(1)
             
-            # Only try using the environment variable as a last resort
-            if 'CREDENTIALS_JSON' in os.environ:
-                # Check if the environment variable looks like JSON content
-                env_value = os.environ['CREDENTIALS_JSON']
-                if env_value.strip().startswith('{') and '"type": "service_account"' in env_value:
-                    print("CREDENTIALS_JSON contains actual JSON content, parsing directly")
-                    try:
-                        # Parse JSON directly from string
-                        import json
-                        cred_dict = json.loads(env_value)
-                        cred = credentials.Certificate(cred_dict)
-                        firebase_admin.initialize_app(cred)
-                        print("Successfully initialized Firebase with JSON from environment variable")
-                    except Exception as e:
-                        print(f"Error parsing JSON from environment variable: {str(e)}")
-                        raise
-                else:
-                    # It's probably a file path
-                    print("Using CREDENTIALS_JSON as file path")
-                    # Write to a temporary file
-                    import tempfile
-                    with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as temp:
-                        temp.write(os.environ['CREDENTIALS_JSON'])
-                        temp_path = temp.name
-                    print(f"Created temporary credentials file at: {temp_path}")
-                    cred = credentials.Certificate(temp_path)
-                    firebase_admin.initialize_app(cred)
-            else:
-                print("No credentials available. Cannot initialize Firebase.")
-                exit(1)
+        # Initialize Firebase
+        firebase_admin.initialize_app(cred)
+        print("Firebase initialized successfully")
                 
     db = firestore.client()
     print("Firestore client initialized successfully!")
@@ -230,20 +204,6 @@ with open('contributions.json', 'r') as f:
         print("Invalid JSON format in contributions.json.")
         contributions = {}
 
-# ---------- Load Repository Metrics ----------
-if os.path.exists('repo_metrics.json'):
-    with open('repo_metrics.json', 'r') as f:
-        try:
-            repo_metrics = json.load(f)
-            # Update repository metrics in Firestore
-            doc_ref = db.collection('repo_stats').document('metrics')
-            doc_ref.set(repo_metrics, merge=True)
-            print(f"Repository metrics updated in Firestore: Stars: {repo_metrics.get('stars_count', 0)}, Forks: {repo_metrics.get('forks_count', 0)}")
-        except json.JSONDecodeError:
-            print("Invalid JSON format in repo_metrics.json.")
-else:
-    print("repo_metrics.json not found. Skipping repository metrics update.")
-
 # ---------- Sync to Firestore ----------
 for github_id, user_data in contributions.items():
     try:
@@ -259,3 +219,17 @@ for github_id, user_data in contributions.items():
         print(f"Error updating Firestore for GitHub user {github_id}: {e}")
 
 print("Firestore update completed.")
+
+# ---------- Load Repository Metrics (Moved to end) ----------
+if os.path.exists('repo_metrics.json'):
+    with open('repo_metrics.json', 'r') as f:
+        try:
+            repo_metrics = json.load(f)
+            # Update repository metrics in Firestore
+            doc_ref = db.collection('repo_stats').document('metrics')
+            doc_ref.set(repo_metrics, merge=True)
+            print(f"Repository metrics updated in Firestore: Stars: {repo_metrics.get('stars_count', 0)}, Forks: {repo_metrics.get('forks_count', 0)}")
+        except json.JSONDecodeError:
+            print("Invalid JSON format in repo_metrics.json.")
+else:
+    print("repo_metrics.json not found. Skipping repository metrics update.")

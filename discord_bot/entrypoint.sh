@@ -17,26 +17,15 @@ for ENV_VAR in DISCORD_BOT_TOKEN GITHUB_TOKEN GITHUB_CLIENT_ID GITHUB_CLIENT_SEC
 done
 
 # Check for credentials
-if [ -n "$CREDENTIALS_JSON" ] && [ -f "$CREDENTIALS_JSON" ]; then
-  echo "✅ credentials.json found at $CREDENTIALS_JSON"
+echo "Checking for Firebase credentials..."
+if [ -f "/secret/firebase-credentials" ]; then
+  echo "✅ Found credentials at /secret/firebase-credentials (production mode)"
 elif [ -f "credentials.json" ]; then
-  echo "✅ credentials.json found in current directory"
-elif [ -f "/secret/firebase-credentials" ]; then
-  echo "✅ Firebase credentials found at /secret/firebase-credentials"
-  cp /secret/firebase-credentials credentials.json
-  echo "✅ Copied to credentials.json for compatibility"
+  echo "✅ Found credentials.json in current directory (development mode)"
 else
-  echo "❌ credentials.json not found!"
-  # Try to save the environment variable to a file if it exists
-  if [ -n "$CREDENTIALS_JSON" ]; then
-    echo "Found CREDENTIALS_JSON environment variable, saving to file..."
-    echo "$CREDENTIALS_JSON" > credentials.json
-    echo "✅ Credentials saved to credentials.json"
-  else
-    # Search for it
-    echo "Searching for credentials.json..."
-    find / -name credentials.json -type f 2>/dev/null || echo "Not found"
-  fi
+  echo "❌ No Firebase credentials found! Application will fail to start."
+  echo "➡️ In production: Mount secret to /secret/firebase-credentials"
+  echo "➡️ In development: Place credentials.json in the current directory"
 fi
 
 # List current directory for debugging

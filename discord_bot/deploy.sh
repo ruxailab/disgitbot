@@ -95,31 +95,26 @@ else
   exit 1
 fi
 
-# Check if the service already exists and remove any existing environment variables
+# Check if the service already exists and clean up any existing configuration
 echo "Checking for existing service configuration..."
 if gcloud run services describe $SERVICE_NAME --region=$REGION &>/dev/null; then
-  echo "Found existing service, checking for environment variables..."
+  echo "Found existing service, cleaning up configuration..."
   
-  # Check if CREDENTIALS_JSON is set or any environment variables exist
-  if gcloud run services describe $SERVICE_NAME --region=$REGION --format="value(spec.template.spec.containers[0].env)" 2>/dev/null | grep -q "CREDENTIALS_JSON" || \
-     gcloud run services describe $SERVICE_NAME --region=$REGION --format="value(spec.template.spec.containers[0].env)" 2>/dev/null | grep -q "name"; then
-    echo "Clearing all existing environment variables first..."
-    gcloud run services update $SERVICE_NAME \
-      --region=$REGION \
-      --clear-env-vars
-  fi
-  
-  # Check if secrets are set
-  if gcloud run services describe $SERVICE_NAME --region=$REGION --format="value(spec.template.spec)" 2>/dev/null | grep -q "secretName"; then
-    echo "Clearing existing secrets..."
-    gcloud run services update $SERVICE_NAME \
-      --region=$REGION \
-      --clear-secrets
-  fi
+  # Always clear environment variables and secrets for a clean deployment
+  echo "Clearing all existing environment variables..."
+  gcloud run services update $SERVICE_NAME \
+    --region=$REGION \
+    --clear-env-vars
+
+  echo "Clearing existing secrets..."
+  gcloud run services update $SERVICE_NAME \
+    --region=$REGION \
+    --clear-secrets
 fi
 
-# Now proceed with the deployment with clean environment variables
+# Now proceed with the deployment with clean configuration
 echo "Deploying to Cloud Run..."
+echo "Setting up with secret mount for Firebase credentials"
 DEPLOY_CMD="gcloud run deploy $SERVICE_NAME \
   --image=gcr.io/$PROJECT_ID/$SERVICE_NAME:latest \
   --platform=managed \
@@ -136,14 +131,10 @@ DEPLOY_CMD="gcloud run deploy $SERVICE_NAME \
   --execution-environment=gen2 \
   --update-secrets=/secret/firebase-credentials=$SECRET_NAME:latest"
 
-# Only add environment variables if we have them, but filter out CREDENTIALS_JSON
+# Add environment variables if we have them
 if [ -n "$ENV_VARS" ]; then
-  # Filter out CREDENTIALS_JSON if it exists in the environment variables
-  FILTERED_ENV_VARS=$(echo "$ENV_VARS" | sed 's/CREDENTIALS_JSON=[^,]*,\{0,1\}//g')
-  if [ -n "$FILTERED_ENV_VARS" ]; then
-    DEPLOY_CMD="$DEPLOY_CMD --set-env-vars=\"$FILTERED_ENV_VARS\""
-    echo "Adding filtered environment variables to deployment"
-  fi
+  DEPLOY_CMD="$DEPLOY_CMD --set-env-vars=\"$ENV_VARS\""
+  echo "Adding environment variables"
 else
   echo "No environment variables to add"
 fi
