@@ -71,12 +71,36 @@ def update_repo_metrics_in_firestore(repo_metrics):
     """
     try:
         # Ensure we have a metrics document
+        print(f"DEBUG: In update_repo_metrics_in_firestore with metrics: {repo_metrics}")
         doc_ref = db.collection('repo_stats').document('metrics')
+        
+        # Add debug log to show what's in the document before update
+        doc_before = doc_ref.get()
+        if doc_before.exists:
+            print(f"DEBUG: Existing metrics document: {doc_before.to_dict()}")
+        else:
+            print("DEBUG: No existing metrics document found")
+        
+        # Convert numeric values to integers to ensure proper storage
+        if 'stars_count' in repo_metrics:
+            repo_metrics['stars_count'] = int(repo_metrics['stars_count'])
+        if 'forks_count' in repo_metrics:
+            repo_metrics['forks_count'] = int(repo_metrics['forks_count'])
+            
+        print(f"DEBUG: Setting metrics with values: {repo_metrics}")
         doc_ref.set(repo_metrics, merge=True)
+        
+        # Verify the update
+        doc_after = doc_ref.get()
+        if doc_after.exists:
+            print(f"DEBUG: Metrics after update: {doc_after.to_dict()}")
+        
         print(f"Repository metrics updated in Firestore: Stars: {repo_metrics.get('stars_count', 0)}, Forks: {repo_metrics.get('forks_count', 0)}")
         return True
     except Exception as e:
         print(f"Error updating repository metrics in Firestore: {e}")
+        import traceback
+        traceback.print_exc()
         return False
 
 def load_repo_metrics_from_firestore():
