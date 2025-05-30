@@ -7,7 +7,26 @@ from role_utils import determine_role
 # ---------- Firebase Initialization ----------
 try:
     if not firebase_admin._apps:
-        cred = credentials.Certificate("credentials.json")
+        # Try different approaches to find credentials
+        credentials_path = "credentials.json"  # Default path
+        
+        # 1. Check if CREDENTIALS_JSON environment variable is set
+        if 'CREDENTIALS_JSON' in os.environ:
+            # The secret is mounted by Cloud Run
+            print("Using credentials from CREDENTIALS_JSON environment variable")
+            credentials_path = os.environ['CREDENTIALS_JSON']
+        # 2. Check if credentials.json exists in current directory
+        elif os.path.exists("credentials.json"):
+            print("Using credentials.json from current directory")
+        # 3. Check if credentials.json exists in parent directory
+        elif os.path.exists("../credentials.json"):
+            print("Using credentials.json from parent directory")
+            credentials_path = "../credentials.json"
+        else:
+            print("WARNING: Could not find credentials.json, will attempt to use default path")
+            
+        print(f"Initializing Firebase with credentials from: {credentials_path}")
+        cred = credentials.Certificate(credentials_path)
         firebase_admin.initialize_app(cred)
     db = firestore.client()
 except Exception as e:

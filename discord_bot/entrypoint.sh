@@ -4,25 +4,28 @@ set -e
 echo "=== Starting Discord Bot Deployment ==="
 echo "Checking environment and files..."
 
-# Check for critical files
-if [ -f ".env" ]; then
-  echo "✅ .env file found"
-else
-  echo "❌ .env file missing!"
-fi
+# Check for environment variables
+echo "Checking for environment variables..."
+for ENV_VAR in DISCORD_BOT_TOKEN GITHUB_TOKEN GITHUB_CLIENT_ID GITHUB_CLIENT_SECRET REPO_OWNER REPO_NAME NGROK_DOMAIN; do
+  if [ -n "${!ENV_VAR}" ]; then
+    # Print first 5 characters followed by ...
+    VALUE="${!ENV_VAR}"
+    echo "✅ Found $ENV_VAR: ${VALUE:0:5}..."
+  else
+    echo "❌ $ENV_VAR not found!"
+  fi
+done
 
-if [ -f "credentials.json" ]; then
-  echo "✅ credentials.json found"
+# Check for credentials
+if [ -n "$CREDENTIALS_JSON" ] && [ -f "$CREDENTIALS_JSON" ]; then
+  echo "✅ credentials.json found at $CREDENTIALS_JSON"
+elif [ -f "credentials.json" ]; then
+  echo "✅ credentials.json found in current directory"
 else
-  echo "❌ credentials.json missing!"
-fi
-
-# Print Discord token (first few characters only)
-DISCORD_TOKEN=$(grep DISCORD_BOT_TOKEN .env | cut -d "=" -f2 | tr -d " ")
-if [ -n "$DISCORD_TOKEN" ]; then
-  echo "✅ Found DISCORD_BOT_TOKEN: ${DISCORD_TOKEN:0:8}..."
-else
-  echo "❌ DISCORD_BOT_TOKEN not found in .env!"
+  echo "❌ credentials.json not found!"
+  # Search for it
+  echo "Searching for credentials.json..."
+  find / -name credentials.json -type f 2>/dev/null || echo "Not found"
 fi
 
 # List current directory for debugging
