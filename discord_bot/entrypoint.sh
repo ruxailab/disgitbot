@@ -21,11 +21,22 @@ if [ -n "$CREDENTIALS_JSON" ] && [ -f "$CREDENTIALS_JSON" ]; then
   echo "✅ credentials.json found at $CREDENTIALS_JSON"
 elif [ -f "credentials.json" ]; then
   echo "✅ credentials.json found in current directory"
+elif [ -f "/secret/firebase-credentials" ]; then
+  echo "✅ Firebase credentials found at /secret/firebase-credentials"
+  cp /secret/firebase-credentials credentials.json
+  echo "✅ Copied to credentials.json for compatibility"
 else
   echo "❌ credentials.json not found!"
-  # Search for it
-  echo "Searching for credentials.json..."
-  find / -name credentials.json -type f 2>/dev/null || echo "Not found"
+  # Try to save the environment variable to a file if it exists
+  if [ -n "$CREDENTIALS_JSON" ]; then
+    echo "Found CREDENTIALS_JSON environment variable, saving to file..."
+    echo "$CREDENTIALS_JSON" > credentials.json
+    echo "✅ Credentials saved to credentials.json"
+  else
+    # Search for it
+    echo "Searching for credentials.json..."
+    find / -name credentials.json -type f 2>/dev/null || echo "Not found"
+  fi
 fi
 
 # List current directory for debugging

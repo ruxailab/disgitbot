@@ -22,7 +22,7 @@ print(f"Python version: {sys.version}")
 print("Checking environment variables:")
 for env_var in ["DISCORD_BOT_TOKEN", "GITHUB_TOKEN", "GITHUB_CLIENT_ID", 
                 "GITHUB_CLIENT_SECRET", "REPO_OWNER", "REPO_NAME", 
-                "NGROK_DOMAIN", "NGROK_AUTHTOKEN"]:
+                "NGROK_DOMAIN"]:
     value = os.getenv(env_var)
     if value:
         # Print first 5 chars and last 5 chars with ... in between for security

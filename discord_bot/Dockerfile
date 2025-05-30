@@ -16,6 +16,9 @@ RUN apt-get update && \
 COPY discord_bot_requirements.txt .
 RUN pip install --no-cache-dir -r discord_bot_requirements.txt
 
+# Create an empty credentials file (will be overwritten by volume mount)
+RUN echo "{}" > /app/credentials.json
+
 # Copy all bot files
 COPY . .
 

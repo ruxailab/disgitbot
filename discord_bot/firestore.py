@@ -7,30 +7,62 @@ from role_utils import determine_role
 # ---------- Firebase Initialization ----------
 try:
     if not firebase_admin._apps:
-        # Try different approaches to find credentials
-        credentials_path = "credentials.json"  # Default path
+        # Try multiple locations for credentials.json
+        print("Initializing Firebase...")
+        possible_paths = [
+            "credentials.json",  # Current directory
+            "../credentials.json",  # Parent directory
+            "/app/credentials.json"  # Container app directory
+        ]
         
-        # 1. Check if CREDENTIALS_JSON environment variable is set
-        if 'CREDENTIALS_JSON' in os.environ:
-            # The secret is mounted by Cloud Run
-            print("Using credentials from CREDENTIALS_JSON environment variable")
-            credentials_path = os.environ['CREDENTIALS_JSON']
-        # 2. Check if credentials.json exists in current directory
-        elif os.path.exists("credentials.json"):
-            print("Using credentials.json from current directory")
-        # 3. Check if credentials.json exists in parent directory
-        elif os.path.exists("../credentials.json"):
-            print("Using credentials.json from parent directory")
-            credentials_path = "../credentials.json"
+        # Search for credentials file first
+        for path in possible_paths:
+            if os.path.exists(path):
+                print(f"Found credentials at: {path}")
+                cred = credentials.Certificate(path)
+                firebase_admin.initialize_app(cred)
+                break
         else:
-            print("WARNING: Could not find credentials.json, will attempt to use default path")
+            # If we get here, none of the paths worked
+            print("Could not find credentials.json file, falling back to environment variable")
             
-        print(f"Initializing Firebase with credentials from: {credentials_path}")
-        cred = credentials.Certificate(credentials_path)
-        firebase_admin.initialize_app(cred)
+            # Only try using the environment variable as a last resort
+            if 'CREDENTIALS_JSON' in os.environ:
+                # Check if the environment variable looks like JSON content
+                env_value = os.environ['CREDENTIALS_JSON']
+                if env_value.strip().startswith('{') and '"type": "service_account"' in env_value:
+                    print("CREDENTIALS_JSON contains actual JSON content, parsing directly")
+                    try:
+                        # Parse JSON directly from string
+                        import json
+                        cred_dict = json.loads(env_value)
+                        cred = credentials.Certificate(cred_dict)
+                        firebase_admin.initialize_app(cred)
+                        print("Successfully initialized Firebase with JSON from environment variable")
+                    except Exception as e:
+                        print(f"Error parsing JSON from environment variable: {str(e)}")
+                        raise
+                else:
+                    # It's probably a file path
+                    print("Using CREDENTIALS_JSON as file path")
+                    # Write to a temporary file
+                    import tempfile
+                    with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as temp:
+                        temp.write(os.environ['CREDENTIALS_JSON'])
+                        temp_path = temp.name
+                    print(f"Created temporary credentials file at: {temp_path}")
+                    cred = credentials.Certificate(temp_path)
+                    firebase_admin.initialize_app(cred)
+            else:
+                print("No credentials available. Cannot initialize Firebase.")
+                exit(1)
+                
     db = firestore.client()
+    print("Firestore client initialized successfully!")
 except Exception as e:
     print(f"Firebase init error: {e}")
+    import traceback
+    traceback.print_exc()
     exit(1)
 
 # ---------- Firestore Helper Functions ----------

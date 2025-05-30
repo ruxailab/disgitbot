@@ -77,15 +77,48 @@ else
   exit 1
 fi
 
+# Before running the Docker build command
+# Copy credentials.json to the Docker build context
+echo "Ensuring credentials.json is available in the build context..."
+cp "$CREDENTIALS_PATH" "$SCRIPT_DIR/credentials.json" || echo "Warning: Failed to copy credentials.json"
+
 # Build the Docker image
 echo "Building Docker image..."
-docker buildx build --platform linux/amd64 \
+if docker buildx build --platform linux/amd64 \
   -t gcr.io/$PROJECT_ID/$SERVICE_NAME:latest \
   -f "$SCRIPT_DIR/Dockerfile" \
   --push \
-  "$SCRIPT_DIR"
+  "$SCRIPT_DIR"; then
+  echo "✅ Docker image built and pushed successfully!"
+else
+  echo "❌ Docker build failed. Check the error above."
+  exit 1
+fi
 
-# Deploy to Cloud Run with environment variables and mounted secrets
+# Check if the service already exists and remove any existing environment variables
+echo "Checking for existing service configuration..."
+if gcloud run services describe $SERVICE_NAME --region=$REGION &>/dev/null; then
+  echo "Found existing service, checking for environment variables..."
+  
+  # Check if CREDENTIALS_JSON is set or any environment variables exist
+  if gcloud run services describe $SERVICE_NAME --region=$REGION --format="value(spec.template.spec.containers[0].env)" 2>/dev/null | grep -q "CREDENTIALS_JSON" || \
+     gcloud run services describe $SERVICE_NAME --region=$REGION --format="value(spec.template.spec.containers[0].env)" 2>/dev/null | grep -q "name"; then
+    echo "Clearing all existing environment variables first..."
+    gcloud run services update $SERVICE_NAME \
+      --region=$REGION \
+      --clear-env-vars
+  fi
+  
+  # Check if secrets are set
+  if gcloud run services describe $SERVICE_NAME --region=$REGION --format="value(spec.template.spec)" 2>/dev/null | grep -q "secretName"; then
+    echo "Clearing existing secrets..."
+    gcloud run services update $SERVICE_NAME \
+      --region=$REGION \
+      --clear-secrets
+  fi
+fi
+
+# Now proceed with the deployment with clean environment variables
 echo "Deploying to Cloud Run..."
 DEPLOY_CMD="gcloud run deploy $SERVICE_NAME \
   --image=gcr.io/$PROJECT_ID/$SERVICE_NAME:latest \
@@ -100,18 +133,20 @@ DEPLOY_CMD="gcloud run deploy $SERVICE_NAME \
   --timeout=300s \
   --allow-unauthenticated \
   --no-cpu-throttling \
-  --execution-environment=gen2"
+  --execution-environment=gen2 \
+  --update-secrets=/secret/firebase-credentials=$SECRET_NAME:latest"
 
-# Only add environment variables if we have them
+# Only add environment variables if we have them, but filter out CREDENTIALS_JSON
 if [ -n "$ENV_VARS" ]; then
-  DEPLOY_CMD="$DEPLOY_CMD --set-env-vars=\"$ENV_VARS\""
-  echo "Adding environment variables to deployment"
+  # Filter out CREDENTIALS_JSON if it exists in the environment variables
+  FILTERED_ENV_VARS=$(echo "$ENV_VARS" | sed 's/CREDENTIALS_JSON=[^,]*,\{0,1\}//g')
+  if [ -n "$FILTERED_ENV_VARS" ]; then
+    DEPLOY_CMD="$DEPLOY_CMD --set-env-vars=\"$FILTERED_ENV_VARS\""
+    echo "Adding filtered environment variables to deployment"
+  fi
 else
   echo "No environment variables to add"
 fi
-
-# Add the secret
-DEPLOY_CMD="$DEPLOY_CMD --set-secrets=CREDENTIALS_JSON=$SECRET_NAME:latest"
 
 # Execute the command
 echo "Running: $DEPLOY_CMD"
