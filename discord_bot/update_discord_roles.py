@@ -7,7 +7,7 @@ from dotenv import load_dotenv # Allows the use of environment variables (this i
                                # tokens and keys)
  
 import json  
-from firestore import load_data_from_firestore
+from firestore import get_firestore_data
 from role_utils import determine_role, PR_THRESHOLDS, ISSUE_THRESHOLDS, COMMIT_THRESHOLDS
 # Environment variables for tokens and other sensitive data
 load_dotenv() # Loads and reads the .env file 
@@ -32,7 +32,7 @@ async def greet(interaction: discord.Interaction):
     await interaction.response.send_message(f"Hello there, {username}")
 
 async def update_roles_for_guild(guild: discord.Guild):
-    contributions, user_mappings = load_data_from_firestore()
+    _, contributions, user_mappings = get_firestore_data()
     print(contributions, user_mappings)
 
     roles = {}
