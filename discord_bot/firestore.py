@@ -216,16 +216,24 @@ for github_id, user_data in contributions.items():
 
 print("Firestore update completed.")
 
-# ---------- Load Repository Metrics (Moved to end) ----------
-if os.path.exists('repo_metrics.json'):
-    with open('repo_metrics.json', 'r') as f:
-        try:
-            repo_metrics = json.load(f)
-            # Update repository metrics in Firestore
-            doc_ref = db.collection('repo_stats').document('metrics')
-            doc_ref.set(repo_metrics, merge=True)
-            print(f"Repository metrics updated in Firestore: Stars: {repo_metrics.get('stars_count', 0)}, Forks: {repo_metrics.get('forks_count', 0)}")
-        except json.JSONDecodeError:
-            print("Invalid JSON format in repo_metrics.json.")
-else:
-    print("repo_metrics.json not found. Skipping repository metrics update.")
+# ---------- Load Repository Metrics (Moved to function) ----------
+def load_repo_metrics_from_file():
+    """
+    Load repository metrics from repo_metrics.json file and update Firestore.
+    """
+    if os.path.exists('repo_metrics.json'):
+        with open('repo_metrics.json', 'r') as f:
+            try:
+                repo_metrics = json.load(f)
+                # Update repository metrics in Firestore
+                doc_ref = db.collection('repo_stats').document('metrics')
+                doc_ref.set(repo_metrics, merge=True)
+                print(f"Repository metrics updated in Firestore: Stars: {repo_metrics.get('stars_count', 0)}, Forks: {repo_metrics.get('forks_count', 0)}")
+            except json.JSONDecodeError:
+                print("Invalid JSON format in repo_metrics.json.")
+    else:
+        print("repo_metrics.json not found. Skipping repository metrics update.")
+
+# Call the function when this file is run directly
+if __name__ == "__main__":
+    load_repo_metrics_from_file()
