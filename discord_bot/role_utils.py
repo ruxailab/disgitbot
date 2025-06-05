@@ -20,6 +20,9 @@ COMMIT_THRESHOLDS = {
     "🚀 Commit Machine": 30
 }
 
+# Medal roles for all-time top 3 PR contributors
+MEDAL_ROLES = ["🥇 PR Champion", "🥈 PR Runner-up", "🥉 PR Bronze"]
+
 # Add role descriptions with thresholds
 PR_DESCRIPTIONS = {
     "⚪ Member (General)": "0 approved PRs",
@@ -110,4 +113,28 @@ def get_next_role(current_role, stats_type):
             next_role = role_list[i + 1][0]
             return f"@{next_role} ({descriptions[next_role]})"
     
-    return "Unknown" 
+    return "Unknown"
+
+def get_medal_assignments(hall_of_fame_data):
+    """
+    Determine medal role assignments for all-time top 3 PR contributors.
+    
+    Args:
+        hall_of_fame_data: Hall of fame data from Firestore
+        
+    Returns:
+        Dictionary mapping GitHub usernames to medal role names
+    """
+    medal_assignments = {}
+    
+    if not hall_of_fame_data or not hall_of_fame_data.get('pr', {}).get('all_time'):
+        return medal_assignments
+    
+    top_3_prs = hall_of_fame_data['pr']['all_time'][:3]  # Get top 3
+    
+    for i, contributor in enumerate(top_3_prs):
+        username = contributor.get('username')
+        if username and i < len(MEDAL_ROLES):
+            medal_assignments[username] = MEDAL_ROLES[i]
+    
+    return medal_assignments 

@@ -9,7 +9,7 @@ from firebase_admin import credentials, firestore
 import json
 import asyncio
 import threading
-from firestore import get_firestore_data
+from firestore import get_firestore_data, get_hall_of_fame_data
 from role_utils import determine_role, get_next_role
 from auth import get_github_username, wait_for_username, start_flask
 import datetime
@@ -280,6 +280,62 @@ async def getstats(interaction: discord.Interaction, type: str = "pr"):
             )
         except Exception as follow_up_error:
             print(f"Error sending followup: {follow_up_error}")
+
+@bot.tree.command(name="halloffame", description="Shows top 3 contributors")
+@app_commands.describe(
+    type="Contribution type",
+    period="Time period"
+)
+@app_commands.choices(type=[
+    app_commands.Choice(name="Pull Requests", value="pr"),
+    app_commands.Choice(name="Issues", value="issue"),
+    app_commands.Choice(name="Commits", value="commit")
+])
+@app_commands.choices(period=[
+    app_commands.Choice(name="All Time", value="all_time"),
+    app_commands.Choice(name="Monthly", value="monthly"),
+    app_commands.Choice(name="Weekly", value="weekly"),
+    app_commands.Choice(name="Daily", value="daily")
+])
+async def halloffame(interaction: discord.Interaction, type: str = "pr", period: str = "all_time"):
+    """Simple hall of fame command - just fetch and display."""
+    await interaction.response.defer()
+    
+    # Simple fetch from Firestore
+    hall_of_fame_data = get_hall_of_fame_data()
+    
+    if not hall_of_fame_data:
+        await interaction.followup.send("Hall of fame data not available yet.", ephemeral=True)
+        return
+    
+    # Get top 3 for the requested category and period
+    top_3 = hall_of_fame_data.get(type, {}).get(period, [])
+    
+    if not top_3:
+        await interaction.followup.send(f"No data for {type} {period}.", ephemeral=True)
+        return
+    
+    # Simple display
+    type_names = {"pr": "Pull Requests", "issue": "Issues", "commit": "Commits"}
+    period_names = {"all_time": "All Time", "monthly": "Monthly", "weekly": "Weekly", "daily": "Daily"}
+    
+    embed = discord.Embed(
+        title=f"🏆 {type_names[type]} Hall of Fame ({period_names[period]})",
+        color=discord.Color.gold()
+    )
+    
+    trophies = ["🥇", "🥈", "🥉"]
+    for i, contributor in enumerate(top_3[:3]):
+        username = contributor.get('username', 'Unknown')
+        value = contributor.get('value', 0)
+        embed.add_field(
+            name=f"{trophies[i]} {username}",
+            value=f"{value} {type_names[type].lower()}",
+            inline=False
+        )
+    
+    embed.set_footer(text=f"Last updated: {hall_of_fame_data.get('last_updated', 'Unknown')}")
+    await interaction.followup.send(embed=embed)
 
 @bot.tree.command(name="setup_voice_stats", description="Sets up voice channels for repository stats display")
 async def setup_voice_stats(interaction: discord.Interaction):

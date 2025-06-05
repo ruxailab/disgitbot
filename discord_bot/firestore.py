@@ -186,7 +186,29 @@ def get_firestore_data():
         traceback.print_exc()
 
     return repo_metrics, contributions, user_mappings
- 
+
+def get_hall_of_fame_data():
+    """
+    Get hall of fame data from Firestore.
+    
+    Returns:
+        Dictionary with hall of fame data or None if not found
+    """
+    try:
+        # Get hall of fame document
+        hof_doc = db.collection('repo_stats').document('hall_of_fame').get()
+        if hof_doc.exists:
+            hall_of_fame = hof_doc.to_dict()
+            print(f"Retrieved hall of fame data from Firestore")
+            return hall_of_fame
+        else:
+            print("No hall of fame data found in Firestore")
+            return None
+    except Exception as e:
+        print(f"Error retrieving hall of fame data from Firestore: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
 
 # ---------- Load JSON Contributions ----------
 if not os.path.exists('contributions.json'):

@@ -530,6 +530,82 @@ def get_org_metrics(org_repos, headers):
     print(f"Organization metrics: Stars: {total_stars}, Forks: {total_forks}, Issues: {total_issues}, PRs: {total_prs}")
     return org_metrics
 
+def create_and_store_hall_of_fame(all_contributions):
+    """
+    Create hall of fame data with top 3 contributors and store in Firestore.
+    
+    Args:
+        all_contributions: Dictionary with all contributor data
+    """
+    print("Creating hall of fame data...")
+    
+    if not all_contributions:
+        print("No contributors found for hall of fame")
+        return
+    
+    contributors = list(all_contributions.keys())
+    
+    # Define categories and their sorting functions
+    categories = {
+        'pr': {
+            'all_time': lambda user: all_contributions[user].get('pr_count', 0),
+            'monthly': lambda user: all_contributions[user].get('stats', {}).get('prs', {}).get('monthly', 0),
+            'weekly': lambda user: all_contributions[user].get('stats', {}).get('prs', {}).get('weekly', 0),
+            'daily': lambda user: all_contributions[user].get('stats', {}).get('prs', {}).get('daily', 0)
+        },
+        'issue': {
+            'all_time': lambda user: all_contributions[user].get('issues_count', 0),
+            'monthly': lambda user: all_contributions[user].get('stats', {}).get('issues', {}).get('monthly', 0),
+            'weekly': lambda user: all_contributions[user].get('stats', {}).get('issues', {}).get('weekly', 0),
+            'daily': lambda user: all_contributions[user].get('stats', {}).get('issues', {}).get('daily', 0)
+        },
+        'commit': {
+            'all_time': lambda user: all_contributions[user].get('commits_count', 0),
+            'monthly': lambda user: all_contributions[user].get('stats', {}).get('commits', {}).get('monthly', 0),
+            'weekly': lambda user: all_contributions[user].get('stats', {}).get('commits', {}).get('weekly', 0),
+            'daily': lambda user: all_contributions[user].get('stats', {}).get('commits', {}).get('daily', 0)
+        }
+    }
+    
+    hall_of_fame = {
+        'last_updated': time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime())
+    }
+    
+    # Create top 3 for each category and time period
+    for category, time_periods in categories.items():
+        hall_of_fame[category] = {}
+        
+        for time_period, sort_func in time_periods.items():
+            # Sort contributors by the metric and get top 3
+            sorted_contributors = sorted(contributors, key=sort_func, reverse=True)
+            top_3 = []
+            
+            for i, username in enumerate(sorted_contributors[:3]):
+                value = sort_func(username)
+                if value > 0:  # Only include contributors with actual contributions
+                    top_3.append({
+                        'username': username,
+                        'value': value,
+                        'rank': i + 1
+                    })
+            
+            hall_of_fame[category][time_period] = top_3
+            print(f"  {category.upper()} {time_period}: {[f'{user[\"username\"]}({user[\"value\"]})' for user in top_3]}")
+    
+    # Store in Firestore
+    try:
+        from firestore import db
+        print("Updating hall of fame in Firestore...")
+        doc_ref = db.collection('repo_stats').document('hall_of_fame')
+        doc_ref.set(hall_of_fame, merge=True)
+        print("Hall of fame updated in Firestore successfully")
+    except Exception as e:
+        print(f"Error updating hall of fame in Firestore: {e}")
+        import traceback
+        traceback.print_exc()
+    
+    print(f"Hall of fame created with {len(hall_of_fame)} categories")
+
 if __name__ == "__main__":
     # Check if GitHub token is available
     github_token = os.getenv('GITHUB_TOKEN')
@@ -988,6 +1064,10 @@ if __name__ == "__main__":
         print("\n========== Calculating rankings for all contributors ==========")
         # Calculate and add rankings for all contributors
         all_contributions = calculate_rankings(all_contributions)
+        
+        print("\n========== Creating and Storing Hall of Fame ==========")
+        # Create hall of fame data and store in Firestore
+        create_and_store_hall_of_fame(all_contributions)
         
         print("\n========== DEBUG: After ranking calculation ==========")
         print("About to update timestamps...")

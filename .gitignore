@@ -49,3 +49,4 @@ contributions.json
 runbot.sh
 activate.sh 
 run_workflow.sh
+commit_and_push.sh
