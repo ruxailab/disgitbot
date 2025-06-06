@@ -590,7 +590,8 @@ def create_and_store_hall_of_fame(all_contributions):
                     })
             
             hall_of_fame[category][time_period] = top_3
-            print(f"  {category.upper()} {time_period}: {[f\"{user['username']}({user['value']})\" for user in top_3]}")
+            user_list = [f"{user['username']}({user['value']})" for user in top_3]
+            print(f"  {category.upper()} {time_period}: {user_list}")
     
     # Store in Firestore
     try:
