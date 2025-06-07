@@ -8,6 +8,48 @@ A Discord bot that integrates with GitHub to track user contributions and manage
 - Google Cloud account with billing enabled
 - ngrok account for OAuth tunneling
 
+## Discord Bot Permissions
+
+For security, the bot should be invited with **minimum required permissions only**. When setting up your bot invite URL, configure these permissions:
+
+### Step-by-Step Bot Setup:
+
+1. **Go to Discord Developer Portal:**
+   - Visit https://discord.com/developers/applications
+   - Select your bot application
+
+2. **Navigate to OAuth2 URL Generator:**
+   - Left panel → **OAuth2** → **OAuth2 URL Generator**
+
+3. **Configure OAuth2 Settings:**
+   - **Scopes:** Tick ✅ **bot** and ✅ **applications.commands**
+   - **Redirects:** Set to `https://discord.com`
+   - **Integration Type:** Select **Guild Install**
+
+4. **Set Bot Permissions** (the permissions section will appear after selecting scopes):
+
+### SCOPES (OAuth2 URL Generator - top section):
+- ✅ **bot** (enables bot functionality)
+- ✅ **applications.commands** (enables slash commands)
+
+### BOT PERMISSIONS (OAuth2 URL Generator - bottom section):
+
+**GENERAL PERMISSIONS:**
+- ✅ **Manage Roles** (for `create_role()`, `add_roles()`, `remove_roles()`)
+- ✅ **Manage Channels** (for `/setup_voice_stats` command)
+
+**TEXT PERMISSIONS:**
+- ✅ **Send Messages** (for all bot responses)
+- ✅ **Read Message History** (required for slash commands)
+- ✅ **Use Slash Commands** (for `/getstats`, `/halloffame`, `/link`)
+
+5. **Copy Generated URL:**
+   - Copy the generated invite URL from the bottom of the page
+   - Use this URL to invite the bot to your Discord server
+
+### ⚠️ Security Note:
+**DO NOT** give the bot `Administrator` permissions. The permissions listed above are sufficient for all bot functionality while maintaining security. All roles created by this bot are purely cosmetic with no dangerous Discord permissions.
+
 ## Project Structure
 
 - **auth.py** - GitHub OAuth authentication system using Flask and ngrok
