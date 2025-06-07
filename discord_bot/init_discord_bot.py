@@ -138,10 +138,14 @@ async def unlink(interaction: discord.Interaction):
     app_commands.Choice(name="Commits", value="commit")
 ])
 async def getstats(interaction: discord.Interaction, type: str = "pr"): 
-    # Get data from Firestore first (before we do any interaction response)
+    """Display user's GitHub stats and current role."""
+    # Defer first, just like halloffame
+    await interaction.response.defer()
+    
+    # Then get data from Firestore
     _, contributions, user_mappings = get_firestore_data()
     print(f"getstats - type: {type}")
-    """Display user's GitHub stats and current role."""
+    
     try:
         # Normalize the type parameter
         stats_type = type.lower().strip()
@@ -153,7 +157,7 @@ async def getstats(interaction: discord.Interaction, type: str = "pr"):
         print(user_id)
         print(github_username)
         if not github_username:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 "Your Discord account is not linked to a GitHub username. Use `/link your_github_username` to link it.",
                 ephemeral=True
             )
@@ -164,7 +168,7 @@ async def getstats(interaction: discord.Interaction, type: str = "pr"):
         print(user_data)  # Make sure you are getting the right data
         
         if not user_data:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 f"No contribution data found for GitHub user '{github_username}'.",
                 ephemeral=True
             )

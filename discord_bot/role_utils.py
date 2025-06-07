@@ -1,23 +1,26 @@
 PR_THRESHOLDS = {
-    "⚪ Member (General)": 0,
-    "🟣 Entry": 1,
-    "🔵 Intermediate": 4,
-    "🔵 Proficient": 7,
-    "🟢 Advanced": 10,
-    "🟡 Expert": 20,
-    "🟠 Master": 40,
-    "🔴 Grandmaster": 60
+    "⚪ Member (0 PRs)": 0,
+    "◯ Contributor (1-2 PRs)": 1,
+    "⚫ Developer (3-5 PRs)": 3,
+    "◼️ Advanced (6-10 PRs)": 6,
+    "⬛ Expert (11-20 PRs)": 11,
+    "🔘 Master (21+ PRs)": 21
 }
 
 ISSUE_THRESHOLDS = {
-    "📝 Bug Reporter": 1,
-    "🔍 Debugger": 3,
-    "🕵️‍♂️ Investigator": 7
+    "🟣 Reporter (1-5 Issues)": 1,
+    "🔵 Tracker (6-15 Issues)": 6,
+    "🟢 Analyst (16-30 Issues)": 16,
+    "🟡 Expert (31-50 Issues)": 31,
+    "🟠 Specialist (51+ Issues)": 51
 }
 
 COMMIT_THRESHOLDS = {
-    "🔧 Committer": 10,
-    "🚀 Commit Machine": 30
+    "⚫ Committer (10-50 Commits)": 10,
+    "⬛ Active (51-150 Commits)": 51,
+    "◼️ Developer (151-300 Commits)": 151,
+    "🖤 Expert (301-500 Commits)": 301,
+    "⚡ Master (501+ Commits)": 501
 }
 
 # Medal roles for all-time top 3 PR contributors
@@ -25,25 +28,28 @@ MEDAL_ROLES = ["🥇 PR Champion", "🥈 PR Runner-up", "🥉 PR Bronze"]
 
 # Add role descriptions with thresholds
 PR_DESCRIPTIONS = {
-    "⚪ Member (General)": "0 approved PRs",
-    "🟣 Entry": "1-3 approved PRs",
-    "🔵 Intermediate": "4-6 approved PRs",
-    "🔵 Proficient": "7-10 approved PRs",
-    "🟢 Advanced": "11-20 approved PRs",
-    "🟡 Expert": "21-40 approved PRs",
-    "🟠 Master": "41-60 approved PRs",
-    "🔴 Grandmaster": "61-80 approved PRs"
+    "⚪ Member (0 PRs)": "0 approved PRs",
+    "◯ Contributor (1-2 PRs)": "1-2 approved PRs", 
+    "⚫ Developer (3-5 PRs)": "3-5 approved PRs",
+    "◼️ Advanced (6-10 PRs)": "6-10 approved PRs",
+    "⬛ Expert (11-20 PRs)": "11-20 approved PRs",
+    "🔘 Master (21+ PRs)": "21+ approved PRs"
 }
 
 ISSUE_DESCRIPTIONS = {
-    "📝 Bug Reporter": "1-3 Issues opened",
-    "🔍 Debugger": "4-6 Issues",
-    "🕵️‍♂️ Investigator": "7-9 Issues"
+    "🟣 Reporter (1-5 Issues)": "1-5 Issues opened",
+    "🔵 Tracker (6-15 Issues)": "6-15 Issues opened",
+    "🟢 Analyst (16-30 Issues)": "16-30 Issues opened",
+    "🟡 Expert (31-50 Issues)": "31-50 Issues opened",
+    "🟠 Specialist (51+ Issues)": "51+ Issues opened"
 }
 
 COMMIT_DESCRIPTIONS = {
-    "🔧 Committer": "10-29 commits",
-    "🚀 Commit Machine": "30+ commits"
+    "⚫ Committer (10-50 Commits)": "10-50 commits",
+    "⬛ Active (51-150 Commits)": "51-150 commits", 
+    "◼️ Developer (151-300 Commits)": "151-300 commits",
+    "🖤 Expert (301-500 Commits)": "301-500 commits",
+    "⚡ Master (501+ Commits)": "501+ commits"
 }
 
 def determine_role(pr_count, issues_count, commits_count):
