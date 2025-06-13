@@ -4,7 +4,9 @@ import json
 import time
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
-from .firestore import update_repo_metrics_in_firestore
+import sys
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+from firestore import update_repo_metrics_in_firestore
 
 # Load environment variables
 load_dotenv("config/.env")
