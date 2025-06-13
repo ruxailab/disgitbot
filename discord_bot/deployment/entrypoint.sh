@@ -6,7 +6,7 @@ echo "Checking environment and files..."
 
 # Check for environment variables
 echo "Checking for environment variables..."
-for ENV_VAR in DISCORD_BOT_TOKEN GITHUB_TOKEN GITHUB_CLIENT_ID GITHUB_CLIENT_SECRET REPO_OWNER REPO_NAME NGROK_DOMAIN; do
+for ENV_VAR in DISCORD_BOT_TOKEN GITHUB_TOKEN GITHUB_CLIENT_ID GITHUB_CLIENT_SECRET REPO_OWNER REPO_NAME NGROK_DOMAIN NGROK_AUTHTOKEN; do
   if [ -n "${!ENV_VAR}" ]; then
     # Print first 5 characters followed by ...
     VALUE="${!ENV_VAR}"
@@ -80,12 +80,12 @@ fi
 
 # Run the Discord bot with output to log file
 echo "===== STARTING DISCORD BOT NOW! =====" >> discord_bot_status.log
-echo "Starting Discord bot with command: python -u init_discord_bot.py"
+echo "Starting Discord bot with command: python -u -m src.bot.init_discord_bot"
 echo "Starting Discord bot..."
 echo "Command executed at: $(date)" >> discord_bot_status.log
 
 # Run the Discord bot with all output captured to the log file
-python -u init_discord_bot.py 2>&1 | tee -a discord_bot.log
+python -u -m src.bot.init_discord_bot 2>&1 | tee -a discord_bot.log
 
 # Report on exit
 echo "Discord bot exited with code $?" | tee -a discord_bot_status.log

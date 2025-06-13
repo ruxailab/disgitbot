@@ -2,7 +2,7 @@ import os
 import json
 import firebase_admin
 from firebase_admin import credentials, firestore
-from role_utils import determine_role
+from .role_utils import determine_role
 
 # ---------- Firebase Initialization ----------
 try:
@@ -16,9 +16,9 @@ try:
             cred = credentials.Certificate(secret_path)
         
         # In development, use local credentials.json
-        elif os.path.exists("credentials.json"):
-            print("Using credentials.json from current directory (development environment)")
-            cred = credentials.Certificate("credentials.json")
+        elif os.path.exists("config/credentials.json"):
+            print("Using credentials.json from config directory (development environment)")
+            cred = credentials.Certificate("config/credentials.json")
         
         # No other fallbacks - if we can't find credentials, fail clearly
         else:

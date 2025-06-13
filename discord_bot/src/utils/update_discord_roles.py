@@ -7,10 +7,10 @@ from dotenv import load_dotenv # Allows the use of environment variables (this i
                                # tokens and keys)
  
 import json  
-from firestore import get_firestore_data, get_hall_of_fame_data
-from role_utils import determine_role, PR_THRESHOLDS, ISSUE_THRESHOLDS, COMMIT_THRESHOLDS, MEDAL_ROLES, get_medal_assignments
+from .firestore import get_firestore_data, get_hall_of_fame_data
+from .role_utils import determine_role, PR_THRESHOLDS, ISSUE_THRESHOLDS, COMMIT_THRESHOLDS, MEDAL_ROLES, get_medal_assignments
 # Environment variables for tokens and other sensitive data
-load_dotenv() # Loads and reads the .env file 
+load_dotenv("config/.env") # Loads and reads the .env file 
 TOKEN = os.getenv("DISCORD_BOT_TOKEN") # Reads and stores the Discord Token from the .env file
 
 # Setup of intents. Intents are permissions the bot has on the server

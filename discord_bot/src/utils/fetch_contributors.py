@@ -4,10 +4,10 @@ import json
 import time
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
-from firestore import update_repo_metrics_in_firestore
+from .firestore import update_repo_metrics_in_firestore
 
 # Load environment variables
-load_dotenv()
+load_dotenv("config/.env")
 
 GITHUB_API_URL = "https://api.github.com"
 ORG_NAME = os.getenv("ORG_NAME", "ruxailab")

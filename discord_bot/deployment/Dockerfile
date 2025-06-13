@@ -13,20 +13,20 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first to leverage Docker cache
-COPY discord_bot_requirements.txt .
+COPY config/discord_bot_requirements.txt .
 RUN pip install --no-cache-dir -r discord_bot_requirements.txt
 
-# Create an empty credentials file (will be overwritten by volume mount)
-RUN echo "{}" > /app/credentials.json
+# Create config directory and empty credentials file (will be overwritten by volume mount)
+RUN mkdir -p /app/config && echo "{}" > /app/config/credentials.json
 
 # Copy all bot files
 COPY . .
 
 # Make entrypoint executable
-RUN chmod +x /app/entrypoint.sh
+RUN chmod +x /app/deployment/entrypoint.sh
 
 # Expose port for health check
 EXPOSE 8080
 
 # Run the entrypoint script
-CMD ["/app/entrypoint.sh"] 
+CMD ["/app/deployment/entrypoint.sh"] 

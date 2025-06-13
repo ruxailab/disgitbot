@@ -38,8 +38,8 @@ print_error() {
 # Get script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 ROOT_DIR="$(dirname "$SCRIPT_DIR")"
-DEFAULT_CREDENTIALS_PATH="$ROOT_DIR/credentials.json"
-ENV_PATH="$SCRIPT_DIR/.env"
+DEFAULT_CREDENTIALS_PATH="$ROOT_DIR/config/credentials.json"
+ENV_PATH="$ROOT_DIR/config/.env"
 
 print_header
 
@@ -496,9 +496,9 @@ main() {
     
     # Copy credentials for Docker build
     print_step "Copying credentials file for Docker build..."
-    if cp "$CREDENTIALS_PATH" "$SCRIPT_DIR/credentials.json" 2>/dev/null; then
+    if cp "$CREDENTIALS_PATH" "$ROOT_DIR/config/credentials.json" 2>/dev/null; then
         print_success "Credentials file copied successfully"
-    elif [ -f "$SCRIPT_DIR/credentials.json" ]; then
+    elif [ -f "$ROOT_DIR/config/credentials.json" ]; then
         print_success "Credentials file already exists and is identical"
     else
         print_error "Failed to copy credentials file"
@@ -511,7 +511,7 @@ main() {
       -t gcr.io/$PROJECT_ID/$SERVICE_NAME:latest \
       -f "$SCRIPT_DIR/Dockerfile" \
       --push \
-      "$SCRIPT_DIR"
+      "$ROOT_DIR"
     
     # Clean up existing service configuration if exists
     if gcloud run services describe $SERVICE_NAME --region=$REGION --project="$PROJECT_ID" &>/dev/null; then

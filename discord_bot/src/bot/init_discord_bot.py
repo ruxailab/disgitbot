@@ -9,9 +9,9 @@ from firebase_admin import credentials, firestore
 import json
 import asyncio
 import threading
-from firestore import get_firestore_data, get_hall_of_fame_data
-from role_utils import determine_role, get_next_role
-from auth import get_github_username, wait_for_username, start_flask
+from ..utils.firestore import get_firestore_data, get_hall_of_fame_data
+from ..utils.role_utils import determine_role, get_next_role
+from .auth import get_github_username, wait_for_username, start_flask
 import datetime
 import sys
 
@@ -19,6 +19,13 @@ import sys
 print("="*50)
 print("Discord Bot Starting...")
 print(f"Python version: {sys.version}")
+print("="*50)
+
+# Load env vars first
+print("Loading environment variables...")
+load_dotenv("config/.env")
+
+# Then check environment variables after loading .env
 print("Checking environment variables:")
 for env_var in ["DISCORD_BOT_TOKEN", "GITHUB_TOKEN", "GITHUB_CLIENT_ID", 
                 "GITHUB_CLIENT_SECRET", "REPO_OWNER", "REPO_NAME", 
@@ -31,10 +38,6 @@ for env_var in ["DISCORD_BOT_TOKEN", "GITHUB_TOKEN", "GITHUB_CLIENT_ID",
     else:
         print(f"  ❌ {env_var}: Not set")
 print("="*50)
-
-# Load env vars
-print("Loading environment variables...")
-load_dotenv()
 TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 if not TOKEN:
     print("ERROR: DISCORD_BOT_TOKEN not found in environment variables!")
@@ -42,7 +45,7 @@ if not TOKEN:
 
 # Firebase init
 if not firebase_admin._apps:
-    cred = credentials.Certificate("credentials.json")
+    cred = credentials.Certificate("config/credentials.json")
     firebase_admin.initialize_app(cred)
 
 db = firestore.client()
@@ -341,6 +344,28 @@ async def halloffame(interaction: discord.Interaction, type: str = "pr", period:
     embed.set_footer(text=f"Last updated: {hall_of_fame_data.get('last_updated', 'Unknown')}")
     await interaction.followup.send(embed=embed)
 
+@bot.tree.command(name="check_permissions", description="Check if bot has required permissions")
+async def check_permissions(interaction: discord.Interaction):
+    """Check if the bot has the required permissions."""
+    await interaction.response.defer(ephemeral=True)
+    
+    guild = interaction.guild
+    bot_member = guild.get_member(bot.user.id)
+    
+    required_perms = [
+        ("Manage Channels", bot_member.guild_permissions.manage_channels),
+        ("Manage Roles", bot_member.guild_permissions.manage_roles),
+        ("View Channels", bot_member.guild_permissions.view_channel),
+        ("Connect", bot_member.guild_permissions.connect)
+    ]
+    
+    results = []
+    for perm_name, has_perm in required_perms:
+        status = "✅" if has_perm else "❌"
+        results.append(f"{status} {perm_name}")
+    
+    await interaction.followup.send(f"Bot permissions:\n" + "\n".join(results), ephemeral=True)
+
 @bot.tree.command(name="setup_voice_stats", description="Sets up voice channels for repository stats display")
 async def setup_voice_stats(interaction: discord.Interaction):
     """Sets up voice channels for repository stats display."""
@@ -374,7 +399,7 @@ async def setup_voice_stats(interaction: discord.Interaction):
 # and user experience. Traditional text commands (!) are not used for consistency.
 
 async def update_voice_channel_stats():
-    """Update voice channel names to display repository stats on the sidebar."""
+    """Update voice channel names to display repository stats (minimal approach)."""
     try:
         # Get the first guild (server) the bot is in
         guild = None
@@ -386,11 +411,17 @@ async def update_voice_channel_stats():
             print("Bot is not in any guild. Cannot update voice channel stats.")
             return
             
+        # Check basic permission
+        bot_member = guild.get_member(bot.user.id)
+        if not bot_member.guild_permissions.manage_channels:
+            print("❌ Bot lacks 'Manage Channels' permission")
+            return
+            
         # Fetch all data from Firestore
         repo_metrics, discord_contributions, _ = get_firestore_data()
         print(f"Retrieved repo metrics from Firestore: {repo_metrics}")
         
-        # If repo_metrics is empty, just use zeros (this should never happen in production)
+        # If repo_metrics is empty, just use zeros
         if not repo_metrics:
             print("WARNING: No repo metrics found in Firestore. Using zeros.")
             repo_metrics = {"stars_count": 0, "forks_count": 0, "total_contributors": 0}
@@ -413,49 +444,50 @@ async def update_voice_channel_stats():
             f"💻 Commits: {total_commits}"
         ]
         
-        # Set up permissions to make channels private
-        everyone_role = guild.default_role
-        private_overwrites = {
-            everyone_role: discord.PermissionOverwrite(
-                connect=False,  # Prevent users from joining
-                view_channel=True  # Still allow them to see the channel in sidebar
-            )
-        }
+        # Find existing stats channels (look for channels starting with emojis)
+        stats_emojis = ["⭐", "🍴", "🎯", "💼", "👥", "💻"]
+        existing_stats_channels = []
         
-        # Try to find the stats category
-        stats_category = discord.utils.get(guild.categories, name="📊 REPOSITORY STATS")
+        for channel in guild.voice_channels:
+            for emoji in stats_emojis:
+                if channel.name.startswith(emoji):
+                    existing_stats_channels.append(channel)
+                    break
         
-        # Create it if it doesn't exist
-        if not stats_category:
-            stats_category = await guild.create_category("📊 REPOSITORY STATS")
+        print(f"Found {len(existing_stats_channels)} existing stats channels")
         
-        # Get existing voice channels in the category
-        existing_channels = [c for c in guild.voice_channels if c.category == stats_category]
-        
-        # Create or update channels
-        for i, name in enumerate(channel_names):
-            if i < len(existing_channels):
-                # Update existing channel
-                channel = existing_channels[i]
-                if channel.name != name:
-                    await channel.edit(name=name)
+        # Update existing channels or create new ones
+        for i, target_name in enumerate(channel_names):
+            try:
+                if i < len(existing_stats_channels):
+                    # Update existing channel name if different
+                    channel = existing_stats_channels[i]
+                    if channel.name != target_name:
+                        print(f"Updating channel: {channel.name} → {target_name}")
+                        await channel.edit(name=target_name)
+                        print(f"✅ Updated: {target_name}")
+                    else:
+                        print(f"✅ Channel already up to date: {target_name}")
+                else:
+                    # Create new channel (no category, no special permissions)
+                    print(f"Creating new channel: {target_name}")
+                    await guild.create_voice_channel(name=target_name)
+                    print(f"✅ Created: {target_name}")
+                    
+            except discord.Forbidden as e:
+                print(f"❌ Permission denied for '{target_name}': {e}")
+                print(f"   This channel was probably created by a higher-role user")
+                print(f"   Creating a new '{target_name}' channel instead...")
+                # Try to create a new channel as fallback
+                try:
+                    await guild.create_voice_channel(name=target_name)
+                    print(f"✅ Created new: {target_name}")
+                except Exception as fallback_error:
+                    print(f"❌ Fallback creation also failed: {fallback_error}")
+            except Exception as e:
+                print(f"❌ Error with '{target_name}': {e}")
                 
-                # Make sure permissions are set correctly
-                await channel.edit(overwrites=private_overwrites)
-            else:
-                # Create new channel with private permissions
-                await guild.create_voice_channel(
-                    name=name, 
-                    category=stats_category,
-                    overwrites=private_overwrites
-                )
-                
-        # Delete extra channels if there are more than needed
-        if len(existing_channels) > len(channel_names):
-            for channel in existing_channels[len(channel_names):]:
-                await channel.delete()
-                
-        print(f"Updated voice channel stats at {datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}")
+        print(f"✅ Stats update completed at {datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}")
             
     except Exception as e:
         print(f"Error updating voice channel stats: {e}")
