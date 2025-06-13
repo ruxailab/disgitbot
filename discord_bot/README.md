@@ -106,18 +106,6 @@ NGROK_DOMAIN=your_chosen_subdomain
 NGROK_AUTHTOKEN=your_ngrok_authtoken
 ```
 
-**Example `.env` file:**
-```bash
-DISCORD_BOT_TOKEN=***REMOVED***
-GITHUB_TOKEN=***REMOVED***
-GITHUB_CLIENT_ID=Ov23liYbQ7pqve5HXo6W
-GITHUB_CLIENT_SECRET=***REMOVED***
-REPO_OWNER=ruxailab
-REPO_NAME=RUXAILAB
-NGROK_DOMAIN=ruxauth
-NGROK_AUTHTOKEN=***REMOVED***
-```
-
 ### 7. Repository Secrets (for GitHub Actions/Cloud Deployment)
 If using GitHub Actions or Cloud Run deployment, add these repository secrets:
 - `DISCORD_BOT_TOKEN`
