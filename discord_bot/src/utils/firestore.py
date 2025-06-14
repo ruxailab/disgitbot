@@ -8,17 +8,18 @@ from role_utils import determine_role
 try:
     if not firebase_admin._apps:
         print("Initializing Firebase...") 
-        # Check the config directory for backward compatibility
-        if os.path.exists("config/credentials.json"):
-            print("Using credentials.json from config directory (development environment)")
-            cred = credentials.Certificate("config/credentials.json")
         
-        # No other fallbacks - if we can't find credentials, fail clearly
+        # Calculate path to config directory relative to this script
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        config_path = os.path.join(script_dir, "../../config/credentials.json")
+        config_path = os.path.abspath(config_path)  # Normalize the path
+        
+        if os.path.exists(config_path):
+            print(f"Using credentials.json from {config_path}")
+            cred = credentials.Certificate(config_path)
         else:
             print("ERROR: No valid credentials found.")
-            print("Place credentials.json in one of these locations:")
-            print("  - discord_bot/src/utils/credentials.json (current directory)")
-            print("  - config/credentials.json (if running from project root)")
+            print(f"Place credentials.json at: {config_path}")
             exit(1)
             
         # Initialize Firebase
