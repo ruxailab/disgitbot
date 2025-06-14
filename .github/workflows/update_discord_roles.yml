@@ -35,7 +35,7 @@ jobs:
           echo "Created or verified existence of necessary JSON files"
 
       - name: Set up Google Credentials
-        run: echo "${{ secrets.GOOGLE_CREDENTIALS_JSON }}" | base64 --decode > credentials.json
+        run: echo "${{ secrets.GOOGLE_CREDENTIALS_JSON }}" | base64 --decode > discord_bot/src/utils/credentials.json
 
       - name: Fetch GitHub contributions 
         env:
@@ -45,7 +45,7 @@ jobs:
 
       - name: Update Firestore
         env:
-          GOOGLE_APPLICATION_CREDENTIALS: credentials.json
+          GOOGLE_APPLICATION_CREDENTIALS: discord_bot/src/utils/credentials.json
         run: |
           python discord_bot/src/utils/firestore.py
 
