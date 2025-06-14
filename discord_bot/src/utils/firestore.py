@@ -7,24 +7,18 @@ from role_utils import determine_role
 # ---------- Firebase Initialization ----------
 try:
     if not firebase_admin._apps:
-        print("Initializing Firebase...")
-        
-        # In production (Cloud Run), use the secret mount
-        secret_path = "/secret/firebase-credentials"
-        if os.path.exists(secret_path):
-            print(f"Using credentials from secret mount (production environment)")
-            cred = credentials.Certificate(secret_path)
-        
-        # In development, use local credentials.json
-        elif os.path.exists("config/credentials.json"):
+        print("Initializing Firebase...") 
+        # Check the config directory for backward compatibility
+        if os.path.exists("config/credentials.json"):
             print("Using credentials.json from config directory (development environment)")
             cred = credentials.Certificate("config/credentials.json")
         
         # No other fallbacks - if we can't find credentials, fail clearly
         else:
             print("ERROR: No valid credentials found.")
-            print("In production: Mount secret to /secret/firebase-credentials")
-            print("In development: Place credentials.json in the current directory")
+            print("Place credentials.json in one of these locations:")
+            print("  - discord_bot/src/utils/credentials.json (current directory)")
+            print("  - config/credentials.json (if running from project root)")
             exit(1)
             
         # Initialize Firebase
