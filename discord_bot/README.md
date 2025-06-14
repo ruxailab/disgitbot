@@ -123,7 +123,7 @@ If using GitHub Actions or Cloud Run deployment, add these repository secrets:
 **Local Development:**
 ```bash
 # Create virtual environment
-python 3.13 -m venv venv
+python3.13 -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 
 # Install dependencies
