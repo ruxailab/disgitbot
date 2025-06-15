@@ -38,6 +38,7 @@ logs/
 # Project specific
 credentials.json
 contributions.json
+
 # IDE specific files
 .idea/
 .vscode/
@@ -46,7 +47,37 @@ contributions.json
 *~
 .DS_Store
 
+# Shell scripts (local development)
 runbot.sh
 activate.sh 
 run_workflow.sh
 commit_and_push.sh
+
+# PR Review System - Test Files and Development Data
+pr_review/test_*.py
+pr_review/*_test.py
+pr_review/api_test.py
+pr_review/quick_test.py
+pr_review/simple_test.py
+pr_review/final_test.py
+pr_review/setup_vertex_ai.py
+pr_review/.env
+pr_review/__pycache__/
+pr_review/logs/
+pr_review/output/
+
+# PR Review System - Temporary/Test Data
+pr_review/data/test_*.json
+pr_review/data/collected_repo_labels*.json
+pr_review/data/labels_collection_report.md
+
+# Keep these important files for production:
+# pr_review/main.py
+# pr_review/config.py
+# pr_review/requirements.txt
+# pr_review/utils/
+# pr_review/scripts/
+# pr_review/.github/
+# pr_review/DEPLOYMENT_TEMPLATE.md
+# pr_review/MENTOR_REQUIREMENTS_CHECKLIST.md
+# pr_review/data/reviewers_config.json

@@ -1,0 +1,68 @@
+{
+  "reviewers": {
+    "marcgc21": {
+      "name": "Marc García",
+      "expertise": ["frontend", "ui/ux", "vue", "javascript", "user-testing"],
+      "max_concurrent_reviews": 3,
+      "availability": "high",
+      "timezone": "Europe/Madrid",
+      "role": "maintainer"
+    },
+    "xemyst": {
+      "name": "Xemyst",
+      "expertise": ["backend", "python", "api", "database", "security"],
+      "max_concurrent_reviews": 2,
+      "availability": "medium",
+      "timezone": "UTC",
+      "role": "contributor"
+    },
+    "KarinePistili": {
+      "name": "Karine Pistili",
+      "expertise": ["accessibility", "testing", "documentation", "user-testing"],
+      "max_concurrent_reviews": 2,
+      "availability": "high",
+      "timezone": "America/Sao_Paulo",
+      "role": "contributor"
+    },
+    "hvini": {
+      "name": "Hvini",
+      "expertise": ["backend", "python", "performance", "ci/cd"],
+      "max_concurrent_reviews": 2,
+      "availability": "medium",
+      "timezone": "America/Sao_Paulo",
+      "role": "contributor"
+    },
+    "sergiobeltranguerrero": {
+      "name": "Sergio Beltrán",
+      "expertise": ["frontend", "backend", "full-stack", "architecture"],
+      "max_concurrent_reviews": 3,
+      "availability": "high",
+      "timezone": "Europe/Madrid",
+      "role": "maintainer"
+    },
+    "leoruas": {
+      "name": "Leo Ruas",
+      "expertise": ["backend", "python", "testing", "ci/cd"],
+      "max_concurrent_reviews": 2,
+      "availability": "medium",
+      "timezone": "America/Sao_Paulo",
+      "role": "contributor"
+    },
+    "JulioManoel": {
+      "name": "Julio Manoel",
+      "expertise": ["frontend", "javascript", "testing"],
+      "max_concurrent_reviews": 2,
+      "availability": "medium",
+      "timezone": "America/Sao_Paulo",
+      "role": "contributor"
+    }
+  },
+  "assignment_rules": {
+    "min_reviewers": 1,
+    "max_reviewers": 2,
+    "require_maintainer_for_high_risk": true,
+    "expertise_match_weight": 0.4,
+    "availability_weight": 0.3,
+    "workload_weight": 0.3
+  }
+} 
