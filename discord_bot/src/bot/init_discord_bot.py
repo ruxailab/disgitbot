@@ -446,22 +446,26 @@ async def update_voice_channel_stats():
         
         # Find existing stats channels (look for channels starting with emojis)
         stats_emojis = ["⭐", "🍴", "🎯", "💼", "👥", "💻"]
-        existing_stats_channels = []
+        existing_stats_channels = {}
         
+        # Map existing channels by their emoji prefix
         for channel in guild.voice_channels:
             for emoji in stats_emojis:
                 if channel.name.startswith(emoji):
-                    existing_stats_channels.append(channel)
+                    existing_stats_channels[emoji] = channel
                     break
         
         print(f"Found {len(existing_stats_channels)} existing stats channels")
         
         # Update existing channels or create new ones
-        for i, target_name in enumerate(channel_names):
+        for target_name in channel_names:
+            # Extract emoji from target name
+            emoji = target_name.split()[0]
+            
             try:
-                if i < len(existing_stats_channels):
+                if emoji in existing_stats_channels:
                     # Update existing channel name if different
-                    channel = existing_stats_channels[i]
+                    channel = existing_stats_channels[emoji]
                     if channel.name != target_name:
                         print(f"Updating channel: {channel.name} → {target_name}")
                         await channel.edit(name=target_name)
@@ -469,7 +473,7 @@ async def update_voice_channel_stats():
                     else:
                         print(f"✅ Channel already up to date: {target_name}")
                 else:
-                    # Create new channel (no category, no special permissions)
+                    # Create new channel only if it doesn't exist
                     print(f"Creating new channel: {target_name}")
                     await guild.create_voice_channel(name=target_name)
                     print(f"✅ Created: {target_name}")
@@ -477,13 +481,8 @@ async def update_voice_channel_stats():
             except discord.Forbidden as e:
                 print(f"❌ Permission denied for '{target_name}': {e}")
                 print(f"   This channel was probably created by a higher-role user")
-                print(f"   Creating a new '{target_name}' channel instead...")
-                # Try to create a new channel as fallback
-                try:
-                    await guild.create_voice_channel(name=target_name)
-                    print(f"✅ Created new: {target_name}")
-                except Exception as fallback_error:
-                    print(f"❌ Fallback creation also failed: {fallback_error}")
+                print(f"   Skipping update to avoid creating duplicates...")
+                # Don't create new channels - just skip to avoid duplicates
             except Exception as e:
                 print(f"❌ Error with '{target_name}': {e}")
                 
