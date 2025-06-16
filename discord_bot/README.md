@@ -36,10 +36,7 @@ discord_bot/
 │   ├── takedown.sh             # Cloud Run service removal script
 │   ├── Dockerfile              # Container configuration
 │   └── entrypoint.sh           # Container startup script with health checks
-└── README.md
-
-../issue_label/                 # RAG-based AI system for automatic issue labeling
-../pr_review/                   # RAG-based AI system for code reviews
+└── README.md 
 ```
 
 ## Setup
