@@ -88,7 +88,7 @@ class ReviewerAssigner:
         
         return default_config
     
-    def assign_reviewers(self, pr_data: Dict[str, Any]) -> List[str]:
+    def assign_reviewers(self, pr_data: Dict[str, Any], repo: str = None) -> Dict[str, Any]:
         """Assign reviewers to a pull request."""
         try:
             # Extract PR information
@@ -109,7 +109,7 @@ class ReviewerAssigner:
             
             if not available_reviewers:
                 logger.warning("No available reviewers found")
-                return []
+                return {"reviewers": [], "reasoning": "No available reviewers found"}
             
             # Score reviewers based on expertise match and availability
             reviewer_scores = self._score_reviewers(available_reviewers, pr_characteristics)
@@ -117,12 +117,29 @@ class ReviewerAssigner:
             # Select reviewers based on assignment rules
             selected_reviewers = self._select_reviewers(reviewer_scores, pr_characteristics)
             
-            logger.info(f"Assigned reviewers: {selected_reviewers}")
-            return selected_reviewers
+            # Format response with detailed reviewer info
+            reviewers_info = []
+            for username in selected_reviewers:
+                reviewer_config = self.reviewers_config["reviewers"].get(username, {})
+                reviewers_info.append({
+                    "username": username,
+                    "name": reviewer_config.get("name", username),
+                    "expertise": ", ".join(reviewer_config.get("expertise", [])),
+                    "score": reviewer_scores.get(username, 0.0)
+                })
+            
+            result = {
+                "reviewers": reviewers_info,
+                "reasoning": f"Selected based on expertise match and availability for {repo or 'repository'}",
+                "characteristics": pr_characteristics
+            }
+            
+            logger.info(f"Assigned reviewers: {[r['username'] for r in reviewers_info]}")
+            return result
             
         except Exception as e:
             logger.error(f"Error assigning reviewers: {e}")
-            return []
+            return {"reviewers": [], "reasoning": f"Error: {str(e)}"}
     
     def _analyze_pr_characteristics(self, title: str, body: str, diff: str, metrics: Dict[str, Any]) -> Dict[str, Any]:
         """Analyze PR characteristics to determine required expertise."""

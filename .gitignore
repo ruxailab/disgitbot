@@ -71,6 +71,7 @@ pr_review/data/test_*.json
 pr_review/data/collected_repo_labels*.json
 pr_review/data/labels_collection_report.md
 
+create_test_pr.sh
 # Keep these important files for production:
 # pr_review/main.py
 # pr_review/config.py

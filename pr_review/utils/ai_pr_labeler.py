@@ -4,8 +4,11 @@ AI-based PR Labeler using Google Gemini for classification
 """
 
 import logging
+import time
+import re
 from typing import List, Dict, Any, Optional
 import google.generativeai as genai
+from google.api_core import exceptions as google_exceptions
 from config import GOOGLE_API_KEY, GEMINI_MODEL
 from utils.github_client import GitHubClient
 
@@ -87,14 +90,8 @@ class AIPRLabeler:
             # Build the AI prompt
             prompt = self._build_classification_prompt(pr_data, available_labels)
             
-            # Get AI classification
-            response = self.model.generate_content(
-                prompt,
-                generation_config=genai.types.GenerationConfig(
-                    temperature=0.3,
-                    max_output_tokens=1000,
-                )
-            )
+            # Get AI classification with retry logic
+            response = self._make_ai_request_with_retry(prompt)
             
             # Parse AI response
             predicted_labels = self._parse_ai_response(response.text, available_labels)
@@ -163,6 +160,167 @@ Only select labels that are highly relevant. Be selective and accurate.
 """
         
         return prompt
+    
+    def _make_ai_request_with_retry(self, prompt: str, max_retries: int = 3, base_delay: int = 30) -> Any:
+        """
+        Make AI request with intelligent retry logic for quota limits
+        
+        Args:
+            prompt: The prompt to send to the AI
+            max_retries: Maximum number of retry attempts
+            base_delay: Base delay in seconds for exponential backoff
+            
+        Returns:
+            AI response object
+        """
+        import random
+        
+        for attempt in range(max_retries + 1):
+            try:
+                logger.info(f"Making AI request (attempt {attempt + 1}/{max_retries + 1})")
+                
+                response = self.model.generate_content(
+                    prompt,
+                    generation_config=genai.types.GenerationConfig(
+                        temperature=0.3,
+                        max_output_tokens=1000,
+                    )
+                )
+                
+                logger.info("✅ AI request successful!")
+                return response
+                
+            except Exception as e:
+                error_message = str(e).lower()
+                
+                # Check if this is the last attempt
+                is_last_attempt = attempt == max_retries
+                
+                # Handle quota/rate limit errors specifically
+                if any(keyword in error_message for keyword in [
+                    'quota', 'rate limit', 'limit exceeded', 'resource_exhausted'
+                ]):
+                    
+                    if is_last_attempt:
+                        logger.error(f"❌ Quota limit reached after {max_retries + 1} attempts. Giving up.")
+                        raise
+                    
+                    # Try to extract retry delay from error message
+                    retry_delay = self._extract_retry_delay(str(e))
+                    
+                    if retry_delay is None:
+                        # Use exponential backoff with jitter
+                        retry_delay = base_delay * (2 ** attempt) + random.randint(1, 10)
+                    
+                    logger.warning(
+                        f"⏳ Quota limit hit on attempt {attempt + 1}. "
+                        f"Waiting {retry_delay} seconds before retry..."
+                    )
+                    
+                    # Show progress during wait
+                    self._wait_with_progress(retry_delay)
+                    continue
+                
+                # Handle other Google API errors
+                elif any(keyword in error_message for keyword in [
+                    'invalid_argument', 'permission_denied', 'unauthenticated'
+                ]):
+                    logger.error(f"❌ API configuration error: {e}")
+                    raise  # Don't retry for configuration errors
+                
+                # Handle temporary/network errors
+                elif any(keyword in error_message for keyword in [
+                    'timeout', 'connection', 'network', 'unavailable'
+                ]):
+                    
+                    if is_last_attempt:
+                        logger.error(f"❌ Network error after {max_retries + 1} attempts: {e}")
+                        raise
+                    
+                    # Shorter delay for network errors
+                    retry_delay = min(base_delay * (2 ** attempt), 60) + random.randint(1, 5)
+                    
+                    logger.warning(
+                        f"🌐 Network error on attempt {attempt + 1}: {e}. "
+                        f"Retrying in {retry_delay} seconds..."
+                    )
+                    
+                    time.sleep(retry_delay)
+                    continue
+                
+                # Unknown error - retry with backoff
+                else:
+                    if is_last_attempt:
+                        logger.error(f"❌ Unknown error after {max_retries + 1} attempts: {e}")
+                        raise
+                    
+                    retry_delay = base_delay * (2 ** attempt) + random.randint(1, 5)
+                    
+                    logger.warning(
+                        f"⚠️  Unknown error on attempt {attempt + 1}: {e}. "
+                        f"Retrying in {retry_delay} seconds..."
+                    )
+                    
+                    time.sleep(retry_delay)
+                    continue
+        
+        # This should never be reached, but just in case
+        raise Exception("Exhausted all retry attempts")
+    
+    def _extract_retry_delay(self, error_message: str) -> Optional[int]:
+        """
+        Extract retry delay from Google API error message
+        
+        Args:
+            error_message: Error message from Google API
+            
+        Returns:
+            Retry delay in seconds if found, None otherwise
+        """
+        try:
+            # Look for patterns like "retry_delay { seconds: 56 }"
+            retry_pattern = r'retry_delay\s*{\s*seconds:\s*(\d+)'
+            match = re.search(retry_pattern, error_message)
+            
+            if match:
+                delay = int(match.group(1))
+                logger.info(f"🕒 API provided retry delay: {delay} seconds")
+                return delay + 5  # Add 5 second buffer
+            
+            return None
+            
+        except Exception as e:
+            logger.debug(f"Failed to extract retry delay: {e}")
+            return None
+    
+    def _wait_with_progress(self, total_seconds: int):
+        """
+        Wait with a progress indicator
+        
+        Args:
+            total_seconds: Total time to wait in seconds
+        """
+        print(f"\n⏳ Waiting for quota reset ({total_seconds}s):")
+        
+        # Show progress in chunks of 10 seconds or less
+        chunk_size = min(10, total_seconds // 10) if total_seconds > 10 else 1
+        
+        for i in range(0, total_seconds, chunk_size):
+            remaining = total_seconds - i
+            chunk_wait = min(chunk_size, remaining)
+            
+            # Calculate progress
+            progress = (i / total_seconds) * 100
+            bar_length = 20
+            filled_length = int(bar_length * progress // 100)
+            bar = "█" * filled_length + "░" * (bar_length - filled_length)
+            
+            print(f"\r[{bar}] {progress:5.1f}% - {remaining:3d}s remaining", end="", flush=True)
+            
+            time.sleep(chunk_wait)
+        
+        print(f"\r[{'█' * 20}] 100.0% - Ready to retry!           ")
+        print()
     
     def _parse_ai_response(self, response_text: str, available_labels: List[str]) -> List[Dict[str, Any]]:
         """Parse the AI response into structured label predictions"""

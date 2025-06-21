@@ -54,6 +54,7 @@ jobs:
       (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'process_pr') ||
       (github.event_name == 'workflow_call' && inputs.action == 'process_pr')
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     
     steps:
     - name: Checkout code
