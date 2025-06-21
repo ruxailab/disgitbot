@@ -87,7 +87,7 @@ jobs:
         
     - name: Upload processing logs
       if: always()
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: pr-automation-logs-${{ inputs.pr_number || github.event.pull_request.number }}
         path: ${{ github.event_name == 'workflow_call' && 'pr-automation/' || '' }}pr_review/logs/
@@ -137,7 +137,7 @@ jobs:
         git push
         
     - name: Upload labels data
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: repository-labels-data
         path: |
