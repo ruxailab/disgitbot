@@ -2,7 +2,12 @@ import os
 import json
 import firebase_admin
 from firebase_admin import credentials, firestore
-from .role_utils import determine_role
+
+# Handle both relative and absolute imports
+try:
+    from .role_utils import determine_role
+except ImportError:
+    from role_utils import determine_role
 
 # ---------- Firebase Initialization ----------
 try:
