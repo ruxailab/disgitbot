@@ -41,7 +41,7 @@ on:
         default: 'process_pr'
         description: 'Action to perform'
     secrets:
-      GITHUB_TOKEN:
+      GH_TOKEN:
         required: true
       GOOGLE_API_KEY:
         required: true
@@ -62,7 +62,7 @@ jobs:
         # If called from another repo, checkout this master repo
         repository: ${{ github.event_name == 'workflow_call' && 'ruxailab/disgitbot' || github.repository }}
         path: ${{ github.event_name == 'workflow_call' && 'pr-automation' || '.' }}
-        token: ${{ secrets.GITHUB_TOKEN || github.token }}
+        token: ${{ secrets.GH_TOKEN || github.token }}
       
     - name: Set up Python
       uses: actions/setup-python@v4
@@ -76,7 +76,7 @@ jobs:
         
     - name: Run PR automation
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN || github.token }}
+        GITHUB_TOKEN: ${{ secrets.GH_TOKEN || github.token }}
         GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
       run: |
         cd ${{ github.event_name == 'workflow_call' && 'pr-automation/' || '' }}pr_review
@@ -107,7 +107,7 @@ jobs:
       with:
         repository: ${{ github.event_name == 'workflow_call' && 'ruxailab/disgitbot' || github.repository }}
         path: ${{ github.event_name == 'workflow_call' && 'pr-automation' || '.' }}
-        token: ${{ secrets.GITHUB_TOKEN || github.token }}
+        token: ${{ secrets.GH_TOKEN || github.token }}
       
     - name: Set up Python
       uses: actions/setup-python@v4
@@ -121,7 +121,7 @@ jobs:
         
     - name: Collect repository labels
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN || github.token }}
+        GITHUB_TOKEN: ${{ secrets.GH_TOKEN || github.token }}
       run: |
         cd ${{ github.event_name == 'workflow_call' && 'pr-automation/' || '' }}pr_review
         python scripts/collect_repo_labels.py
@@ -159,7 +159,7 @@ jobs:
       with:
         repository: ${{ github.event_name == 'workflow_call' && 'ruxailab/disgitbot' || github.repository }}
         path: ${{ github.event_name == 'workflow_call' && 'pr-automation' || '.' }}
-        token: ${{ secrets.GITHUB_TOKEN || github.token }}
+        token: ${{ secrets.GH_TOKEN || github.token }}
       
     - name: Set up Python
       uses: actions/setup-python@v4
@@ -173,7 +173,7 @@ jobs:
         
     - name: Update repository cache
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN || github.token }}
+        GITHUB_TOKEN: ${{ secrets.GH_TOKEN || github.token }}
         GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
       run: |
         cd ${{ github.event_name == 'workflow_call' && 'pr-automation/' || '' }}pr_review
