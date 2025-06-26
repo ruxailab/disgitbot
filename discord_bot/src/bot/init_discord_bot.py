@@ -9,9 +9,19 @@ from firebase_admin import credentials, firestore
 import json
 import asyncio
 import threading
-from ..utils.firestore import get_firestore_data, get_hall_of_fame_data
-from ..utils.role_utils import determine_role, get_next_role
-from .auth import get_github_username, wait_for_username, start_flask
+# Handle both relative and absolute imports
+try:
+    from ..utils.firestore import get_firestore_data, get_hall_of_fame_data
+    from ..utils.role_utils import determine_role, get_next_role
+    from .auth import get_github_username, wait_for_username, start_flask
+except ImportError:
+    # If relative imports fail, try absolute imports
+    import sys
+    import os
+    sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+    from src.utils.firestore import get_firestore_data, get_hall_of_fame_data
+    from src.utils.role_utils import determine_role, get_next_role
+    from src.bot.auth import get_github_username, wait_for_username, start_flask
 import datetime
 import sys
 
