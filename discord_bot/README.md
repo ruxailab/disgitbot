@@ -1,15 +1,3 @@
-# DisGitBot - Discord GitHub Integration System
-
-## Quick Start Checklist
-
-Before setting up, make sure you have:
-- [ ] Discord bot token (from Discord Developer Portal)
-- [ ] GitHub personal access token (with repo permissions)
-- [ ] GitHub OAuth app (with ngrok callback URL)
-- [ ] Google Cloud Firestore database and service account
-- [ ] Ngrok account and authtoken (free tier works)
-- [ ] Python 3.13+ installed
-
 ## Project Structure
 
 ```
@@ -43,15 +31,26 @@ discord_bot/
 
 ### 1. Discord Bot Creation
 1. Create a Discord bot at https://discord.com/developers/applications
-2. Enable the following bot permissions:
-   - **Bot** (Send messages, embed links, etc.)
-   - **applications.commands** (Use slash commands)
-   - **Manage Roles** (Assign roles based on contributions)
-   - **Manage Channels** (Create/update voice channels for stats)
-   - **Send Messages** (Bot responses)
-   - **Read Message History** (Command processing)
-   - **Use Slash Commands** (Primary interface)
-3. Copy the bot token for environment variables
+2. Click on OAuth2 on the left sidebar
+3. In Redirects, put https://discord.com
+4. Under OAuth2 URL Generator, SCOPEs, check
+   - applications.commands
+   - bot
+5. Under BOT PERMISSIONS, check
+   - Manage Roles
+   - View Channels
+   - Manage Channels
+   - Send Messages
+   - Embed Links
+   - Read Message History
+   - Use Slash Commands
+   - Use Embedded Activities 
+6. Click on Bot on the left sidebar
+7. Under Privileged Gateway Intents, enable
+   - PRESENCE INTENT
+   - SERVER MEMBERS INTENT
+   - MESSAGE CONTENT INTENT
+8. Copy the bot token for environment variable
 
 ### 2. Firestore Database Setup
 1. Create a Google Cloud project and enable Firestore
