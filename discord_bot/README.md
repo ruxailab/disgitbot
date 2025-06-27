@@ -1,225 +1,138 @@
-## Project Structure
+# Discord Bot Setup
+
+## 1. Structure
 
 ```
 discord_bot/
-├── main.py                     # Main entry point for the Discord bot
+├── main.py                     # Entry point
 ├── src/
-│   ├── __init__.py
 │   ├── bot/
-│   │   ├── __init__.py
-│   │   ├── init_discord_bot.py # Main Discord bot with slash commands
-│   │   └── auth.py             # GitHub OAuth authentication using Flask and ngrok
-│   └── utils/
-│       ├── __init__.py
-│       ├── firestore.py        # Firestore database operations
-│       ├── role_utils.py       # Role determination logic based on contribution thresholds
-│       ├── fetch_contributors.py # GitHub API integration to collect contribution data
-│       └── update_discord_roles.py # Updates Discord roles based on GitHub activity
+│   │   ├── init_discord_bot.py # Main bot code with slash commands
+│   │   └── auth.py             # GitHub OAuth handling
+│   └── utils/                  # Database and role utilities
 ├── config/
-│   ├── .env                    # Environment variables
-│   ├── credentials.json        # Google Cloud service account credentials
-│   └── discord_bot_requirements.txt # Python dependencies
-├── deployment/
-│   ├── deploy.sh               # Google Cloud Run deployment script
-│   ├── takedown.sh             # Cloud Run service removal script
-│   ├── Dockerfile              # Container configuration
-│   └── entrypoint.sh           # Container startup script with health checks
-└── README.md 
+│   ├── .env                    # Your environment variables
+│   ├── credentials.json        # Firebase service account key
+│   └── discord_bot_requirements.txt
+└── deployment/                 # Cloud deployment scripts
 ```
 
-## Setup
+## 2. Step-by-Step Setup (Monkey See, Monkey Do)
 
-### 1. Discord Bot Creation
-1. Create a Discord bot at https://discord.com/developers/applications
-2. Click on OAuth2 on the left sidebar
-3. In Redirects, put https://discord.com
-4. Under OAuth2 URL Generator, SCOPEs, check
-   - applications.commands
-   - bot
-5. Under BOT PERMISSIONS, check
-   - Manage Roles
-   - View Channels
-   - Manage Channels
-   - Send Messages
-   - Embed Links
-   - Read Message History
-   - Use Slash Commands
-   - Use Embedded Activities 
-6. Click on Bot on the left sidebar
-7. Under Privileged Gateway Intents, enable
-   - PRESENCE INTENT
-   - SERVER MEMBERS INTENT
-   - MESSAGE CONTENT INTENT
-8. Copy the bot token for environment variable
+### Step 1: Create Discord Bot
+1. Go to https://discord.com/developers/applications
+2. Click "New Application" → name it whatever
+3. Go to "OAuth2" tab → check these boxes:
+   - ✅ `bot`
+   - ✅ `applications.commands`
+4. Under "Bot Permissions" check these:
+   - ✅ `Manage Roles`
+   - ✅ `View Channels` 
+   - ✅ `Manage Channels`
+   - ✅ `Send Messages`
+   - ✅ `Embed Links`
+   - ✅ `Read Message History`
+   - ✅ `Use Slash Commands`
+   - ✅ `Use Embedded Activities `
+   - ✅ `Connect` (for voice channels)
+5. Copy the generated URL and invite bot to your server
+6. Go to "Bot" tab → Enable these 3 intents:
+   - ✅ `PRESENCE INTENT`
+   - ✅ `SERVER MEMBERS INTENT` 
+   - ✅ `MESSAGE CONTENT INTENT`
+7. Click "Reset Token" → copy the token (save it!)
 
-### 2. Firestore Database Setup
-1. Create a Google Cloud project and enable Firestore
-2. Create a service account with Firestore permissions
-3. Download the service account JSON key file
-4. Place the file as `config/credentials.json`
-5. For deployment, encode the JSON as base64 for secrets
+### Step 2: Create Firebase Database
+1. Go to https://console.firebase.google.com
+2. Create new project → Enable Firestore
+3. Create database → Start in test mode → Next → Done
+4. Add a dummy document so database isn't empty:
+   - Collection: `discord`
+   - Document ID: `123456789` (any numbers)
+   - Field: `github_id`, Value: `testuser`
+5. Go to Project Settings → Service Accounts → Python
+6. Click "Generate new private key" → download the JSON file
+7. **IMPORTANT**: Rename it to `credentials.json` and put it in `discord_bot/config/`
 
-### 3. GitHub Personal Access Token
-1. Go to GitHub Settings → Developer settings → Personal access tokens
-2. Create a token with the following permissions:
-   - **repo** (Full repository access)
-   - **read:org** (Read organization data)
-   - **read:user** (Read user profile data)
-3. Copy the token for environment variables
+### Step 3: Create GitHub Token
+1. Go to https://github.com/settings/tokens
+2. Click "Generate new token (classic)"
+3. Check only: ✅ `repo` (gives full repo access)
+4. Generate → copy the token (save it!)
 
-### 4. GitHub OAuth App Setup
-1. Go to GitHub Settings → Developer settings → OAuth Apps
-2. Create a new OAuth App with these settings:
-   - **Application name**: Your bot name
-   - **Homepage URL**: `https://ruxauth.ngrok.io`
-   - **Authorization callback URL**: `https://ruxauth.ngrok.io/login/github/authorized`
-3. Copy the Client ID and Client Secret for environment variables
+### Step 4: Create GitHub OAuth App  
+1. Go to https://github.com/settings/developers
+2. Click "New OAuth App"
+3. Fill in:
+   - **Application name**: `Your Bot Name`
+   - **Homepage URL**: `https://your-ngrok-domain.ngrok.io`
+   - **Authorization callback URL**: `https://your-ngrok-domain.ngrok.io/login/github/authorized`
+4. Create → copy Client ID and generate Client Secret (save both!)
 
-### 5. Ngrok Authentication Setup
-1. Sign up for a free ngrok account at https://dashboard.ngrok.com/signup
-2. Go to https://dashboard.ngrok.com/get-started/your-authtoken
-3. Copy your authtoken for environment variables
-4. Choose a custom subdomain (e.g., "ruxauth") for consistent URLs
+### Step 5: NGROK Setup (Temporary Solution)
+**Note**: NGROK is temporary. DM online for the token and URLs. We need a better solution to bridge the bot's backend server's GitHub OAuth to end users.
 
-### 6. Environment Variables Configuration
-Create a `config/.env` file with all required variables:
+### Step 6: Create Environment File
+Create `discord_bot/config/.env` with these EXACT values:
 
 ```bash
-# Discord Configuration
-DISCORD_BOT_TOKEN=your_discord_bot_token_here
+# Discord (use your bot token from Step 1)
+DISCORD_BOT_TOKEN=your_actual_bot_token_here
 
-# GitHub Configuration  
-GITHUB_TOKEN=your_github_personal_access_token
-GITHUB_CLIENT_ID=your_github_oauth_client_id
-GITHUB_CLIENT_SECRET=your_github_oauth_client_secret
+# GitHub (use your token from Step 3)
+GITHUB_TOKEN=your_github_token_here
+GITHUB_CLIENT_ID=your_oauth_client_id_from_step_4
+GITHUB_CLIENT_SECRET=your_oauth_client_secret_from_step_4
 
-# Repository Configuration
-REPO_OWNER=your_github_username_or_org
+# Repository Info (JUST THE NAMES, NOT FULL URLS)
+REPO_OWNER=your_github_username
 REPO_NAME=your_repository_name
 
-# Ngrok Configuration (for GitHub OAuth)
-NGROK_DOMAIN=your_chosen_subdomain
-NGROK_AUTHTOKEN=your_ngrok_authtoken
+# NGROK (DM online for these values)
+NGROK_DOMAIN=your_assigned_subdomain
+NGROK_AUTHTOKEN=your_assigned_token
 ```
 
-### 7. Repository Secrets (for GitHub Actions/Cloud Deployment)
-If using GitHub Actions or Cloud Run deployment, add these repository secrets:
-- `DISCORD_BOT_TOKEN`
-- `GITHUB_TOKEN` (as `GH_TOKEN`)
-- `GOOGLE_CREDENTIALS_JSON` (base64 encoded credentials.json)
-- `GITHUB_CLIENT_ID`
-- `GITHUB_CLIENT_SECRET`
-- `REPO_OWNER`
-- `REPO_NAME`
-- `NGROK_DOMAIN`
-- `NGROK_AUTHTOKEN`
+**Important Clarifications**:
+- `REPO_OWNER`: Just your GitHub username (e.g., `johnsmith`, NOT `https://github.com/johnsmith`)
+- `REPO_NAME`: Just the repository name (e.g., `my-project`, NOT the full URL)
+- `NGROK_DOMAIN`: Just the subdomain without `https://` (e.g., `mybot`, not `https://mybot.ngrok.io`)
 
-### 8. Installation and Running
-
-**Local Development:**
+### Step 7: Run the Bot
 ```bash
-# Create virtual environment
-python3.13 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+# 1. Make sure no virtual environment is active
+deactivate
 
-# Install dependencies
+# 2. Create new virtual environment with Python 3.13
+python3.13 -m venv discord_bot_env
+
+# 3. Activate it
+source discord_bot_env/bin/activate
+
+# 4. Upgrade pip
 python -m pip install --upgrade pip
+
+# 5. Install requirements
 pip install -r discord_bot/config/discord_bot_requirements.txt
 
-# Verify environment variables
+# 6. Run the bot
 cd discord_bot
-python -c "from dotenv import load_dotenv; import os; load_dotenv('config/.env'); print('Environment variables loaded successfully')"
-
-# Run the bot
-python src/bot/init_discord_bot.py
+python main.py
 ```
 
-**Cloud Deployment:**
+### Step 8: Link Your Account
+1. In Discord, type `/link`
+2. Click the URL it gives you
+3. Authorize with GitHub
+4. Done! Your Discord is now linked to GitHub
+
+### Step 9: Update Roles (One-Time Setup)
 ```bash
-cd discord_bot
-chmod +x deployment/deploy.sh
-./deployment/deploy.sh
+# Set default repo for workflows
+gh repo set-default
+
+# Run the workflow to fetch data and assign roles
+gh workflow run update-discord-roles.yml
 ```
 
-**⚠️ Important:** Make sure all environment variables are properly set in your `config/.env` file before running. The bot will check for missing variables on startup and display their status.
-
-### 9. Troubleshooting
-
-**Common Issues:**
-
-1. **Ngrok Authentication Error (ERR_NGROK_4018)**
-   - Make sure you have a valid `NGROK_AUTHTOKEN` in your `.env` file
-   - Verify your ngrok account is active at https://dashboard.ngrok.com/
-
-2. **Discord Bot Permission Issues**
-   - Ensure the bot role is high enough in your server's role hierarchy
-   - Check that all required permissions are enabled in Discord Developer Portal
-
-3. **GitHub OAuth Not Working**
-   - Verify your GitHub OAuth app callback URL matches your ngrok domain
-   - Check that `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` are correct
-
-4. **Firestore Connection Issues**
-   - Ensure `credentials.json` exists in the `config/` directory
-   - Verify the service account has proper Firestore permissions
-
-5. **Environment Variables Not Loading**
-   - Check that your `.env` file is in the `config/` directory
-   - Ensure there are no extra spaces or quotes around values
-   - Use the startup logs to verify which variables are loaded
-
-**Debug Commands:**
-```bash
-# Check environment variables
-python -c "from dotenv import load_dotenv; import os; load_dotenv('config/.env'); print([k for k in os.environ.keys() if k.startswith(('DISCORD_', 'GITHUB_', 'NGROK_', 'REPO_'))])"
-
-# Test bot permissions
-# Use the /check_permissions command in Discord
-```
-
-## File Explanations
-
-### Core Bot Files
-**main.py** - Main entry point for running the Discord bot
-
-**src/bot/init_discord_bot.py** - Main Discord bot with slash commands (/link, /getstats, /halloffame, /setup_voice_stats)
-
-**src/bot/auth.py** - GitHub OAuth authentication using Flask and ngrok
-
-### Utility Files
-**src/utils/firestore.py** - Firestore database operations for user data storage
-
-**src/utils/role_utils.py** - Role determination logic based on contribution thresholds
-
-**src/utils/fetch_contributors.py** - GitHub API integration to collect contribution data
-
-**src/utils/update_discord_roles.py** - Updates Discord roles based on GitHub activity
-
-### Configuration Files
-**config/.env** - Environment variables (Discord tokens, GitHub credentials, ngrok domain)
-
-**config/credentials.json** - Google Cloud service account credentials
-
-**config/discord_bot_requirements.txt** - Python dependencies
-
-### Deployment Files
-**deployment/deploy.sh** - Google Cloud Run deployment script
-
-**deployment/takedown.sh** - Cloud Run service removal script
-
-**deployment/Dockerfile** - Container configuration
-
-**deployment/entrypoint.sh** - Container startup script with health checks
-
-### AI Components
-**../issue_label/** - RAG-based AI system for automatic issue labeling using repository-specific context
-
-**../pr_review/** - RAG-based AI system for code reviews using historical review data
-
-## Demos
-
-**Firestore, Workflow, Data Fetching, Auto Role Update**  
-[![Firestore Demo](https://img.youtube.com/vi/AGuPckbdqdY/0.jpg)](https://youtu.be/AGuPckbdqdY)
-
-**GitHub Link Integration & OAuth**  
-[![GitHub OAuth Demo](https://img.youtube.com/vi/3uSMN4r4Af0/0.jpg)](https://youtu.be/3uSMN4r4Af0) 
+**That's it!** Your bot should now work. If you get errors, check that your `.env` file has the right values and your `credentials.json` is in the right place. 
