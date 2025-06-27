@@ -120,13 +120,13 @@ cd discord_bot
 python main.py
 ```
 
-### Step 8: Link Your Account
+### Step 8: Test Link Your Account
 1. In Discord, type `/link`
 2. Click the URL it gives you
 3. Authorize with GitHub
 4. Done! Your Discord is now linked to GitHub
 
-### Step 9: Update Roles (One-Time Setup)
+### Step 9: Test Update Roles
 ```bash
 # Set default repo for workflows
 gh repo set-default
