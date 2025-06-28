@@ -154,19 +154,19 @@ Go to your GitHub repository → Settings → Secrets and variables → Actions 
    - **Add to `.env`:** `GITHUB_TOKEN=your_token_here`
    - **Add to GitHub Secrets:** Create secret named `GH_TOKEN`
 
-### Step 4: Deploy to Cloud Run & Set OAUTH_BASE_URL
+### Step 4: Initial Deployment to Get Cloud Run URL
 
 **What this configures:** 
 - `.env` file: `OAUTH_BASE_URL=YOUR_CLOUD_RUN_URL` 
 
-**What this does:** Deploys your bot to Google Cloud Run to get a stable URL for GitHub OAuth, then saves it to your config.
+**What this does:** Deploys your bot temporarily to get a stable Cloud Run URL, which you'll need for GitHub OAuth setup.
 
-1. **Deploy Your Bot:**
+1. **Initial Deploy to Get URL:**
    ```bash
    # Make the deployment script executable
    chmod +x discord_bot/deployment/deploy.sh
    
-   # Run the deployment script
+   # Run the deployment script (this is just to get the URL)
    ./discord_bot/deployment/deploy.sh
    ```
 
@@ -185,10 +185,8 @@ Go to your GitHub repository → Settings → Secrets and variables → Actions 
 
 4. **Keep Your URL Handy:**
    - **Save this URL somewhere** - you'll need it for GitHub OAuth setup in the next step!
-   - **Redeploy after updating .env:**
-     ```bash
-     ./discord_bot/deployment/deploy.sh
-     ```
+
+**Note:** This is just a temporary deployment to get your URL. You'll do the final deployment in Step 7 after configuring everything.
 
 ### Step 5: Get GITHUB_CLIENT_ID (.env) + GITHUB_CLIENT_SECRET (.env)
 
@@ -231,34 +229,21 @@ Go to your GitHub repository → Settings → Secrets and variables → Actions 
 
 ---
 
-## 7. Running the Bot Locally (Optional)
+## 7. Final Deployment
 
-If you want to run the bot locally for development:
-
-### Install and Run
+Now that all your environment variables and GitHub OAuth settings are configured, deploy your bot:
 
 ```bash
-# 1. Make sure no virtual environment is active
-deactivate
-
-# 2. Create new virtual environment with Python 3.13
-python3.13 -m venv discord_bot_env
-
-# 3. Activate the virtual environment
-source discord_bot_env/bin/activate
-
-# 4. Upgrade pip to latest version
-python -m pip install --upgrade pip
-
-# 5. Install all required dependencies
-pip install -r discord_bot/config/discord_bot_requirements.txt
-
-# 6. Navigate to bot directory and run
-cd discord_bot
-python main.py
+# Deploy your bot with all settings configured
+./discord_bot/deployment/deploy.sh
 ```
 
-**Note:** Local development won't work for OAuth features since GitHub OAuth needs a public URL.
+The deployment script will:
+- Build your Docker image with the updated `.env` file
+- Deploy to Cloud Run with your `OAUTH_BASE_URL` configured
+- Set up all environment variables and secrets
+
+**After deployment completes, your bot will be fully functional with OAuth!**
 
 ---
 
@@ -315,3 +300,248 @@ python main.py
    - Make sure your `OAUTH_BASE_URL` is set correctly in `.env`
 
 **Need help?** Contact `onlineee__.` on Discord for support.
+
+---
+
+## 10. Understanding the Networking Architecture (For Developers)
+
+### **🏗️ How Discord Bot + Flask OAuth Works Together**
+
+This section explains the technical details of how our Discord bot serves both Discord commands AND web OAuth on the same Cloud Run service.
+
+### **📁 File Structure Overview**
+
+```
+discord_bot/
+├── main.py                          # Entry point - orchestrates everything
+├── src/bot/
+│   ├── init_discord_bot.py         # Discord bot with all commands
+│   └── auth.py                     # Flask OAuth server
+└── deployment/
+    └── entrypoint.sh               # Container startup script
+```
+
+### **🚀 Container Startup Flow**
+
+**File: `discord_bot/deployment/entrypoint.sh` (Lines 42-47)**
+```bash
+echo "Command: python -u main.py"
+echo "Command executed at: $(date)" >> discord_bot_status.log
+
+# Run the new main.py which includes both Discord bot and Flask OAuth
+python -u main.py 2>&1 | tee -a discord_bot.log
+```
+
+**File: `discord_bot/main.py` (Lines 15-31)**
+```python
+def run_discord_bot_async():
+    """Run the Discord bot asynchronously using existing bot setup"""
+    print("🤖 Starting Discord bot...")
+    
+    try:
+        # Import the existing Discord bot with all commands
+        print("📦 Importing existing Discord bot setup...")
+        import src.bot.init_discord_bot as discord_bot_module
+        
+        print("✅ Discord bot setup imported successfully")
+        
+        # Get the bot instance and run it
+        print("🤖 Starting Discord bot connection...")
+        discord_bot_module.bot.run(discord_bot_module.TOKEN)
+```
+
+### **🧵 Threading Architecture**
+
+**File: `discord_bot/main.py` (Lines 64-75)**
+```python
+# Start Discord bot in a separate thread
+print("🧵 Setting up Discord bot thread...")
+def start_discord_bot():
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        print("🤖 Starting Discord bot in thread...")
+        run_discord_bot_async()
+    except Exception as e:
+        print(f"❌ Discord bot error: {e}")
+        import traceback
+        traceback.print_exc()
+
+discord_thread = threading.Thread(target=start_discord_bot, daemon=True)
+discord_thread.start()
+```
+
+**File: `discord_bot/main.py` (Lines 85-94)**
+```python
+# Run Flask web server in main thread
+oauth_app.run(
+    host="0.0.0.0",    # Listen on all network interfaces
+    port=port,         # Cloud Run sets PORT=8080
+    debug=True,        # Enable debug for more logging
+    use_reloader=False,
+    threaded=True      # Handle multiple requests simultaneously
+)
+```
+
+### **🌐 Flask OAuth Route Definitions**
+
+**File: `discord_bot/src/bot/auth.py` (Lines 40-49)**
+```python
+@app.route("/")
+def index():
+    return jsonify({
+        "service": "Discord Bot with OAuth",
+        "status": "running",
+        "endpoints": {
+            "start_auth": "/auth/start/<discord_user_id>",
+            "callback": "/auth/callback"
+        }
+    })
+```
+
+**File: `discord_bot/src/bot/auth.py` (Lines 51-70)**
+```python
+@app.route("/auth/start/<discord_user_id>")
+def start_oauth(discord_user_id):
+    """Start OAuth flow for a specific Discord user"""
+    try:
+        with oauth_sessions_lock:
+            # Clear any existing session for this user
+            oauth_sessions[discord_user_id] = {
+                'status': 'pending',
+                'created_at': time.time()
+            }
+        
+        # Store user ID in session for callback
+        session['discord_user_id'] = discord_user_id
+        
+        print(f"Starting OAuth for Discord user: {discord_user_id}")
+        
+        # Redirect to GitHub OAuth
+        return redirect(url_for("github.login"))
+```
+
+### **🔄 GitHub OAuth Callback Processing**
+
+**File: `discord_bot/src/bot/auth.py` (Lines 75-95)**
+```python
+@app.route("/auth/callback")
+def github_callback():
+    """Handle GitHub OAuth callback - original working version"""
+    try:
+        discord_user_id = session.get('discord_user_id')
+        
+        if not discord_user_id:
+            return "Authentication failed: No Discord user session", 400
+        
+        if not github.authorized:
+            print("❌ GitHub OAuth not authorized")
+            with oauth_sessions_lock:
+                oauth_sessions[discord_user_id] = {
+                    'status': 'failed',
+                    'error': 'GitHub authorization failed'
+                }
+            return "GitHub authorization failed", 400
+        
+        # Get GitHub user info
+        resp = github.get("/user")
+```
+
+### **💾 Inter-Thread Communication**
+
+**File: `discord_bot/src/bot/auth.py` (Lines 11-13)**
+```python
+# Global state for OAuth sessions (keyed by Discord user ID)
+oauth_sessions = {}
+oauth_sessions_lock = threading.Lock()
+```
+
+**File: `discord_bot/src/bot/auth.py` (Lines 170-185)**
+```python
+def wait_for_username(discord_user_id, max_wait_time=300):
+    """Wait for OAuth completion by polling the status"""
+    start_time = time.time()
+    
+    while time.time() - start_time < max_wait_time:
+        with oauth_sessions_lock:
+            session_data = oauth_sessions.get(discord_user_id)
+            
+            if session_data:
+                if session_data['status'] == 'completed':
+                    github_username = session_data.get('github_username')
+                    # Clean up
+                    del oauth_sessions[discord_user_id]
+                    return github_username
+```
+
+### **🤖 Discord Command Integration**
+
+**File: `discord_bot/src/bot/init_discord_bot.py` (Lines 74-85)**
+```python
+@bot.tree.command(name="link", description="Link your Discord to GitHub")
+async def link(interaction: discord.Interaction):
+    await interaction.response.defer(ephemeral=True)
+
+    # Attempt to acquire the lock
+    if not verification_lock.acquire(blocking=False):
+        await interaction.followup.send("The verification process is currently busy. Please try again later.", ephemeral=True)
+        return
+
+    try:
+        discord_user_id = str(interaction.user.id)
+        
+        # Get the OAuth URL for this specific user
+        oauth_url = get_github_username_for_user(discord_user_id)
+```
+
+### **🌍 Cloud Run Environment Configuration**
+
+**File: `discord_bot/main.py` (Lines 42-49)**
+```python
+# Check required environment variables
+required_vars = [
+    "DISCORD_BOT_TOKEN", 
+    "GITHUB_TOKEN", 
+    "GITHUB_CLIENT_ID", 
+    "GITHUB_CLIENT_SECRET",
+    "OAUTH_BASE_URL"      # ← This is your Cloud Run URL
+]
+```
+
+**File: `discord_bot/src/bot/auth.py` (Lines 27-35)**
+```python
+# Get the base URL for OAuth callbacks (Cloud Run URL)
+base_url = os.getenv("OAUTH_BASE_URL")
+if not base_url:
+    raise ValueError("OAUTH_BASE_URL environment variable is required")
+
+# OAuth blueprint with custom callback URL (avoiding Flask-Dance auto routes)
+github_blueprint = make_github_blueprint(
+    client_id=os.getenv("GITHUB_CLIENT_ID"),
+    client_secret=os.getenv("GITHUB_CLIENT_SECRET"),
+    redirect_url=f"{base_url}/auth/callback"  # ← GitHub will redirect here
+)
+```
+
+### **🎯 Key Networking Concepts Demonstrated**
+
+1. **Single Process, Multiple Services**: `main.py` Lines 64-94 show how one container runs both Discord bot (background thread) and Flask (main thread)
+
+2. **Shared Memory Communication**: `auth.py` Lines 11-13 and 170-185 show how threads communicate via the `oauth_sessions` dictionary
+
+3. **URL Routing**: `auth.py` Lines 51-70 demonstrate Flask's `@app.route` decorator for handling different URL paths
+
+4. **Environment-Based Configuration**: `main.py` Lines 42-49 show how Cloud Run URLs are configured via environment variables
+
+5. **OAuth Flow State Management**: `auth.py` Lines 55-65 show how user sessions are tracked across HTTP requests
+
+6. **Thread-Safe Operations**: `auth.py` Lines 56-60 and 174-178 demonstrate proper locking for shared data structures
+
+### **🔍 Debugging Your Networking**
+
+- **View Flask logs**: Check Cloud Run logs for HTTP request patterns
+- **Inspect OAuth sessions**: Add debug prints in `auth.py` Lines 56 and 110
+- **Monitor thread health**: Add logging to `main.py` Lines 70-73
+- **Test routes directly**: Visit `YOUR_CLOUD_RUN_URL/` to see the Flask index page
+
+This architecture allows a single Cloud Run service to handle both Discord WebSocket connections and HTTP OAuth requests efficiently!
