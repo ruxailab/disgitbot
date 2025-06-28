@@ -17,7 +17,7 @@ discord_bot/
 └── deployment/                 # Cloud deployment scripts
 ```
 
-## 2. Step-by-Step Setup (Monkey See, Monkey Do)
+## 2. Step-by-Step Setup
 
 ### Step 1: Create Discord Bot
 1. Go to https://discord.com/developers/applications
