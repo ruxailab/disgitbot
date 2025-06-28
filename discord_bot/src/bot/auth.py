@@ -1,7 +1,7 @@
 import os
 import threading
 import time
-from flask import Flask, redirect, url_for, jsonify
+from flask import Flask, redirect, url_for, jsonify, session
 from flask_dance.contrib.github import make_github_blueprint, github
 from dotenv import load_dotenv
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -26,9 +26,11 @@ def create_oauth_app():
         os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
     
     # Get the base URL for OAuth callbacks (Cloud Run URL)
-    base_url = os.getenv("OAUTH_BASE_URL") or "https://discord-bot-999242429166.us-central1.run.app"
+    base_url = os.getenv("OAUTH_BASE_URL")
+    if not base_url:
+        raise ValueError("OAUTH_BASE_URL environment variable is required")
     
-    # OAuth blueprint with dynamic callback URL
+    # OAuth blueprint with custom callback URL (avoiding Flask-Dance auto routes)
     github_blueprint = make_github_blueprint(
         client_id=os.getenv("GITHUB_CLIENT_ID"),
         client_secret=os.getenv("GITHUB_CLIENT_SECRET"),
@@ -43,8 +45,7 @@ def create_oauth_app():
             "status": "running",
             "endpoints": {
                 "start_auth": "/auth/start/<discord_user_id>",
-                "callback": "/auth/callback",
-                "check": "/auth/check/<discord_user_id>"
+                "callback": "/auth/callback"
             }
         })
     
@@ -60,7 +61,6 @@ def create_oauth_app():
                 }
             
             # Store user ID in session for callback
-            from flask import session
             session['discord_user_id'] = discord_user_id
             
             print(f"Starting OAuth for Discord user: {discord_user_id}")
@@ -74,9 +74,8 @@ def create_oauth_app():
     
     @app.route("/auth/callback")
     def github_callback():
-        """Handle GitHub OAuth callback"""
+        """Handle GitHub OAuth callback - original working version"""
         try:
-            from flask import session
             discord_user_id = session.get('discord_user_id')
             
             if not discord_user_id:
@@ -145,63 +144,19 @@ def create_oauth_app():
             print(f"❌ Error in OAuth callback: {e}")
             return f"Authentication failed: {str(e)}", 500
     
-    @app.route("/auth/check/<discord_user_id>")
-    def check_oauth_status(discord_user_id):
-        """Check OAuth status for a Discord user (for polling)"""
-        try:
-            with oauth_sessions_lock:
-                session_data = oauth_sessions.get(discord_user_id)
-                
-                if not session_data:
-                    return jsonify({"status": "not_found"}), 404
-                
-                # Check if session is too old (5 minutes)
-                if time.time() - session_data.get('created_at', 0) > 300:
-                    del oauth_sessions[discord_user_id]
-                    return jsonify({"status": "expired"}), 404
-                
-                if session_data['status'] == 'completed':
-                    result = {
-                        "status": "completed",
-                        "github_username": session_data.get('github_username'),
-                        "discord_user_id": discord_user_id
-                    }
-                    # Clean up completed session
-                    del oauth_sessions[discord_user_id]
-                    return jsonify(result)
-                elif session_data['status'] == 'failed':
-                    result = {
-                        "status": "failed",
-                        "error": session_data.get('error', 'Unknown error')
-                    }
-                    # Clean up failed session
-                    del oauth_sessions[discord_user_id]
-                    return jsonify(result)
-                else:
-                    return jsonify({"status": session_data['status']})
-            
-        except Exception as e:
-            print(f"Error checking OAuth status: {e}")
-            return jsonify({"error": "Internal server error"}), 500
-    
     return app
 
-# New interface for Discord bot to use
-def get_github_username_for_user(discord_user_id, base_url=None):
-    """
-    Get OAuth URL for a specific Discord user
-    """
+def get_github_username_for_user(discord_user_id):
+    """Get OAuth URL for a specific Discord user"""
+    base_url = os.getenv("OAUTH_BASE_URL")
     if not base_url:
-        base_url = os.getenv("OAUTH_BASE_URL") or "https://discord-bot-999242429166.us-central1.run.app"
+        raise ValueError("OAUTH_BASE_URL environment variable is required")
     
     return f"{base_url}/auth/start/{discord_user_id}"
 
 def wait_for_username(discord_user_id, max_wait_time=300):
-    """
-    Wait for OAuth completion by polling the status
-    """
+    """Wait for OAuth completion by polling the status"""
     start_time = time.time()
-    base_url = os.getenv("OAUTH_BASE_URL") or "https://discord-bot-999242429166.us-central1.run.app"
     
     while time.time() - start_time < max_wait_time:
         with oauth_sessions_lock:
@@ -229,17 +184,3 @@ def wait_for_username(discord_user_id, max_wait_time=300):
             del oauth_sessions[discord_user_id]
     
     return None
-
-# Legacy compatibility functions (will be removed later)
-def get_github_username():
-    """Legacy function - deprecated"""
-    print("WARNING: get_github_username() is deprecated. Use get_github_username_for_user() instead.")
-    return "https://please-use-new-auth-flow"
-
-def start_flask():
-    """Legacy function - deprecated"""
-    pass
-
-def start_ngrok():
-    """Legacy function - deprecated"""
-    pass

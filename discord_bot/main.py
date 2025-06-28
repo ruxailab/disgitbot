@@ -48,7 +48,8 @@ def main():
             "DISCORD_BOT_TOKEN", 
             "GITHUB_TOKEN", 
             "GITHUB_CLIENT_ID", 
-            "GITHUB_CLIENT_SECRET"
+            "GITHUB_CLIENT_SECRET",
+            "OAUTH_BASE_URL"
         ]
         
         missing_vars = []
@@ -63,41 +64,15 @@ def main():
         
         print("✅ All required environment variables found")
         
-        # Set OAuth base URL if not provided
-        if not os.getenv("OAUTH_BASE_URL"):
-            # Try to detect if we're on Cloud Run
-            if os.getenv("PORT"):  # Cloud Run sets PORT
-                service_url = os.getenv("SERVICE_URL")
-                if service_url:
-                    os.environ["OAUTH_BASE_URL"] = service_url
-                    print(f"📍 Detected Cloud Run service URL: {service_url}")
-                else:
-                    print("⚠️  Running on Cloud Run but SERVICE_URL not detected")
-                    print("   OAuth callbacks will use default URL")
-            else:
-                print("🏠 Running locally - OAuth will use default URL")
-        
         # Import and create the OAuth Flask app
         print("📦 Importing Flask OAuth components...")
-        try:
-            from src.bot.auth import create_oauth_app
-            print("✅ Flask OAuth import successful")
-        except Exception as e:
-            print(f"❌ Failed to import Flask OAuth: {e}")
-            import traceback
-            traceback.print_exc()
-            raise
+        from src.bot.auth import create_oauth_app
+        print("✅ Flask OAuth import successful")
         
         # Create the Flask OAuth app
         print("🌶️  Creating Flask OAuth app...")
-        try:
-            oauth_app = create_oauth_app()
-            print("✅ Flask OAuth app created successfully")
-        except Exception as e:
-            print(f"❌ Failed to create Flask OAuth app: {e}")
-            import traceback
-            traceback.print_exc()
-            raise
+        oauth_app = create_oauth_app()
+        print("✅ Flask OAuth app created successfully")
         
         # Start Discord bot in a separate thread
         print("🧵 Setting up Discord bot thread...")

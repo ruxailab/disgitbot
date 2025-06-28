@@ -6,7 +6,7 @@ echo "🚀 Discord Bot + Flask OAuth Integration"
 
 # Check for environment variables
 echo "Checking for environment variables..."
-for ENV_VAR in DISCORD_BOT_TOKEN GITHUB_TOKEN GITHUB_CLIENT_ID GITHUB_CLIENT_SECRET REPO_OWNER; do
+for ENV_VAR in DISCORD_BOT_TOKEN GITHUB_TOKEN GITHUB_CLIENT_ID GITHUB_CLIENT_SECRET REPO_OWNER OAUTH_BASE_URL; do
   if [ -n "${!ENV_VAR}" ]; then
     # Print first 5 characters followed by ...
     VALUE="${!ENV_VAR}"

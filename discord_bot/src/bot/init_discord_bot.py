@@ -1,29 +1,20 @@
 # init_discord_bot.py
 import os
+import sys
 import discord
 from discord.ext import commands
 from discord import app_commands
 from dotenv import load_dotenv
 import firebase_admin
 from firebase_admin import credentials, firestore
-import json
 import asyncio
 import threading
-# Handle both relative and absolute imports
-try:
-    from ..utils.firestore import get_firestore_data, get_hall_of_fame_data
-    from ..utils.role_utils import determine_role, get_next_role
-    from .auth import get_github_username, wait_for_username, start_flask
-except ImportError:
-    # If relative imports fail, try absolute imports
-    import sys
-    import os
-    sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
-    from src.utils.firestore import get_firestore_data, get_hall_of_fame_data
-    from src.utils.role_utils import determine_role, get_next_role
-    from src.bot.auth import get_github_username_for_user, wait_for_username
 import datetime
-import sys
+
+# Import utilities
+from ..utils.firestore import get_firestore_data, get_hall_of_fame_data
+from ..utils.role_utils import determine_role, get_next_role
+from .auth import get_github_username_for_user, wait_for_username
 
 # Add startup logging
 print("="*50)
@@ -47,6 +38,7 @@ for env_var in ["DISCORD_BOT_TOKEN", "GITHUB_TOKEN", "GITHUB_CLIENT_ID",
     else:
         print(f"  ❌ {env_var}: Not set")
 print("="*50)
+
 TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 if not TOKEN:
     print("ERROR: DISCORD_BOT_TOKEN not found in environment variables!")
@@ -87,9 +79,6 @@ async def link(interaction: discord.Interaction):
         return
 
     try:
-        # Import the new auth functions
-        from .auth import get_github_username_for_user, wait_for_username
-        
         discord_user_id = str(interaction.user.id)
         
         # Get the OAuth URL for this specific user
@@ -415,9 +404,6 @@ async def setup_voice_stats(interaction: discord.Interaction):
         print(f"Error in setup_voice_stats: {e}")
         import traceback
         traceback.print_exc()
-
-# Note: We use slash commands (/) as the primary interface for better Discord integration
-# and user experience. Traditional text commands (!) are not used for consistency.
 
 async def update_voice_channel_stats():
     """Update voice channel names to display repository stats (minimal approach)."""
