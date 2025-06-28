@@ -14,107 +14,21 @@ from dotenv import load_dotenv
 load_dotenv("config/.env")
 
 def run_discord_bot_async():
-    """Run the Discord bot asynchronously"""
+    """Run the Discord bot asynchronously using existing bot setup"""
     print("🤖 Starting Discord bot...")
     
     try:
-        # Import Discord bot components
-        import discord
-        from discord.ext import commands
-        from discord import app_commands
-        import firebase_admin
-        from firebase_admin import credentials, firestore
-        import datetime
-        import sys
+        # Import the existing Discord bot with all commands
+        print("📦 Importing existing Discord bot setup...")
+        import src.bot.init_discord_bot as discord_bot_module
         
-        print("✅ Discord imports successful")
+        # The init_discord_bot module will handle all the Discord bot setup
+        # including commands like /getstats, /halloffame, /link, etc.
+        print("✅ Discord bot setup imported successfully")
         
-        # Import utilities
-        try:
-            from src.utils.firestore import get_firestore_data, get_hall_of_fame_data
-            from src.utils.role_utils import determine_role, get_next_role
-            from src.bot.auth import get_github_username_for_user, wait_for_username
-            print("✅ Utility imports successful")
-        except ImportError as e:
-            print(f"⚠️  ImportError for utils, trying fallback: {e}")
-            import sys
-            import os
-            sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
-            from utils.firestore import get_firestore_data, get_hall_of_fame_data
-            from utils.role_utils import determine_role, get_next_role
-            from bot.auth import get_github_username_for_user, wait_for_username
-            print("✅ Fallback utility imports successful")
-
-        TOKEN = os.getenv("DISCORD_BOT_TOKEN")
-        if not TOKEN:
-            print("❌ ERROR: DISCORD_BOT_TOKEN not found!")
-            return
-
-        # Firebase init
-        print("🔥 Initializing Firebase...")
-        if not firebase_admin._apps:
-            cred = credentials.Certificate("config/credentials.json")
-            firebase_admin.initialize_app(cred)
-        print("✅ Firebase initialized")
-
-        db = firestore.client()
-
-        intents = discord.Intents.default()
-        intents.message_content = True
-        bot = commands.Bot(command_prefix="!", intents=intents)
-
-        verification_lock = threading.Lock()
-
-        @bot.event
-        async def on_ready():
-            try:
-                synced = await bot.tree.sync()
-                print(f"🤖 {bot.user} is online! Synced {len(synced)} command(s).")
-            except Exception as e:
-                print(f"Failed to sync commands: {e}")
-
-        @bot.tree.command(name="link", description="Link your Discord to GitHub")
-        async def link(interaction: discord.Interaction):
-            await interaction.response.defer(ephemeral=True)
-
-            if not verification_lock.acquire(blocking=False):
-                await interaction.followup.send("The verification process is currently busy. Please try again later.", ephemeral=True)
-                return
-
-            try:
-                discord_user_id = str(interaction.user.id)
-                oauth_url = get_github_username_for_user(discord_user_id)
-                
-                await interaction.followup.send(f"Please complete GitHub authentication: {oauth_url}", ephemeral=True)
-
-                github_username = await asyncio.get_event_loop().run_in_executor(
-                    None, wait_for_username, discord_user_id
-                )
-
-                if github_username:
-                    doc_ref = db.collection('discord').document(discord_user_id)
-                    doc_ref.set({
-                        'github_id': github_username,
-                        'pr_count': 0,
-                        'issues_count': 0,
-                        'commits_count': 0,
-                        'role': 'member'
-                    })
-
-                    await interaction.followup.send(f"Successfully linked to GitHub user: `{github_username}`", ephemeral=True)
-                else:
-                    await interaction.followup.send("Authentication timed out or failed. Please try again.", ephemeral=True)
-
-            except Exception as e:
-                print("Error in /link:", e)
-                await interaction.followup.send("Failed to link GitHub account.", ephemeral=True)
-            finally:
-                verification_lock.release()
-
-        # Add other Discord commands here if needed (keeping it minimal for now)
+        # Get the bot instance and run it
         print("🤖 Starting Discord bot connection...")
-        # Run the bot
-        return bot.run(TOKEN)
+        discord_bot_module.bot.run(discord_bot_module.TOKEN)
         
     except Exception as e:
         print(f"❌ Error in Discord bot setup: {e}")

@@ -4,7 +4,7 @@
 
 ```
 discord_bot/
-├── main.py                     # Entry point
+├── main.py                     # Entry point with Flask OAuth integration
 ├── src/
 │   ├── bot/
 │   │   ├── init_discord_bot.py # Main bot code with slash commands
@@ -34,8 +34,7 @@ cp discord_bot/config/.env.example discord_bot/config/.env
 - `GITHUB_CLIENT_ID=` (GitHub OAuth app ID)
 - `GITHUB_CLIENT_SECRET=` (GitHub OAuth app secret)
 - `REPO_OWNER=` (Your GitHub organization name)
-- `NGROK_DOMAIN=` (Temporary tunneling domain)
-- `NGROK_AUTHTOKEN=` (Ngrok authentication token)
+- `OAUTH_BASE_URL=` (Your Cloud Run URL - set in Step 4)
 
 **Additional files you need:**
 - `discord_bot/config/credentials.json` (Firebase/Google Cloud credentials)
@@ -155,7 +154,43 @@ Go to your GitHub repository → Settings → Secrets and variables → Actions 
    - **Add to `.env`:** `GITHUB_TOKEN=your_token_here`
    - **Add to GitHub Secrets:** Create secret named `GH_TOKEN`
 
-### Step 4: Get GITHUB_CLIENT_ID (.env) + GITHUB_CLIENT_SECRET (.env)
+### Step 4: Deploy to Cloud Run & Set OAUTH_BASE_URL
+
+**What this configures:** 
+- `.env` file: `OAUTH_BASE_URL=YOUR_CLOUD_RUN_URL` 
+
+**What this does:** Deploys your bot to Google Cloud Run to get a stable URL for GitHub OAuth, then saves it to your config.
+
+1. **Deploy Your Bot:**
+   ```bash
+   # Make the deployment script executable
+   chmod +x discord_bot/deployment/deploy.sh
+   
+   # Run the deployment script
+   ./discord_bot/deployment/deploy.sh
+   ```
+
+2. **Get Your Cloud Run URL:**
+   - After deployment completes, you'll see a URL like: `https://discord-bot-abcd1234-uc.a.run.app`
+   - **IMPORTANT: Copy this exact URL** - you'll use it multiple times!
+   
+   **Alternative way to find your URL:**
+   - Go to [Google Cloud Run Console](https://console.cloud.google.com/run)
+   - Click on your service name (usually `discord-bot`)
+   - Copy the URL shown at the top of the page
+
+3. **Save Your URL to .env file:**
+   - **Add to `.env`:** `OAUTH_BASE_URL=YOUR_CLOUD_RUN_URL`
+   - **Example:** `OAUTH_BASE_URL=https://discord-bot-abcd1234-uc.a.run.app`
+
+4. **Keep Your URL Handy:**
+   - **Save this URL somewhere** - you'll need it for GitHub OAuth setup in the next step!
+   - **Redeploy after updating .env:**
+     ```bash
+     ./discord_bot/deployment/deploy.sh
+     ```
+
+### Step 5: Get GITHUB_CLIENT_ID (.env) + GITHUB_CLIENT_SECRET (.env)
 
 **What this configures:** 
 - `.env` file: `GITHUB_CLIENT_ID=your_client_id`
@@ -168,14 +203,19 @@ Go to your GitHub repository → Settings → Secrets and variables → Actions 
    - Click "New OAuth App"
 3. **Fill in Application Details:**
    - **Application name:** `Your Bot Name` (anything you want)
-   - **Homepage URL:** `https://your-ngrok-domain.ngrok.io` (you'll get this in Step 6)
-   - **Authorization callback URL:** `https://your-ngrok-domain.ngrok.io/login/github/authorized`
+   - **Homepage URL:** `YOUR_CLOUD_RUN_URL` (from Step 4)
+   - **Authorization callback URL:** `YOUR_CLOUD_RUN_URL/login/github/authorized`
+   
+   **Example URLs:** If your Cloud Run URL is `https://discord-bot-abcd1234-uc.a.run.app`, then:
+   - Homepage URL: `https://discord-bot-abcd1234-uc.a.run.app`
+   - Callback URL: `https://discord-bot-abcd1234-uc.a.run.app/login/github/authorized`
+
 4. **Get Credentials:**
    - Click "Register application"
    - Copy the "Client ID" → **Add to `.env`:** `GITHUB_CLIENT_ID=your_client_id`
    - Click "Generate a new client secret" → Copy it → **Add to `.env`:** `GITHUB_CLIENT_SECRET=your_secret`
 
-### Step 5: Get REPO_OWNER (.env)
+### Step 6: Get REPO_OWNER (.env)
 
 **What this configures:** 
 - `.env` file: `REPO_OWNER=your_org_name`
@@ -189,28 +229,11 @@ Go to your GitHub repository → Settings → Secrets and variables → Actions 
    - **Add to `.env`:** `REPO_OWNER=your_org_name` (example: `REPO_OWNER=ruxailab`)
    - **Important:** Use ONLY the organization name, NOT the full URL
 
-### Step 6: Get NGROK_DOMAIN (.env) + NGROK_AUTHTOKEN (.env)
-
-**What this configures:** 
-- `.env` file: `NGROK_DOMAIN=your_subdomain`
-- `.env` file: `NGROK_AUTHTOKEN=your_auth_token`
-
-**What this does:** Creates a tunnel so GitHub can send OAuth callbacks to your local bot during development.
-
-**Option 1 (Recommended):** Get pre-configured values:
-- Contact `onlineee__.` on Discord for the `NGROK_DOMAIN` and `NGROK_AUTHTOKEN` values
-- **Add to `.env`:** Set both values as provided
-
-**Option 2:** Use your own Ngrok setup:
-- Sign up at https://ngrok.com
-- Get your authtoken from the dashboard
-- Choose a subdomain (if you have a paid plan)
-- **Add to `.env`:** `NGROK_DOMAIN=your_subdomain` (just the subdomain, not the full URL)
-- **Add to `.env`:** `NGROK_AUTHTOKEN=your_auth_token`
-
 ---
 
-## 4. Running the Bot Locally
+## 7. Running the Bot Locally (Optional)
+
+If you want to run the bot locally for development:
 
 ### Install and Run
 
@@ -235,15 +258,25 @@ cd discord_bot
 python main.py
 ```
 
-### Test the Bot
+**Note:** Local development won't work for OAuth features since GitHub OAuth needs a public URL.
+
+---
+
+## 8. Test the Bot
 
 1. **Link Your Discord Account:**
    - In your Discord server, type `/link`
    - Click the URL the bot provides
-   - Authorize with GitHub
-   - You should see a success message
+   - You'll be redirected to GitHub to authorize
+   - After authorization, you should see a success message
+   - You can now close the tab and return to Discord
 
-2. **Test Role Updates:**
+2. **Test Other Commands:**
+   - `/getstats` - View your GitHub contribution stats
+   - `/halloffame` - See top contributors
+   - `/setup_voice_stats` - Create voice channels showing repo stats
+
+3. **Test Role Updates:**
    ```bash
    # Set your repository as default for GitHub CLI
    gh repo set-default
@@ -254,44 +287,31 @@ python main.py
 
 ---
 
-## 5. Optional: Deploy to Google Cloud
-
-If you want to deploy the bot to the cloud instead of running it locally:
-
-```bash
-# Make the deployment script executable
-chmod +x discord_bot/deployment/deploy.sh
-
-# Run the deployment script
-./discord_bot/deployment/deploy.sh
-```
-
-The deployment script will guide you through:
-- Selecting a Google Cloud project
-- Configuring environment variables
-- Setting up credentials
-- Deploying to Cloud Run
-
----
-
-## 6. Troubleshooting
+## 9. Troubleshooting
 
 **Common Issues:**
 
 1. **Bot doesn't respond to commands:**
    - Check that all intents are enabled in Discord Developer Portal
    - Verify the bot has proper permissions in your Discord server
+   - Check Cloud Run logs for errors
 
 2. **Authentication errors:**
    - Double-check all tokens in your `.env` file
    - Make sure `credentials.json` is in the correct location
+   - Redeploy after changing `.env` file
 
-3. **GitHub linking fails:**
-   - Verify your GitHub OAuth app settings
-   - Check that the callback URL matches your Ngrok domain
+3. **GitHub linking fails with "redirect_uri not associated":**
+   - Make sure your GitHub OAuth app's callback URL matches your Cloud Run URL
+   - Should be: `YOUR_CLOUD_RUN_URL/login/github/authorized`
+   - Redeploy after updating GitHub OAuth settings
 
 4. **Role assignment doesn't work:**
    - Ensure the bot has "Manage Roles" permission
    - Check that the bot's role is higher than the roles it's trying to assign
+
+5. **"Discord bot is running" instead of GitHub OAuth:**
+   - This means you're using old code - redeploy with the latest version
+   - Make sure your `OAUTH_BASE_URL` is set correctly in `.env`
 
 **Need help?** Contact `onlineee__.` on Discord for support.

@@ -235,8 +235,8 @@ create_new_env_file() {
     # Repository Owner
     read -p "Repository Owner: " repo_owner
     
-    # Ngrok Domain
-    read -p "Ngrok Domain : " ngrok_domain
+    # OAuth Base URL (optional - will auto-detect on Cloud Run)
+    read -p "OAuth Base URL (optional): " oauth_base_url
     
     # Create .env file
     cat > "$ENV_PATH" << EOF
@@ -245,7 +245,7 @@ GITHUB_TOKEN=$github_token
 GITHUB_CLIENT_ID=$github_client_id
 GITHUB_CLIENT_SECRET=$github_client_secret
 REPO_OWNER=$repo_owner
-NGROK_DOMAIN=$ngrok_domain
+OAUTH_BASE_URL=$oauth_base_url
 EOF
     
     print_success ".env file created successfully!"
@@ -273,8 +273,8 @@ edit_env_file() {
     read -p "Repository Owner [$REPO_OWNER]: " new_repo_owner
     repo_owner=${new_repo_owner:-$REPO_OWNER}
     
-    read -p "Ngrok Domain [$NGROK_DOMAIN]: " new_ngrok_domain
-    ngrok_domain=${new_ngrok_domain:-$NGROK_DOMAIN}
+    read -p "OAuth Base URL [$OAUTH_BASE_URL]: " new_oauth_base_url
+    oauth_base_url=${new_oauth_base_url:-$OAUTH_BASE_URL}
     
     # Update .env file
     cat > "$ENV_PATH" << EOF
@@ -283,7 +283,7 @@ GITHUB_TOKEN=$github_token
 GITHUB_CLIENT_ID=$github_client_id
 GITHUB_CLIENT_SECRET=$github_client_secret
 REPO_OWNER=$repo_owner
-NGROK_DOMAIN=$ngrok_domain
+OAUTH_BASE_URL=$oauth_base_url
 EOF
     
     print_success ".env file updated successfully!"

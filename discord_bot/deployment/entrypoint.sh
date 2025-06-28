@@ -1,12 +1,12 @@
 #!/bin/bash
 set -e
 
-echo "=== Starting Discord Bot Deployment ==="
-echo "Checking environment and files..."
+echo "=== Starting Discord Bot with Flask OAuth ==="
+echo "🚀 Discord Bot + Flask OAuth Integration"
 
 # Check for environment variables
 echo "Checking for environment variables..."
-for ENV_VAR in DISCORD_BOT_TOKEN GITHUB_TOKEN GITHUB_CLIENT_ID GITHUB_CLIENT_SECRET REPO_OWNER NGROK_DOMAIN NGROK_AUTHTOKEN; do
+for ENV_VAR in DISCORD_BOT_TOKEN GITHUB_TOKEN GITHUB_CLIENT_ID GITHUB_CLIENT_SECRET REPO_OWNER; do
   if [ -n "${!ENV_VAR}" ]; then
     # Print first 5 characters followed by ...
     VALUE="${!ENV_VAR}"
@@ -20,12 +20,14 @@ done
 echo "Checking for Firebase credentials..."
 if [ -f "/secret/firebase-credentials" ]; then
   echo "✅ Found credentials at /secret/firebase-credentials (production mode)"
-elif [ -f "credentials.json" ]; then
-  echo "✅ Found credentials.json in current directory (development mode)"
+  # Copy to expected location
+  cp /secret/firebase-credentials config/credentials.json
+elif [ -f "config/credentials.json" ]; then
+  echo "✅ Found credentials.json in config directory"
 else
   echo "❌ No Firebase credentials found! Application will fail to start."
   echo "➡️ In production: Mount secret to /secret/firebase-credentials"
-  echo "➡️ In development: Place credentials.json in the current directory"
+  echo "➡️ In development: Place credentials.json in config/ directory"
 fi
 
 # List current directory for debugging
@@ -36,60 +38,17 @@ ls -la
 touch discord_bot_status.log
 echo "Startup timestamp: $(date)" > discord_bot_status.log
 
-# Create health check server
-PORT=${PORT:-8080}
-echo "Creating health check server on port $PORT..."
-
-cat > health_server.py << 'EOF'
-import http.server
-import socketserver
-import os
-
-PORT = int(os.environ.get('PORT', 8080))
-
-class HealthHandler(http.server.SimpleHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200)
-        self.send_header('Content-type', 'text/html')
-        self.end_headers()
-        self.wfile.write(b'Discord bot is running')
-        
-    def log_message(self, format, *args):
-        return
-
-print(f"Health check server started at port {PORT}")
-httpd = socketserver.TCPServer(("", PORT), HealthHandler)
-httpd.serve_forever()
-EOF
-
-# Start the health check server in the background and save its PID
-python health_server.py &
-HEALTH_PID=$!
-
-# Make sure the health server is running before continuing
-echo "Waiting for health check server to start..."
-sleep 5
-
-# Check if the health server process is still running
-if kill -0 $HEALTH_PID 2>/dev/null; then
-  echo "✅ Health check server running on port $PORT"
-else
-  echo "❌ Health check server failed to start!"
-  exit 1
-fi
-
-# Run the Discord bot with output to log file
-echo "===== STARTING DISCORD BOT NOW! =====" >> discord_bot_status.log
-echo "Starting Discord bot with command: python -u -m src.bot.init_discord_bot"
-echo "Starting Discord bot..."
+echo "===== STARTING DISCORD BOT WITH FLASK OAUTH ====="
+echo "Starting Discord bot with Flask OAuth integration..."
+echo "Command: python -u main.py"
 echo "Command executed at: $(date)" >> discord_bot_status.log
 
-# Run the Discord bot with all output captured to the log file
-python -u -m src.bot.init_discord_bot 2>&1 | tee -a discord_bot.log
+# Run the new main.py which includes both Discord bot and Flask OAuth
+python -u main.py 2>&1 | tee -a discord_bot.log
 
 # Report on exit
 echo "Discord bot exited with code $?" | tee -a discord_bot_status.log
 
-# Keep the container running for health check
+# Keep the container running for logs inspection
 echo "Bot exited, keeping container alive for logs inspection"
 tail -f discord_bot.log 

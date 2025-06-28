@@ -21,7 +21,7 @@ except ImportError:
     sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
     from src.utils.firestore import get_firestore_data, get_hall_of_fame_data
     from src.utils.role_utils import determine_role, get_next_role
-    from src.bot.auth import get_github_username, wait_for_username, start_flask
+    from src.bot.auth import get_github_username_for_user, wait_for_username
 import datetime
 import sys
 
@@ -38,8 +38,7 @@ load_dotenv("config/.env")
 # Then check environment variables after loading .env
 print("Checking environment variables:")
 for env_var in ["DISCORD_BOT_TOKEN", "GITHUB_TOKEN", "GITHUB_CLIENT_ID", 
-                "GITHUB_CLIENT_SECRET", "REPO_OWNER", 
-                "NGROK_DOMAIN"]:
+                "GITHUB_CLIENT_SECRET", "REPO_OWNER"]:
     value = os.getenv(env_var)
     if value:
         # Print first 5 chars and last 5 chars with ... in between for security
@@ -88,22 +87,34 @@ async def link(interaction: discord.Interaction):
         return
 
     try:
-        github_auth_url = await asyncio.get_event_loop().run_in_executor(None, get_github_username)
-        await interaction.followup.send(f"Please complete GitHub auth: {github_auth_url}", ephemeral=True)
+        # Import the new auth functions
+        from .auth import get_github_username_for_user, wait_for_username
+        
+        discord_user_id = str(interaction.user.id)
+        
+        # Get the OAuth URL for this specific user
+        oauth_url = get_github_username_for_user(discord_user_id)
+        
+        await interaction.followup.send(f"Please complete GitHub authentication: {oauth_url}", ephemeral=True)
 
-        # Wait for the Flask auth to complete and get the username
-        github_username = await asyncio.get_event_loop().run_in_executor(None, wait_for_username)
+        # Wait for the OAuth to complete and get the username
+        github_username = await asyncio.get_event_loop().run_in_executor(
+            None, wait_for_username, discord_user_id
+        )
 
-        doc_ref = db.collection('discord').document(str(interaction.user.id))
-        doc_ref.set({
-            'github_id': github_username,
-            'pr_count': 0,
-            'issues_count': 0,
-            'commits_count': 0,
-            'role': 'member'
-        })
+        if github_username:
+            doc_ref = db.collection('discord').document(discord_user_id)
+            doc_ref.set({
+                'github_id': github_username,
+                'pr_count': 0,
+                'issues_count': 0,
+                'commits_count': 0,
+                'role': 'member'
+            })
 
-        await interaction.followup.send(f"Successfully linked to GitHub user: `{github_username}`", ephemeral=True)
+            await interaction.followup.send(f"Successfully linked to GitHub user: `{github_username}`", ephemeral=True)
+        else:
+            await interaction.followup.send("Authentication timed out or failed. Please try again.", ephemeral=True)
 
     except Exception as e:
         print("Error in /link:", e)
@@ -516,4 +527,6 @@ async def auto_update_voice_stats():
             print(f"Error in auto update voice stats task: {e}")
             await asyncio.sleep(300)  # Wait 5 minutes on error
 
-bot.run(TOKEN)
+# Bot is now run from main.py, not here
+if __name__ == "__main__":
+    bot.run(TOKEN)
