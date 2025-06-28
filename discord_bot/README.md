@@ -474,6 +474,118 @@ def wait_for_username(discord_user_id, max_wait_time=300):
                     return github_username
 ```
 
+### **🌍 The Network Magic: How Cloud Run URL → Flask App**
+
+**Key Question:** How does `https://discord-bot-999242429166.us-central1.run.app/auth/start/123` actually reach your Flask code?
+
+### **🔧 Step 1: Cloud Run Sets Up a Reverse Proxy**
+
+When you deploy, Cloud Run automatically creates a **reverse proxy**:
+
+```bash
+# Your deployment command:
+gcloud run deploy discord-bot --port=8080
+
+# Cloud Run thinks: "I'll listen on the public URL and forward to port 8080 inside the container"
+```
+
+### **🚪 Step 2: Flask Binds to Port 8080 Inside Container**
+
+**File: `discord_bot/main.py` (Lines 85-90)**
+```python
+# Get port from environment (Cloud Run sets PORT=8080)
+port = int(os.environ.get("PORT", 8080))
+
+# Flask says: "I'm listening on ALL network interfaces, port 8080"
+oauth_app.run(
+    host="0.0.0.0",    # ← Listen on ALL interfaces (not just localhost)
+    port=port,         # ← 8080
+)
+```
+
+### **🌐 Step 3: The Network Translation**
+
+```
+User types: https://discord-bot-999242429166.us-central1.run.app/auth/start/123
+     ↓
+Google DNS: "discord-bot-999242429166.us-central1.run.app = Load Balancer IP 34.102.136.180"
+     ↓
+Load Balancer: "This request is for service 'discord-bot' in us-central1"
+     ↓
+Container Router: "discord-bot service → Container Instance #abc123"
+     ↓
+Network Namespace: "Forward to container internal IP 10.4.0.15:8080"
+     ↓
+Container Network: "localhost:8080/auth/start/123"
+     ↓
+Flask App: "@app.route('/auth/start/<id>') matches! Call start_oauth(id='123')"
+```
+
+### **🔍 The Actual HTTP Translation**
+
+**What the user sends:**
+```http
+GET /auth/start/123 HTTP/1.1
+Host: discord-bot-999242429166.us-central1.run.app
+```
+
+**What Cloud Run forwards to your Flask app:**
+```http
+GET /auth/start/123 HTTP/1.1
+Host: localhost:8080                    # ← Changed!
+X-Forwarded-Host: discord-bot-999242429166.us-central1.run.app  # ← Original host saved
+X-Forwarded-Proto: https               # ← Original protocol saved
+```
+
+### **🏠 Why `host="0.0.0.0"` is Critical**
+
+**File: `discord_bot/main.py` (Line 87)**
+```python
+oauth_app.run(host="0.0.0.0", port=8080)
+             # ↑ THIS IS KEY!
+```
+
+- **If you used `host="127.0.0.1"`**: Flask only listens on localhost interface
+- **With `host="0.0.0.0"`**: Flask listens on ALL network interfaces, including container's external interface
+
+### **🐳 Inside the Container Network**
+
+```bash
+# Inside your container, this is what the network looks like:
+$ ip addr show
+1: lo: 127.0.0.1        # localhost
+2: eth0: 10.4.0.15      # container's internal IP
+
+$ netstat -ln
+tcp  0.0.0.0:8080  LISTEN   # Flask listening on ALL interfaces
+
+# Cloud Run forwards from eth0 (10.4.0.15:8080) to your Flask app
+```
+
+### **🎯 The Complete Flow**
+
+```
+1. 🌍 Public Internet
+   User: "I want https://discord-bot-999242429166.us-central1.run.app/auth/start/123"
+   
+2. 🌐 Google's Load Balancer  
+   LB: "discord-bot-999242429166 → Container cluster in us-central1"
+   
+3. ⚙️ Container Orchestrator
+   K8s: "discord-bot service → Pod #abc123 at IP 10.4.0.15"
+   
+4. 🔌 Network Proxy
+   Proxy: "Forward HTTP to 10.4.0.15:8080/auth/start/123"
+   
+5. 🐳 Container Network
+   Container: "Incoming request on eth0:8080"
+   
+6. 🌶️ Flask Application
+   Flask: "@app.route('/auth/start/<id>') → start_oauth(id='123')"
+```
+
+**The KEY insight:** Your Flask app never knows about the public domain! It just sees `localhost:8080/auth/start/123` and Cloud Run handles all the networking magic invisibly.
+
 ### **🤖 Discord Command Integration**
 
 **File: `discord_bot/src/bot/init_discord_bot.py` (Lines 74-85)**
