@@ -18,7 +18,6 @@ GITHUB_CLIENT_SECRET = os.getenv('GITHUB_CLIENT_SECRET')
 
 # Repository Configuration
 REPO_OWNER = os.getenv('REPO_OWNER', 'ruxailab')
-REPO_NAME = os.getenv('REPO_NAME', 'RUXAILAB')
 
 # Vertex AI Configuration
 VERTEX_AI_PROJECT_ID = os.getenv('VERTEX_AI_PROJECT_ID')
@@ -51,7 +50,7 @@ if not VERTEX_AI_PROJECT_ID:
 if not GOOGLE_API_KEY:
     print("⚠️  Warning: GOOGLE_API_KEY not set. AI-powered reviews will be disabled.")
 
-print(f"✅ Configuration loaded for repository: {REPO_OWNER}/{REPO_NAME}")
+print(f"✅ Configuration loaded for organization: {REPO_OWNER}")
 
 # Model configuration
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-1.5-pro")

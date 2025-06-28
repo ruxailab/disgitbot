@@ -235,9 +235,6 @@ create_new_env_file() {
     # Repository Owner
     read -p "Repository Owner: " repo_owner
     
-    # Repository Name  
-    read -p "Repository Name: " repo_name
-    
     # Ngrok Domain
     read -p "Ngrok Domain : " ngrok_domain
     
@@ -248,7 +245,6 @@ GITHUB_TOKEN=$github_token
 GITHUB_CLIENT_ID=$github_client_id
 GITHUB_CLIENT_SECRET=$github_client_secret
 REPO_OWNER=$repo_owner
-REPO_NAME=$repo_name
 NGROK_DOMAIN=$ngrok_domain
 EOF
     
@@ -277,9 +273,6 @@ edit_env_file() {
     read -p "Repository Owner [$REPO_OWNER]: " new_repo_owner
     repo_owner=${new_repo_owner:-$REPO_OWNER}
     
-    read -p "Repository Name [$REPO_NAME]: " new_repo_name
-    repo_name=${new_repo_name:-$REPO_NAME}
-    
     read -p "Ngrok Domain [$NGROK_DOMAIN]: " new_ngrok_domain
     ngrok_domain=${new_ngrok_domain:-$NGROK_DOMAIN}
     
@@ -290,7 +283,6 @@ GITHUB_TOKEN=$github_token
 GITHUB_CLIENT_ID=$github_client_id
 GITHUB_CLIENT_SECRET=$github_client_secret
 REPO_OWNER=$repo_owner
-REPO_NAME=$repo_name
 NGROK_DOMAIN=$ngrok_domain
 EOF
     

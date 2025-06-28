@@ -38,7 +38,7 @@ load_dotenv("config/.env")
 # Then check environment variables after loading .env
 print("Checking environment variables:")
 for env_var in ["DISCORD_BOT_TOKEN", "GITHUB_TOKEN", "GITHUB_CLIENT_ID", 
-                "GITHUB_CLIENT_SECRET", "REPO_OWNER", "REPO_NAME", 
+                "GITHUB_CLIENT_SECRET", "REPO_OWNER", 
                 "NGROK_DOMAIN"]:
     value = os.getenv(env_var)
     if value:

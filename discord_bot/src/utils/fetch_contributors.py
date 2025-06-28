@@ -15,7 +15,6 @@ GITHUB_API_URL = "https://api.github.com"
 ORG_NAME = os.getenv("ORG_NAME", "ruxailab")
 # Keep legacy variables for backward compatibility
 REPO_OWNER = os.getenv("REPO_OWNER", "ruxailab")
-REPO_NAME = os.getenv("REPO_NAME", "RUXAILAB")
 
 def get_github_headers():
     """

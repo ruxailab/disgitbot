@@ -6,7 +6,7 @@ echo "Checking environment and files..."
 
 # Check for environment variables
 echo "Checking for environment variables..."
-for ENV_VAR in DISCORD_BOT_TOKEN GITHUB_TOKEN GITHUB_CLIENT_ID GITHUB_CLIENT_SECRET REPO_OWNER REPO_NAME NGROK_DOMAIN NGROK_AUTHTOKEN; do
+for ENV_VAR in DISCORD_BOT_TOKEN GITHUB_TOKEN GITHUB_CLIENT_ID GITHUB_CLIENT_SECRET REPO_OWNER NGROK_DOMAIN NGROK_AUTHTOKEN; do
   if [ -n "${!ENV_VAR}" ]; then
     # Print first 5 characters followed by ...
     VALUE="${!ENV_VAR}"

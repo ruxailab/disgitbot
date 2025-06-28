@@ -49,7 +49,6 @@ Update `.env` file with your credentials:
 # GitHub Configuration
 GITHUB_TOKEN=your_github_token_here
 REPO_OWNER=your_org
-REPO_NAME=your_repo
 
 # Vertex AI Configuration
 VERTEX_AI_PROJECT_ID=your_vertex_ai_project_id
