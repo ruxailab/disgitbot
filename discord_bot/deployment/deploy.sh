@@ -322,7 +322,10 @@ handle_credentials_file() {
                 ;;
             2)
                 show_credentials_help
-                get_custom_credentials_path
+                echo
+                read -p "Press Enter to continue..." dummy
+                handle_credentials_file
+                return
                 ;;
         esac
     else
@@ -422,13 +425,6 @@ get_deployment_config() {
     fi
     
     print_success "Configuration complete!"
-    echo -e "\n${BLUE}Deployment Summary:${NC}"
-    echo "Project: $PROJECT_ID"
-    echo "Service: $SERVICE_NAME"
-    echo "Region: $REGION"
-    echo "Memory: $MEMORY"
-    echo "CPU: $CPU"
-    echo
 }
 
 # Main deployment flow
@@ -438,6 +434,34 @@ main() {
     handle_credentials_file
     get_deployment_config
     
+    # Show comprehensive deployment summary
+    echo -e "\n${PURPLE}================================${NC}"
+    echo -e "${PURPLE}   DEPLOYMENT SUMMARY${NC}"
+    echo -e "${PURPLE}================================${NC}"
+    echo -e "${BLUE}Google Cloud Configuration:${NC}"
+    echo "  Project: $PROJECT_ID ($PROJECT_NAME)"
+    echo "  Service: $SERVICE_NAME"
+    echo "  Region: $REGION"
+    echo "  Memory: $MEMORY"
+    echo "  CPU: $CPU"
+    echo
+    echo -e "${BLUE}Environment Configuration:${NC}"
+    echo "  .env file: $ENV_PATH"
+    echo "  Credentials: $CREDENTIALS_PATH"
+    echo
+    echo -e "${BLUE}What will be deployed:${NC}"
+    echo "  • Discord bot with Flask OAuth integration"
+    echo "  • Firebase/Firestore database connection"
+    echo "  • GitHub OAuth authentication"
+    echo "  • Cloud Run service with public URL"
+    echo
+    echo -e "${YELLOW}This will:${NC}"
+    echo "  • Build and push Docker image to Google Container Registry"
+    echo "  • Deploy to Cloud Run (may take 2-5 minutes)"
+    echo "  • Set up secrets and environment variables"
+    echo "  • Enable required Google Cloud services"
+    echo "  • Generate a public URL for your bot"
+    echo -e "${PURPLE}================================${NC}"
     echo
     read -p "Proceed with deployment? (y/N): " confirm
     if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
