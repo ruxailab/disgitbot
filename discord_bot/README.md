@@ -161,6 +161,11 @@ Go to your GitHub repository → Settings → Secrets and variables → Actions 
 
 **What this does:** Deploys your bot temporarily to get a stable Cloud Run URL, which you'll need for GitHub OAuth setup.
 
+**⚠️ PREREQUISITE: Make sure Docker is running before deployment!**
+- **On Mac/Windows:** Open Docker Desktop and wait for it to be fully started
+- **On Linux:** Run `sudo systemctl start docker` or `sudo service docker start`
+- **Verify Docker is running:** `docker version` should work without errors
+
 1. **Initial Deploy to Get URL:**
    ```bash
    # Make the deployment script executable

@@ -51,13 +51,17 @@ if ! command -v gcloud &> /dev/null; then
     exit 1
 fi
 
-# Check authentication
-if ! gcloud auth list --filter=status:ACTIVE --format="value(account)" | head -n1 > /dev/null; then
-    print_warning "You're not authenticated with Google Cloud."
+# Check authentication with better error handling
+print_step "Verifying Google Cloud authentication..."
+auth_account=$(gcloud auth list --filter=status:ACTIVE --format="value(account)" 2>/dev/null | head -n1)
+
+if [ -z "$auth_account" ]; then
+    print_error "You're not authenticated with Google Cloud."
     echo "Please run: gcloud auth login"
     exit 1
 fi
 
+print_success "Authenticated as: $auth_account"
 print_success "Google Cloud CLI is ready!"
 
 # Function to select from options with arrow keys
