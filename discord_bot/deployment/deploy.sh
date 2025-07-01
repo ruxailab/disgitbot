@@ -456,7 +456,7 @@ main() {
     echo "  • Cloud Run service with public URL"
     echo
     echo -e "${YELLOW}This will:${NC}"
-    echo "  • Build and push Docker image to Google Container Registry"
+    echo "  • Build and push Docker image using Google Cloud Build (no local Docker needed!)"
     echo "  • Deploy to Cloud Run (may take 2-5 minutes)"
     echo "  • Set up secrets and environment variables"
     echo "  • Enable required Google Cloud services"
@@ -474,6 +474,7 @@ main() {
     gcloud services enable run.googleapis.com \
                            containerregistry.googleapis.com \
                            secretmanager.googleapis.com \
+                           cloudbuild.googleapis.com \
                            --project="$PROJECT_ID"
     
     # Set default project
@@ -514,8 +515,8 @@ main() {
         fi
     done < "$ENV_PATH"
     
-    # Copy credentials for Docker build
-    print_step "Copying credentials file for Docker build..."
+    # Copy credentials for Cloud Build
+    print_step "Copying credentials file for Cloud Build..."
     if cp "$CREDENTIALS_PATH" "$ROOT_DIR/config/credentials.json" 2>/dev/null; then
         print_success "Credentials file copied successfully"
     elif [ -f "$ROOT_DIR/config/credentials.json" ]; then
@@ -525,13 +526,23 @@ main() {
         exit 1
     fi
     
-    # Build and push Docker image
-    print_step "Building and pushing Docker image..."
-    docker buildx build --platform linux/amd64 \
-      -t gcr.io/$PROJECT_ID/$SERVICE_NAME:latest \
-      -f "$SCRIPT_DIR/Dockerfile" \
-      --push \
+    # Build and push Docker image using Google Cloud Build
+    print_step "Building and pushing Docker image using Google Cloud Build..."
+    print_step "This eliminates the need for local Docker daemon - building in the cloud! 🚀"
+    
+    # Copy Dockerfile to root directory for Cloud Build
+    print_step "Preparing Dockerfile for Cloud Build..."
+    cp "$SCRIPT_DIR/Dockerfile" "$ROOT_DIR/Dockerfile"
+    
+    # Use Cloud Build to build and push the image
+    gcloud builds submit \
+      --tag gcr.io/$PROJECT_ID/$SERVICE_NAME:latest \
+      --project="$PROJECT_ID" \
       "$ROOT_DIR"
+    
+    # Clean up temporary Dockerfile
+    rm -f "$ROOT_DIR/Dockerfile"
+    print_success "Build completed and temporary files cleaned up!"
     
     # Clean up existing service configuration if exists
     if gcloud run services describe $SERVICE_NAME --region=$REGION --project="$PROJECT_ID" &>/dev/null; then

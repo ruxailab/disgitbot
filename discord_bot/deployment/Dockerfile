@@ -1,20 +1,21 @@
-FROM --platform=linux/amd64 python:3.13-slim
+FROM --platform=linux/amd64 python:3.13
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
+ENV DEBIAN_FRONTEND=noninteractive
 
 WORKDIR /app
 
-# Install necessary packages
+# Install only what we need (apt-utils already included in full image)
 RUN apt-get update && \
-    apt-get install -y curl && \
+    apt-get install -y --no-install-recommends curl && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first to leverage Docker cache
 COPY config/discord_bot_requirements.txt .
-RUN pip install --no-cache-dir -r discord_bot_requirements.txt
+RUN pip install --no-cache-dir --root-user-action=ignore -r discord_bot_requirements.txt
 
 # Create config directory and empty credentials file (will be overwritten by volume mount)
 RUN mkdir -p /app/config && echo "{}" > /app/config/credentials.json
