@@ -619,6 +619,13 @@ main() {
         fi
     done < "$ENV_PATH"
     
+    # Debug: Show what we parsed
+    echo -e "\n${BLUE}🔍 DEBUG: Environment variables parsing:${NC}"
+    echo "ENV_VARS length: ${#ENV_VARS}"
+    echo "ENV_VARS content: '$ENV_VARS'"
+    echo "Number of variables: $(echo "$ENV_VARS" | tr ',' '\n' | wc -l)"
+    echo
+    
     # Final check - ensure we have environment variables
     if [ -z "$ENV_VARS" ]; then
         print_error "No valid environment variables found!"
@@ -627,13 +634,26 @@ main() {
         echo "  • The .env file validation was skipped"
         echo "  • The .env file was modified after validation"
         echo "  • The .env file contains only comments or empty lines"
+        echo "  • Hidden characters or encoding issues"
+        echo "  • Different shell/platform behavior"
+        echo
+        echo -e "${BLUE}🔍 Let's debug the .env file:${NC}"
+        echo "File exists: $([ -f "$ENV_PATH" ] && echo 'YES' || echo 'NO')"
+        echo "File size: $(wc -c < "$ENV_PATH" 2>/dev/null || echo 'ERROR')"
+        echo "File encoding: $(file "$ENV_PATH" 2>/dev/null || echo 'UNKNOWN')"
+        echo
+        echo -e "${BLUE}Raw file contents with line numbers:${NC}"
+        cat -n "$ENV_PATH"
+        echo
+        echo -e "${BLUE}File with visible characters (showing spaces/tabs):${NC}"
+        cat -A "$ENV_PATH"
         echo
         echo -e "${RED}Cannot deploy without environment variables!${NC}"
         echo -e "${BLUE}Please run the script again and ensure your .env file has the required variables.${NC}"
         exit 1
     fi
     
-    print_success "Environment variables prepared successfully"
+    print_success "Environment variables prepared successfully (${#ENV_VARS} characters)"
     
     # Copy credentials for Cloud Build
     print_step "Copying credentials file for Cloud Build..."
