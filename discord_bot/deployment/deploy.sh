@@ -165,77 +165,59 @@ select_project() {
     print_success "Selected project: $PROJECT_ID ($PROJECT_NAME)"
 }
 
-# Function to validate .env file has all required fields
+# Function to validate .env file using Python helper
 validate_env_file() {
-    print_step "Validating .env file..."
+    print_step "Validating .env file format and content..."
     
-    # Required fields
-    REQUIRED_FIELDS=("DISCORD_BOT_TOKEN" "GITHUB_TOKEN" "GITHUB_CLIENT_ID" "GITHUB_CLIENT_SECRET" "REPO_OWNER")
-    MISSING_FIELDS=()
-    EMPTY_FIELDS=()
+    # Paths
+    EXAMPLE_PATH="$ROOT_DIR/config/.env.example"
+    VALIDATOR_PATH="$ROOT_DIR/src/utils/env_validator.py"
     
-    # Source the .env file
-    echo "📄 Attempting to source .env file: $ENV_PATH"
-    if ! source "$ENV_PATH" 2>/dev/null; then
-        print_error "Failed to read .env file!"
-        echo -e "${BLUE}Please check the file format and try again.${NC}"
-        echo -e "${YELLOW}File contents:${NC}"
-        cat "$ENV_PATH"
+    # Check if validator exists
+    if [ ! -f "$VALIDATOR_PATH" ]; then
+        print_error "Env validator not found: $VALIDATOR_PATH"
         exit 1
-    else
-        echo "✅ Successfully sourced .env file"
     fi
     
-    # Check each required field
-    for field in "${REQUIRED_FIELDS[@]}"; do
-        echo "🔍 Checking field: $field"
-        if ! grep -q "^$field=" "$ENV_PATH"; then
-            echo "  ❌ Field not found"
-            MISSING_FIELDS+=("$field")
-        else
-            # Get the value
-            value=$(grep "^$field=" "$ENV_PATH" | cut -d'=' -f2- | tr -d '"' | tr -d "'")
-            echo "  ✅ Found field with value: '${value:0:20}...'"
-            if [ -z "$value" ]; then
-                echo "  ❌ But value is empty!"
-                EMPTY_FIELDS+=("$field")
-            fi
-        fi
-    done
+    # Check if .env.example exists
+    if [ ! -f "$EXAMPLE_PATH" ]; then
+        print_error ".env.example file not found: $EXAMPLE_PATH"
+        exit 1
+    fi
     
-    # Report issues
-    if [ ${#MISSING_FIELDS[@]} -gt 0 ] || [ ${#EMPTY_FIELDS[@]} -gt 0 ]; then
-        print_error "❌ .env file validation failed!"
-        echo
-        
-        if [ ${#MISSING_FIELDS[@]} -gt 0 ]; then
-            print_error "Missing required fields:"
-            for field in "${MISSING_FIELDS[@]}"; do
-                echo "  • $field"
-            done
+    # Check if .env exists
+    if [ ! -f "$ENV_PATH" ]; then
+        print_error ".env file not found: $ENV_PATH"
+        exit 1
+    fi
+    
+    # Run Python validator and capture output (disable set -e temporarily)
+    echo "🔍 Running strict format validation..."
+    set +e  # Temporarily disable exit on error
+    VALIDATOR_OUTPUT=$(python3 "$VALIDATOR_PATH" "$EXAMPLE_PATH" "$ENV_PATH" 2>&1)
+    VALIDATOR_EXIT_CODE=$?
+    set -e  # Re-enable exit on error
+    
+    if [ $VALIDATOR_EXIT_CODE -eq 0 ]; then
+        # Check if there are warnings in the output
+        if echo "$VALIDATOR_OUTPUT" | grep -q "⚠️ Warnings:"; then
+            # Show output only if there are warnings
+            echo "$VALIDATOR_OUTPUT"
             echo
-        fi
-        
-        if [ ${#EMPTY_FIELDS[@]} -gt 0 ]; then
-            print_error "Empty required fields:"
-            for field in "${EMPTY_FIELDS[@]}"; do
-                echo "  • $field"
-            done
+            print_warning "⚠️ Validation passed but with warnings!"
+            echo -e "${YELLOW}Please review the warnings above.${NC}"
+            echo -e "${BLUE}This is often normal for optional configuration fields.${NC}"
+            echo -e "${BLUE}Check each warning to ensure it's expected for your deployment.${NC}"
             echo
+            read -p "Press Enter to continue with deployment, or Ctrl+C to cancel..." dummy
         fi
-        
-        echo -e "${BLUE}Your .env file should contain:${NC}"
-        echo -e "${GREEN}DISCORD_BOT_TOKEN=your_discord_bot_token${NC}"
-        echo -e "${GREEN}GITHUB_TOKEN=your_github_token${NC}"
-        echo -e "${GREEN}GITHUB_CLIENT_ID=your_github_client_id${NC}"
-        echo -e "${GREEN}GITHUB_CLIENT_SECRET=your_github_client_secret${NC}"
-        echo -e "${GREEN}REPO_OWNER=your_repo_owner${NC}"
-        echo -e "${YELLOW}OAUTH_BASE_URL=your_oauth_url (optional)${NC}"
+        print_success "✅ .env file validation passed!"
+        sleep 1  # Brief pause so users can see the success message
+        return 0
+    else
+        # Show validator output only on failure
+        echo "$VALIDATOR_OUTPUT"
         echo
-        echo -e "${BLUE}Current .env file contents:${NC}"
-        cat -n "$ENV_PATH"
-        echo
-        
         declare -a fix_options=(
             "Edit the .env file now"
             "Exit and fix manually"
@@ -254,17 +236,6 @@ validate_env_file() {
             print_warning "Please fix your .env file and run the script again."
             exit 1
         fi
-    else
-        print_success "✅ .env file validation passed!"
-        echo "Found all required environment variables:"
-        for field in "${REQUIRED_FIELDS[@]}"; do
-            echo "  ✓ $field"
-        done
-        
-        # Check for optional fields
-        if grep -q "^OAUTH_BASE_URL=" "$ENV_PATH" && [ -n "$OAUTH_BASE_URL" ]; then
-            echo "  ✓ OAUTH_BASE_URL (optional)"
-        fi
     fi
 }
 
@@ -277,6 +248,7 @@ handle_env_file() {
         echo "Current contents:"
         echo -e "${YELLOW}$(cat "$ENV_PATH")${NC}"
         echo
+        sleep 1  # Brief pause so users can read the .env contents
         
         declare -a env_options=(
             "Use existing .env file"
