@@ -580,14 +580,23 @@ main() {
     # Prepare environment variables
     print_step "Preparing environment variables..."
     ENV_VARS=""
-    while IFS= read -r line; do
+    echo "🔍 DEBUG: Processing .env file line by line:"
+    
+    # Ensure file ends with newline to avoid last line parsing issues
+    echo "" >> "$ENV_PATH"
+    
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        echo "  Raw line: '$line'"
         if [[ ! $line =~ ^# && -n $line ]]; then
             clean_line=$(echo "$line" | sed 's/[[:space:]]*=[[:space:]]*/=/g')
+            echo "  ✅ Adding: '$clean_line'"
             if [ -n "$ENV_VARS" ]; then
                 ENV_VARS="$ENV_VARS,$clean_line"
             else
                 ENV_VARS="$clean_line"
             fi
+        else
+            echo "  ❌ Skipping: comment or empty"
         fi
     done < "$ENV_PATH"
     

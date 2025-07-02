@@ -154,25 +154,20 @@ Go to your GitHub repository → Settings → Secrets and variables → Actions 
    - **Add to `.env`:** `GITHUB_TOKEN=your_token_here`
    - **Add to GitHub Secrets:** Create secret named `GH_TOKEN`
 
-### Step 4: Initial Deployment to Get Cloud Run URL
+### Step 4: Get Cloud Run URL (Placeholder Deployment)
 
 **What this configures:** 
 - `.env` file: `OAUTH_BASE_URL=YOUR_CLOUD_RUN_URL` 
 
-**What this does:** Deploys your bot temporarily to get a stable Cloud Run URL, which you'll need for GitHub OAuth setup.
+**What this does:** Creates a placeholder Cloud Run service to get your stable URL, which you'll need for GitHub OAuth setup.
 
-**⚠️ PREREQUISITE: Make sure Docker is running before deployment!**
-- **On Mac/Windows:** Open Docker Desktop and wait for it to be fully started
-- **On Linux:** Run `sudo systemctl start docker` or `sudo service docker start`
-- **Verify Docker is running:** `docker version` should work without errors
-
-1. **Initial Deploy to Get URL:**
+1. **Deploy placeholder service to get URL:**
    ```bash
-   # Make the deployment script executable
-   chmod +x discord_bot/deployment/deploy.sh
-   
-   # Run the deployment script (this is just to get the URL)
-   ./discord_bot/deployment/deploy.sh
+   gcloud run deploy discord-bot \
+     --image gcr.io/cloudrun/hello \
+     --platform managed \
+     --region us-central1 \
+     --allow-unauthenticated
    ```
 
 2. **Get Your Cloud Run URL:**
@@ -181,7 +176,7 @@ Go to your GitHub repository → Settings → Secrets and variables → Actions 
    
    **Alternative way to find your URL:**
    - Go to [Google Cloud Run Console](https://console.cloud.google.com/run)
-   - Click on your service name (usually `discord-bot`)
+   - Click on your service name (`discord-bot`)
    - Copy the URL shown at the top of the page
 
 3. **Save Your URL to .env file:**
@@ -191,7 +186,7 @@ Go to your GitHub repository → Settings → Secrets and variables → Actions 
 4. **Keep Your URL Handy:**
    - **Save this URL somewhere** - you'll need it for GitHub OAuth setup in the next step!
 
-**Note:** This is just a temporary deployment to get your URL. You'll do the final deployment in Step 7 after configuring everything.
+**Note:** This placeholder will be replaced with your actual bot in Step 7.
 
 ### Step 5: Get GITHUB_CLIENT_ID (.env) + GITHUB_CLIENT_SECRET (.env)
 
