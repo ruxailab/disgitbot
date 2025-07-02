@@ -1,4 +1,4 @@
-FROM --platform=linux/amd64 python:3.13
+FROM --platform=linux/amd64 python:3.12
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
