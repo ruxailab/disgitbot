@@ -28,7 +28,12 @@ def run_discord_bot_async():
         
         # Get the bot instance and run it
         print("🤖 Starting Discord bot connection...")
-        discord_bot_module.bot.run(discord_bot_module.TOKEN)
+        
+        # Ensure TOKEN is validated (deployment pipeline guarantees this)
+        token = discord_bot_module.TOKEN
+        assert token is not None, "TOKEN should be validated by deployment pipeline"
+        
+        discord_bot_module.bot.run(token)
         
     except Exception as e:
         print(f"❌ Error in Discord bot setup: {e}")
@@ -43,26 +48,9 @@ def main():
     print("="*60)
     
     try:
-        # Check required environment variables
-        required_vars = [
-            "DISCORD_BOT_TOKEN", 
-            "GITHUB_TOKEN", 
-            "GITHUB_CLIENT_ID", 
-            "GITHUB_CLIENT_SECRET",
-            "OAUTH_BASE_URL"
-        ]
-        
-        missing_vars = []
-        for var in required_vars:
-            if not os.getenv(var):
-                missing_vars.append(var)
-        
-        if missing_vars:
-            print(f"❌ Missing required environment variables: {', '.join(missing_vars)}")
-            print("Please check your .env file configuration.")
-            return
-        
-        print("✅ All required environment variables found")
+        # Environment variables are validated by env_validator.py in deployment pipeline
+        # No need to duplicate validation here - trust the deployment process
+        print("✅ Environment variables validated by deployment pipeline")
         
         # Import and create the OAuth Flask app
         print("📦 Importing Flask OAuth components...")

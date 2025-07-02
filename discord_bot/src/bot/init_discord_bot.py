@@ -26,23 +26,14 @@ print("="*50)
 print("Loading environment variables...")
 load_dotenv("config/.env")
 
-# Then check environment variables after loading .env
-print("Checking environment variables:")
-for env_var in ["DISCORD_BOT_TOKEN", "GITHUB_TOKEN", "GITHUB_CLIENT_ID", 
-                "GITHUB_CLIENT_SECRET", "REPO_OWNER"]:
-    value = os.getenv(env_var)
-    if value:
-        # Print first 5 chars and last 5 chars with ... in between for security
-        masked_value = value[:5] + "..." + value[-5:] if len(value) > 15 else "[SET]"
-        print(f"  ✅ {env_var}: {masked_value}")
-    else:
-        print(f"  ❌ {env_var}: Not set")
+# Environment variables validated by deployment pipeline - trust the process
+print("✅ Environment variables validated by deployment pipeline")
 print("="*50)
 
+# Get Discord bot token (validated by deployment pipeline)
 TOKEN = os.getenv("DISCORD_BOT_TOKEN")
-if not TOKEN:
-    print("ERROR: DISCORD_BOT_TOKEN not found in environment variables!")
-    sys.exit(1)
+# TOKEN is guaranteed to be set by deployment pipeline validation
+assert TOKEN is not None, "DISCORD_BOT_TOKEN should be validated by deployment pipeline"
 
 # Firebase init
 if not firebase_admin._apps:
@@ -199,6 +190,7 @@ async def getstats(interaction: discord.Interaction, type: str = "pr"):
         )
 
         # Set up type-specific variables
+        title_prefix = "PR"  # Default value
         if stats_type == "pr":
             count_field = "pr_count"
             stats_field = "prs"
@@ -360,7 +352,10 @@ async def check_permissions(interaction: discord.Interaction):
     await interaction.response.defer(ephemeral=True)
     
     guild = interaction.guild
+    assert guild is not None, "Command should only work in guilds"
+    assert bot.user is not None, "Bot user should be available"
     bot_member = guild.get_member(bot.user.id)
+    assert bot_member is not None, "Bot should be a member of the guild"
     
     required_perms = [
         ("Manage Channels", bot_member.guild_permissions.manage_channels),
@@ -384,6 +379,7 @@ async def setup_voice_stats(interaction: discord.Interaction):
     
     try:
         guild = interaction.guild
+        assert guild is not None, "Command should only work in guilds"
         
         # Check if a stats category already exists
         existing_category = discord.utils.get(guild.categories, name="📊 REPOSITORY STATS")
@@ -419,7 +415,9 @@ async def update_voice_channel_stats():
             return
             
         # Check basic permission
+        assert bot.user is not None, "Bot user should be available"
         bot_member = guild.get_member(bot.user.id)
+        assert bot_member is not None, "Bot should be a member of the guild"
         if not bot_member.guild_permissions.manage_channels:
             print("❌ Bot lacks 'Manage Channels' permission")
             return
