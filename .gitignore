@@ -51,8 +51,7 @@ contributions.json
 runbot.sh
 activate.sh 
 run_workflow.sh
-commit_and_push.sh
-force-sync.sh
+commit_and_push.sh 
 # PR Review System - Test Files and Development Data
 pr_review/test_*.py
 pr_review/*_test.py
