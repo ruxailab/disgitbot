@@ -237,32 +237,24 @@ Go to your GitHub repository → Settings → Secrets and variables → Actions 
 
 **What this does:** Creates a placeholder Cloud Run service to get your stable URL, which you'll need for GitHub OAuth setup.
 
-1. **Deploy placeholder service to get URL:**
+1. **Run the URL getter script:**
    ```bash
-   gcloud run deploy discord-bot \
-     --image gcr.io/cloudrun/hello \
-     --platform managed \
-     --region us-central1 \
-     --allow-unauthenticated
+   ./discord_bot/deployment/get_url.sh
    ```
-
-2. **Get Your Cloud Run URL:**
-   - After deployment completes, you'll see a URL like: `https://discord-bot-abcd1234-uc.a.run.app`
-   - **IMPORTANT: Copy this exact URL** - you'll use it multiple times!
    
-   **Alternative way to find your URL:**
-   - Go to [Google Cloud Run Console](https://console.cloud.google.com/run)
-   - Click on your service name (`discord-bot`)
-   - Copy the URL shown at the top of the page
+   This interactive script will:
+   - Guide you through Google Cloud authentication
+   - Let you select your Google Cloud project
+   - Choose your preferred region
+   - Deploy a placeholder Hello World service
+   - Generate your Cloud Run URL automatically
 
-3. **Save Your URL to .env file:**
+2. **Save the generated information:**
+   - The script will display your URL like: `https://discord-bot-abcd1234-uc.a.run.app`
+   - **IMPORTANT: Copy this exact URL** - you'll use it multiple times!
+   - **REMEMBER YOUR PROJECT ID** - you'll need it for the final deployment
    - **Add to `.env`:** `OAUTH_BASE_URL=YOUR_CLOUD_RUN_URL`
    - **Example:** `OAUTH_BASE_URL=https://discord-bot-abcd1234-uc.a.run.app`
-
-4. **Keep Your URL Handy:**
-   - **Save this URL somewhere** - you'll need it for GitHub OAuth setup in the next step!
-
-**Note:** This placeholder will be replaced with your actual bot in Step 7.
 
 ### Step 5: Get GITHUB_CLIENT_ID (.env) + GITHUB_CLIENT_SECRET (.env)
 
