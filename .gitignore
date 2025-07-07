@@ -81,3 +81,5 @@ create_test_pr.sh
 # pr_review/DEPLOYMENT_TEMPLATE.md
 # pr_review/MENTOR_REQUIREMENTS_CHECKLIST.md
 # pr_review/data/reviewers_config.json
+
+pre_prompt.txt

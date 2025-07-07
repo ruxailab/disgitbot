@@ -76,19 +76,19 @@ def determine_role(pr_count, issues_count, commits_count):
         if pr_count >= threshold:
             pr_role = role
             break
-    
+
     # Determine issue role
     for role, threshold in reversed(ISSUE_THRESHOLDS.items()):
         if issues_count >= threshold:
             issue_role = role
             break
-    
+
     # Determine commit role
     for role, threshold in reversed(COMMIT_THRESHOLDS.items()):
         if commits_count >= threshold:
             commit_role = role
             break
-    
+
     return pr_role, issue_role, commit_role
 
 def get_next_role(current_role, stats_type):

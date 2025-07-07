@@ -133,9 +133,25 @@ jobs:
         cd pr_review
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
-        git add data/collected_repo_labels*.json data/labels_collection_report.md
-        git diff --staged --quiet || git commit -m "🤖 Update repository labels cache [automated]"
-        git push
+        
+        # Check if files exist before adding them
+        if [ -f "data/collected_repo_labels.json" ]; then
+          git add data/collected_repo_labels.json
+        fi
+        if [ -f "data/collected_repo_labels_simplified.json" ]; then
+          git add data/collected_repo_labels_simplified.json
+        fi
+        if [ -f "data/labels_collection_report.md" ]; then
+          git add data/labels_collection_report.md
+        fi
+        
+        # Only commit if there are changes
+        if ! git diff --staged --quiet; then
+          git commit -m "Update repository labels cache [automated]"
+          git push
+        else
+          echo "No changes to commit"
+        fi
         
     - name: Upload labels data
       uses: actions/upload-artifact@v4

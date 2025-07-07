@@ -36,7 +36,7 @@ jobs:
       experience_level: 'intermediate'  # Options: beginner, intermediate, advanced
       action: 'process_pr'
     secrets:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_TOKEN: ${{ secrets.GH_TOKEN }}
       GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
 ```
 
@@ -79,7 +79,7 @@ jobs:
       experience_level: 'intermediate'
       action: ${{ github.event.inputs.action || 'process_pr' }}
     secrets:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_TOKEN: ${{ secrets.GH_TOKEN }}
       GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
 ```
 
