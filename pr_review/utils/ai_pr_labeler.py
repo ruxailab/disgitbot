@@ -187,7 +187,7 @@ Only select labels that are highly relevant. Be selective and accurate.
                     )
                 )
                 
-                logger.info("✅ AI request successful!")
+                logger.info("AI request successful!")
                 return response
                 
             except Exception as e:
@@ -202,7 +202,7 @@ Only select labels that are highly relevant. Be selective and accurate.
                 ]):
                     
                     if is_last_attempt:
-                        logger.error(f"❌ Quota limit reached after {max_retries + 1} attempts. Giving up.")
+                        logger.error(f"Quota limit reached after {max_retries + 1} attempts. Giving up.")
                         raise
                     
                     # Try to extract retry delay from error message
@@ -225,7 +225,7 @@ Only select labels that are highly relevant. Be selective and accurate.
                 elif any(keyword in error_message for keyword in [
                     'invalid_argument', 'permission_denied', 'unauthenticated'
                 ]):
-                    logger.error(f"❌ API configuration error: {e}")
+                    logger.error(f"API configuration error: {e}")
                     raise  # Don't retry for configuration errors
                 
                 # Handle temporary/network errors
@@ -234,7 +234,7 @@ Only select labels that are highly relevant. Be selective and accurate.
                 ]):
                     
                     if is_last_attempt:
-                        logger.error(f"❌ Network error after {max_retries + 1} attempts: {e}")
+                        logger.error(f"Network error after {max_retries + 1} attempts: {e}")
                         raise
                     
                     # Shorter delay for network errors
@@ -251,7 +251,7 @@ Only select labels that are highly relevant. Be selective and accurate.
                 # Unknown error - retry with backoff
                 else:
                     if is_last_attempt:
-                        logger.error(f"❌ Unknown error after {max_retries + 1} attempts: {e}")
+                        logger.error(f"Unknown error after {max_retries + 1} attempts: {e}")
                         raise
                     
                     retry_delay = base_delay * (2 ** attempt) + random.randint(1, 5)
@@ -376,7 +376,7 @@ Only select labels that are highly relevant. Be selective and accurate.
         if not predictions:
             return "No labels predicted by AI for this PR."
         
-        formatted = "## 🤖 AI-Predicted Labels\n\n"
+        formatted = "## AI-Predicted Labels\n\n"
         
         for i, label in enumerate(predictions, 1):
             confidence_bar = "█" * int(label["confidence"] * 10)

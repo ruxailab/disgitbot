@@ -322,36 +322,36 @@ def print_validation_results(result: dict, env_example_path: str, env_path: str,
     NC = '\033[0m'  # No Color
     
     if result['valid']:
-        print(f"{GREEN}✅ .env file validation passed!{NC}")
-        print(f"{GREEN}✅ Format matches .env.example exactly{NC}")
-        print(f"{GREEN}✅ All required fields have values{NC}")
+        print(f"{GREEN}PASS: .env file validation passed!{NC}")
+        print(f"{GREEN}PASS: Format matches .env.example exactly{NC}")
+        print(f"{GREEN}PASS: All required fields have values{NC}")
         
         # Show warnings even on success
         if result['warnings']:
             print()
-            print(f"{YELLOW}⚠️ Warnings:{NC}")
+            print(f"{YELLOW}WARNINGS:{NC}")
             for warning in result['warnings']:
                 print(f"  • {warning}")
         return
     
-    print(f"{RED}❌ .env file validation failed!{NC}")
+    print(f"{RED}FAIL: .env file validation failed!{NC}")
     print()
     
     # Print specific error categories
     if result['errors']:
-        print(f"{RED}❌ Critical errors:{NC}")
+        print(f"{RED}CRITICAL ERRORS:{NC}")
         for error in result['errors']:
             print(f"  • {error}")
         print()
     
     if result['format_errors']:
-        print(f"{RED}❌ Format errors:{NC}")
+        print(f"{RED}FORMAT ERRORS:{NC}")
         for error in result['format_errors']:
             print(f"  • {error}")
         print()
     
     if result['line_mismatches']:
-        print(f"{RED}❌ Line mismatches:{NC}")
+        print(f"{RED}LINE MISMATCHES:{NC}")
         for mismatch in result['line_mismatches'][:3]:  # Show first 3 mismatches
             line_num = mismatch['line']
             expected = mismatch['expected']
@@ -362,25 +362,25 @@ def print_validation_results(result: dict, env_example_path: str, env_path: str,
         print()
     
     if result['required_missing']:
-        print(f"{RED}❌ Missing required fields:{NC}")
+        print(f"{RED}MISSING REQUIRED FIELDS:{NC}")
         for field in result['required_missing']:
             print(f"  • {field}")
         print()
     
     if result['required_empty']:
-        print(f"{RED}❌ Empty required fields:{NC}")
+        print(f"{RED}EMPTY REQUIRED FIELDS:{NC}")
         for field in result['required_empty']:
             print(f"  • {field}")
         print()
     
     if result['warnings']:
-        print(f"{YELLOW}⚠️ Warnings:{NC}")
+        print(f"{YELLOW}WARNINGS:{NC}")
         for warning in result['warnings']:
             print(f"  • {warning}")
         print()
 
-    print(f"{YELLOW}💡 Fix: Copy .env.example and fill in your values ONLY{NC}")
-    print(f"{YELLOW}💡 Rules: No spaces around =, no quotes, no trailing whitespace{NC}")
+    print(f"{YELLOW}FIX: Copy .env.example and fill in your values ONLY{NC}")
+    print(f"{YELLOW}RULES: No spaces around =, no quotes, no trailing whitespace{NC}")
 
 
 def main():
@@ -395,11 +395,11 @@ def main():
         
         # Validate that files exist
         if not os.path.exists(env_example_path):
-            print(f"❌ .env.example file not found: {env_example_path}")
+            print(f"ERROR: .env.example file not found: {env_example_path}")
             sys.exit(1)
         
         if not os.path.exists(env_path):
-            print(f"❌ .env file not found: {env_path}")
+            print(f"ERROR: .env file not found: {env_path}")
             sys.exit(1)
         
         # Perform validation

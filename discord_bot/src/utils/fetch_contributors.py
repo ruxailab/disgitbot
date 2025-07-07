@@ -808,7 +808,7 @@ if __name__ == "__main__":
                     
                     # Daily PRs
                     pr_daily_url = f"{GITHUB_API_URL}/search/issues?q=repo:{repo_owner}/{repo_name}+{pr_query_type}+author:{username}+{pr_time_field}:>={time_ranges['yesterday']}"
-                    print(f"  DEBUG - {username} Daily PR URL: {pr_daily_url}")
+                    print(f"  DEBUG - {username} Daily PR URL: <{pr_daily_url}>")
                     pr_daily_response = make_github_request(pr_daily_url, headers, 'search')
                     
                     if pr_daily_response and pr_daily_response.status_code == 200:
@@ -819,7 +819,7 @@ if __name__ == "__main__":
                     
                     # Weekly PRs
                     pr_weekly_url = f"{GITHUB_API_URL}/search/issues?q=repo:{repo_owner}/{repo_name}+{pr_query_type}+author:{username}+{pr_time_field}:>={time_ranges['week_ago']}"
-                    print(f"  DEBUG - {username} Weekly PR URL: {pr_weekly_url}")
+                    print(f"  DEBUG - {username} Weekly PR URL: <{pr_weekly_url}>")
                     pr_weekly_response = make_github_request(pr_weekly_url, headers, 'search')
                     
                     if pr_weekly_response and pr_weekly_response.status_code == 200:
@@ -830,7 +830,7 @@ if __name__ == "__main__":
                     
                     # Monthly PRs
                     pr_monthly_url = f"{GITHUB_API_URL}/search/issues?q=repo:{repo_owner}/{repo_name}+{pr_query_type}+author:{username}+{pr_time_field}:>={time_ranges['month_ago']}"
-                    print(f"  DEBUG - {username} Monthly PR URL: {pr_monthly_url}")
+                    print(f"  DEBUG - {username} Monthly PR URL: <{pr_monthly_url}>")
                     pr_monthly_response = make_github_request(pr_monthly_url, headers, 'search')
                     
                     if pr_monthly_response and pr_monthly_response.status_code == 200:
@@ -879,7 +879,7 @@ if __name__ == "__main__":
                     
                     # Daily Issues
                     issue_daily_url = f"{GITHUB_API_URL}/search/issues?q=repo:{repo_owner}/{repo_name}+{issue_query_type}+author:{username}+{issue_time_field}:>={time_ranges['yesterday']}"
-                    print(f"  DEBUG - {username} Daily Issue URL: {issue_daily_url}")
+                    print(f"  DEBUG - {username} Daily Issue URL: <{issue_daily_url}>")
                     issue_daily_response = make_github_request(issue_daily_url, headers, 'search')
                     
                     if issue_daily_response and issue_daily_response.status_code == 200:
@@ -890,7 +890,7 @@ if __name__ == "__main__":
                     
                     # Weekly Issues
                     issue_weekly_url = f"{GITHUB_API_URL}/search/issues?q=repo:{repo_owner}/{repo_name}+{issue_query_type}+author:{username}+{issue_time_field}:>={time_ranges['week_ago']}"
-                    print(f"  DEBUG - {username} Weekly Issue URL: {issue_weekly_url}")
+                    print(f"  DEBUG - {username} Weekly Issue URL: <{issue_weekly_url}>")
                     issue_weekly_response = make_github_request(issue_weekly_url, headers, 'search')
                     
                     if issue_weekly_response and issue_weekly_response.status_code == 200:
@@ -901,7 +901,7 @@ if __name__ == "__main__":
                     
                     # Monthly Issues
                     issue_monthly_url = f"{GITHUB_API_URL}/search/issues?q=repo:{repo_owner}/{repo_name}+{issue_query_type}+author:{username}+{issue_time_field}:>={time_ranges['month_ago']}"
-                    print(f"  DEBUG - {username} Monthly Issue URL: {issue_monthly_url}")
+                    print(f"  DEBUG - {username} Monthly Issue URL: <{issue_monthly_url}>")
                     issue_monthly_response = make_github_request(issue_monthly_url, headers, 'search')
                     
                     if issue_monthly_response and issue_monthly_response.status_code == 200:
@@ -932,7 +932,7 @@ if __name__ == "__main__":
 
                     # Daily Commits
                     commit_daily_url = f"{GITHUB_API_URL}/search/commits?q=repo:{repo_owner}/{repo_name}+author:{username}+committer-date:>={time_ranges['yesterday']}"
-                    print(f"  DEBUG - {username} Daily Commit URL: {commit_daily_url}")
+                    print(f"  DEBUG - {username} Daily Commit URL: <{commit_daily_url}>")
                     commit_daily_response = make_github_request(commit_daily_url, headers, 'search')
                     if commit_daily_response and commit_daily_response.status_code == 200:
                         commit_daily_count = commit_daily_response.json().get("total_count", 0)
@@ -942,7 +942,7 @@ if __name__ == "__main__":
 
                     # Weekly Commits
                     commit_weekly_url = f"{GITHUB_API_URL}/search/commits?q=repo:{repo_owner}/{repo_name}+author:{username}+committer-date:>={time_ranges['week_ago']}"
-                    print(f"  DEBUG - {username} Weekly Commit URL: {commit_weekly_url}")
+                    print(f"  DEBUG - {username} Weekly Commit URL: <{commit_weekly_url}>")
                     commit_weekly_response = make_github_request(commit_weekly_url, headers, 'search')
                     if commit_weekly_response and commit_weekly_response.status_code == 200:
                         commit_weekly_count = commit_weekly_response.json().get("total_count", 0)
@@ -952,7 +952,7 @@ if __name__ == "__main__":
 
                     # Monthly Commits
                     commit_monthly_url = f"{GITHUB_API_URL}/search/commits?q=repo:{repo_owner}/{repo_name}+author:{username}+committer-date:>={time_ranges['month_ago']}"
-                    print(f"  DEBUG - {username} Monthly Commit URL: {commit_monthly_url}")
+                    print(f"  DEBUG - {username} Monthly Commit URL: <{commit_monthly_url}>")
                     commit_monthly_response = make_github_request(commit_monthly_url, headers, 'search')
                     if commit_monthly_response and commit_monthly_response.status_code == 200:
                         commit_monthly_count = commit_monthly_response.json().get("total_count", 0)

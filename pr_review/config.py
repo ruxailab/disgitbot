@@ -45,12 +45,12 @@ if not GITHUB_TOKEN:
     raise ValueError("GITHUB_TOKEN environment variable is required")
 
 if not VERTEX_AI_PROJECT_ID:
-    print("⚠️  Warning: VERTEX_AI_PROJECT_ID not set. AI-powered reviews will be disabled.")
+    print("Warning: VERTEX_AI_PROJECT_ID not set. AI-powered reviews will be disabled.")
 
 if not GOOGLE_API_KEY:
-    print("⚠️  Warning: GOOGLE_API_KEY not set. AI-powered reviews will be disabled.")
+    print("Warning: GOOGLE_API_KEY not set. AI-powered reviews will be disabled.")
 
-print(f"✅ Configuration loaded for organization: {REPO_OWNER}")
+print(f"Configuration loaded for organization: {REPO_OWNER}")
 
 # Model configuration
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-1.5-pro")
@@ -69,12 +69,6 @@ REVIEW_COMMENT_TEMPLATE = """
 
 {reference_info}
 """
-
-CONFIDENCE_LEVELS = {
-    "high": "🔍",
-    "medium": "💭",
-    "low": "⚠️"
-}
 
 # Developer experience levels for personalized reviews
 EXPERIENCE_LEVELS = ["beginner", "intermediate", "advanced"] 

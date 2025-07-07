@@ -27,7 +27,7 @@ print("Loading environment variables...")
 load_dotenv("config/.env")
 
 # Environment variables validated by deployment pipeline - trust the process
-print("✅ Environment variables validated by deployment pipeline")
+print("Environment variables validated by deployment pipeline")
 print("="*50)
 
 # Get Discord bot token (validated by deployment pipeline)
@@ -366,7 +366,7 @@ async def check_permissions(interaction: discord.Interaction):
     
     results = []
     for perm_name, has_perm in required_perms:
-        status = "✅" if has_perm else "❌"
+        status = "PASS" if has_perm else "FAIL"
         results.append(f"{status} {perm_name}")
     
     await interaction.followup.send(f"Bot permissions:\n" + "\n".join(results), ephemeral=True)
@@ -382,14 +382,14 @@ async def setup_voice_stats(interaction: discord.Interaction):
         assert guild is not None, "Command should only work in guilds"
         
         # Check if a stats category already exists
-        existing_category = discord.utils.get(guild.categories, name="📊 REPOSITORY STATS")
+        existing_category = discord.utils.get(guild.categories, name="REPOSITORY STATS")
         
         if existing_category:
             # Category already exists, inform user
             await interaction.followup.send("Repository stats display already exists! Refreshing stats now.")
         else:
             # Create a new category for stats
-            await guild.create_category("📊 REPOSITORY STATS")
+            await guild.create_category("REPOSITORY STATS")
             await interaction.followup.send("Repository stats display created! Refreshing stats now.")
         
         # Update the stats
@@ -419,7 +419,7 @@ async def update_voice_channel_stats():
         bot_member = guild.get_member(bot.user.id)
         assert bot_member is not None, "Bot should be a member of the guild"
         if not bot_member.guild_permissions.manage_channels:
-            print("❌ Bot lacks 'Manage Channels' permission")
+            print("Bot lacks 'Manage Channels' permission")
             return
             
         # Fetch all data from Firestore
@@ -439,59 +439,65 @@ async def update_voice_channel_stats():
         total_issues = repo_metrics.get('issues_count', 0)
         total_commits = repo_metrics.get('commits_count', 0)
         
+        # Find or create the stats category
+        stats_category = discord.utils.get(guild.categories, name="REPOSITORY STATS")
+        if not stats_category:
+            print("Creating REPOSITORY STATS category...")
+            stats_category = await guild.create_category("REPOSITORY STATS")
+        
         # Define channel names with stats
         channel_names = [
-            f"⭐ Stars: {stars_count}",
-            f"🍴 Forks: {forks_count}",
-            f"🎯 Issues: {total_issues}",
-            f"💼 PRs: {total_prs}",
-            f"👥 Contributors: {total_contributors}",
-            f"💻 Commits: {total_commits}"
+            f"Stars: {stars_count}",
+            f"Forks: {forks_count}",
+            f"Issues: {total_issues}",
+            f"PRs: {total_prs}",
+            f"Contributors: {total_contributors}",
+            f"Commits: {total_commits}"
         ]
         
-        # Find existing stats channels (look for channels starting with emojis)
-        stats_emojis = ["⭐", "🍴", "🎯", "💼", "👥", "💻"]
+        # Find existing stats channels (look for channels starting with keywords)
+        stats_keywords = ["Stars:", "Forks:", "Issues:", "PRs:", "Contributors:", "Commits:"]
         existing_stats_channels = {}
         
-        # Map existing channels by their emoji prefix
-        for channel in guild.voice_channels:
-            for emoji in stats_emojis:
-                if channel.name.startswith(emoji):
-                    existing_stats_channels[emoji] = channel
+        # Map existing channels by their keyword prefix (only in the stats category)
+        for channel in stats_category.voice_channels:
+            for keyword in stats_keywords:
+                if channel.name.startswith(keyword):
+                    existing_stats_channels[keyword] = channel
                     break
         
         print(f"Found {len(existing_stats_channels)} existing stats channels")
         
         # Update existing channels or create new ones
         for target_name in channel_names:
-            # Extract emoji from target name
-            emoji = target_name.split()[0]
+            # Extract keyword from target name
+            keyword = target_name.split()[0] + ":"
             
             try:
-                if emoji in existing_stats_channels:
+                if keyword in existing_stats_channels:
                     # Update existing channel name if different
-                    channel = existing_stats_channels[emoji]
+                    channel = existing_stats_channels[keyword]
                     if channel.name != target_name:
                         print(f"Updating channel: {channel.name} → {target_name}")
                         await channel.edit(name=target_name)
-                        print(f"✅ Updated: {target_name}")
+                        print(f"Updated: {target_name}")
                     else:
-                        print(f"✅ Channel already up to date: {target_name}")
+                        print(f"Channel already up to date: {target_name}")
                 else:
                     # Create new channel only if it doesn't exist
                     print(f"Creating new channel: {target_name}")
-                    await guild.create_voice_channel(name=target_name)
-                    print(f"✅ Created: {target_name}")
+                    await guild.create_voice_channel(name=target_name, category=stats_category)
+                    print(f"Created: {target_name}")
                     
             except discord.Forbidden as e:
-                print(f"❌ Permission denied for '{target_name}': {e}")
+                print(f"Permission denied for '{target_name}': {e}")
                 print(f"   This channel was probably created by a higher-role user")
                 print(f"   Skipping update to avoid creating duplicates...")
                 # Don't create new channels - just skip to avoid duplicates
             except Exception as e:
-                print(f"❌ Error with '{target_name}': {e}")
+                print(f"Error with '{target_name}': {e}")
                 
-        print(f"✅ Stats update completed at {datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}")
+        print(f"Stats update completed at {datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}")
             
     except Exception as e:
         print(f"Error updating voice channel stats: {e}")

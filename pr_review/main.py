@@ -132,10 +132,10 @@ class PRReviewSystem:
     def _build_comprehensive_comment(self, metrics: Dict, labels: List[Dict], reviewers: Dict, ai_review: Dict) -> str:
         """Build a focused comment with metrics and automation info (per mentor requirements)"""
         
-        comment = "# 🤖 Automated PR Analysis\n\n"
+        comment = "# Automated PR Analysis\n\n"
         
-        # Metrics section (mentor's EXACT format)
-        comment += "## 📊 Code Metrics\n\n"
+        # Add metrics section
+        comment += "## Code Metrics\n\n"
         comment += f"**In this PR introducing {metrics.get('functions_added', 0)} more functions:**\n"
         comment += f"- **Cyclomatic complexity will increase by:** {metrics.get('cyclomatic_complexity_added', 0)}\n"
         comment += f"- **Line number will increase by:** {metrics.get('lines_added', 0)}\n"
@@ -149,17 +149,21 @@ class PRReviewSystem:
                 comment += f"- {factor}\n"
             comment += "\n"
         
+        # Add labels section
+        comment += "## Auto-Applied Labels\n\n"
+        
         # AI-predicted labels
         if labels:
-            comment += "## 🏷️ Auto-Applied Labels\n\n"
             for label in labels:
                 confidence_percent = int(label["confidence"] * 100)
                 comment += f"- **{label['name']}** ({confidence_percent}% confidence)\n"
             comment += "\n"
         
+        # Add reviewers section
+        comment += "## Auto-Assigned Reviewers\n\n"
+        
         # Reviewer assignments
         if reviewers.get('reviewers'):
-            comment += "## 👥 Auto-Assigned Reviewers\n\n"
             for reviewer in reviewers['reviewers']:
                 comment += f"- **@{reviewer['username']}** "
                 comment += f"({reviewer.get('expertise', 'General')} expertise)\n"

@@ -82,7 +82,7 @@ def create_oauth_app():
                 return "Authentication failed: No Discord user session", 400
             
             if not github.authorized:
-                print("❌ GitHub OAuth not authorized")
+                print("GitHub OAuth not authorized")
                 with oauth_sessions_lock:
                     oauth_sessions[discord_user_id] = {
                         'status': 'failed',
@@ -93,7 +93,7 @@ def create_oauth_app():
             # Get GitHub user info
             resp = github.get("/user")
             if not resp.ok:
-                print(f"❌ GitHub API call failed: {resp.status_code}")
+                print(f"GitHub API call failed: {resp.status_code}")
                 with oauth_sessions_lock:
                     oauth_sessions[discord_user_id] = {
                         'status': 'failed',
@@ -105,7 +105,7 @@ def create_oauth_app():
             github_username = github_user.get("login")
             
             if not github_username:
-                print("❌ No GitHub username found")
+                print("No GitHub username found")
                 with oauth_sessions_lock:
                     oauth_sessions[discord_user_id] = {
                         'status': 'failed',
@@ -121,13 +121,13 @@ def create_oauth_app():
                     'github_user_data': github_user
                 }
             
-            print(f"✅ OAuth completed for {github_username} (Discord: {discord_user_id})")
+            print(f"OAuth completed for {github_username} (Discord: {discord_user_id})")
             
             return f"""
             <html>
             <head><title>Authentication Successful</title></head>
             <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
-                <h1>✅ Authentication Successful!</h1>
+                <h1>Authentication Successful!</h1>
                 <p>Your Discord account has been linked to GitHub user: <strong>{github_username}</strong></p>
                 <p>You can now close this tab and return to Discord.</p>
                 <script>
@@ -141,7 +141,7 @@ def create_oauth_app():
             """
             
         except Exception as e:
-            print(f"❌ Error in OAuth callback: {e}")
+            print(f"Error in OAuth callback: {e}")
             return f"Authentication failed: {str(e)}", 500
     
     return app

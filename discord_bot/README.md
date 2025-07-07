@@ -1,6 +1,81 @@
 # Discord Bot Setup Guide
 
-## 1. Project Structure
+# 1. Prerequisites
+
+### Python 3.13 Setup
+
+This project requires Python 3.13. Follow the setup instructions for your operating system:
+
+#### macOS Setup
+```bash
+# Install pyenv if not already installed
+brew install pyenv
+
+# Add pyenv to your shell profile
+echo 'export PYENV_ROOT="$HOME/.pyenv"' >> ~/.zshrc
+echo 'command -v pyenv >/dev/null || export PATH="$PYENV_ROOT/bin:$PATH"' >> ~/.zshrc
+echo 'eval "$(pyenv init -)"' >> ~/.zshrc
+
+# Restart your terminal or reload your profile
+source ~/.zshrc
+
+# Install Python 3.13
+pyenv install 3.13.0
+pyenv global 3.13.0
+```
+
+#### Windows Setup
+```bash
+# Install pyenv-win using Git
+git clone https://github.com/pyenv-win/pyenv-win.git %USERPROFILE%\.pyenv
+
+# Add to PATH (run in Command Prompt as Administrator)
+setx PATH "%USERPROFILE%\.pyenv\pyenv-win\bin;%USERPROFILE%\.pyenv\pyenv-win\shims;%PATH%"
+
+# Restart Command Prompt and install Python 3.13
+pyenv install 3.13.0
+pyenv global 3.13.0
+```
+
+#### Linux Setup
+```bash
+# Install pyenv dependencies
+sudo apt update
+sudo apt install -y make build-essential libssl-dev zlib1g-dev \
+libbz2-dev libreadline-dev libsqlite3-dev wget curl llvm libncurses5-dev \
+libncursesw5-dev xz-utils tk-dev libffi-dev liblzma-dev python3-openssl git
+
+# Install pyenv
+curl https://pyenv.run | bash
+
+# Add to shell profile
+echo 'export PYENV_ROOT="$HOME/.pyenv"' >> ~/.bashrc
+echo 'command -v pyenv >/dev/null || export PATH="$PYENV_ROOT/bin:$PATH"' >> ~/.bashrc
+echo 'eval "$(pyenv init -)"' >> ~/.bashrc
+
+# Restart terminal and install Python 3.13
+source ~/.bashrc
+pyenv install 3.13.0
+pyenv global 3.13.0
+```
+
+### Virtual Environment Setup
+
+After installing Python 3.13, create and activate a virtual environment:
+
+```bash
+# Create virtual environment
+python3.13 -m venv venv
+
+# Activate virtual environment
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Upgrade pip and install dependencies
+python -m pip install --upgrade pip
+pip install -r discord_bot/config/discord_bot_requirements.txt
+```
+
+# 2. Project Structure
 
 ```
 discord_bot/
@@ -17,7 +92,7 @@ discord_bot/
 └── deployment/                 # Cloud deployment scripts
 ```
 
-## 2. Complete Setup Guide
+# 3. Complete Setup Guide
 
 ### Overview: What You Need to Configure
 
@@ -47,7 +122,7 @@ Go to your GitHub repository → Settings → Secrets and variables → Actions 
 
 ---
 
-## 3. Step-by-Step Configuration
+# 4. Step-by-Step Configuration
 
 ### Step 1: Get DISCORD_BOT_TOKEN (.env) + DISCORD_BOT_TOKEN (GitHub Secret)
 
@@ -62,28 +137,29 @@ Go to your GitHub repository → Settings → Secrets and variables → Actions 
 3. **Configure OAuth2 Scopes:**
    - Go to "OAuth2" tab
    - Under "Scopes", check these boxes:
-     - ✅ `bot`
-     - ✅ `applications.commands`
+     - [x] `bot`
+     - [x] `applications.commands`
 4. **Set Bot Permissions:**
-   - Under "Bot Permissions", check these boxes:
-     - ✅ `Manage Roles`
-     - ✅ `View Channels` 
-     - ✅ `Manage Channels`
-     - ✅ `Send Messages`
-     - ✅ `Embed Links`
-     - ✅ `Read Message History`
-     - ✅ `Use Slash Commands`
-     - ✅ `Use Embedded Activities`
-     - ✅ `Connect` (for voice channels)
+   - Scroll down to find "Bot Permissions" section (below the Scopes section)
+   - Check these boxes:
+     - [x] `Manage Roles`
+     - [x] `View Channels` 
+     - [x] `Manage Channels`
+     - [x] `Send Messages`
+     - [x] `Embed Links`
+     - [x] `Read Message History`
+     - [x] `Use Slash Commands`
+     - [x] `Use Embedded Activities`
+     - [x] `Connect`
 5. **Invite Bot to Your Server:**
    - Copy the generated URL from the OAuth2 page
    - Paste it in your browser and invite the bot to your Discord server
 6. **Enable Required Intents:**
    - Go to "Bot" tab
    - Enable these 3 intents:
-     - ✅ `PRESENCE INTENT`
-     - ✅ `SERVER MEMBERS INTENT` 
-     - ✅ `MESSAGE CONTENT INTENT`
+     - [x] `PRESENCE INTENT`
+     - [x] `SERVER MEMBERS INTENT` 
+     - [x] `MESSAGE CONTENT INTENT`
 7. **Get Your Bot Token:**
    - Click "Reset Token" → Copy the token
    - **Add to `.env`:** `DISCORD_BOT_TOKEN=your_token_here`
@@ -148,7 +224,7 @@ Go to your GitHub repository → Settings → Secrets and variables → Actions 
 2. **Create New Token:**
    - Click "Generate new token" → "Generate new token (classic)"
 3. **Set Permissions:**
-   - Check only: ✅ `repo` (this gives full repository access)
+   - Check only: [x] `repo` (this gives full repository access)
 4. **Generate and Save:**
    - Click "Generate token" → Copy the token
    - **Add to `.env`:** `GITHUB_TOKEN=your_token_here`
@@ -229,7 +305,7 @@ Go to your GitHub repository → Settings → Secrets and variables → Actions 
 
 ---
 
-## 7. Final Deployment
+# 5. Final Deployment
 
 Now that all your environment variables and GitHub OAuth settings are configured, deploy your bot:
 
@@ -247,7 +323,7 @@ The deployment script will:
 
 ---
 
-## 8. Test the Bot
+# 6. Test the Bot
 
 1. **Link Your Discord Account:**
    - In your Discord server, type `/link`
@@ -272,7 +348,7 @@ The deployment script will:
 
 ---
 
-## 9. Troubleshooting
+# 7. Troubleshooting
 
 **Common Issues:**
 
@@ -293,23 +369,19 @@ The deployment script will:
 
 4. **Role assignment doesn't work:**
    - Ensure the bot has "Manage Roles" permission
-   - Check that the bot's role is higher than the roles it's trying to assign
-
-5. **"Discord bot is running" instead of GitHub OAuth:**
-   - This means you're using old code - redeploy with the latest version
-   - Make sure your `OAUTH_BASE_URL` is set correctly in `.env`
+   - Check that the bot's role is higher than the roles it's trying to assign 
 
 **Need help?** Contact `onlineee__.` on Discord for support.
 
 ---
 
-## 10. Understanding the Networking Architecture (For Developers)
+# 8. Understanding the Networking Architecture (For Developers)
 
-### **🏗️ How Discord Bot + Flask OAuth Works Together**
+### How Discord Bot + Flask OAuth Works Together
 
 This section explains the technical details of how our Discord bot serves both Discord commands AND web OAuth on the same Cloud Run service.
 
-### **📁 File Structure Overview**
+### File Structure Overview
 
 ```
 discord_bot/
@@ -321,7 +393,7 @@ discord_bot/
     └── entrypoint.sh               # Container startup script
 ```
 
-### **🚀 Container Startup Flow**
+### Container Startup Flow
 
 **File: `discord_bot/deployment/entrypoint.sh` (Lines 42-47)**
 ```bash
@@ -350,7 +422,7 @@ def run_discord_bot_async():
         discord_bot_module.bot.run(discord_bot_module.TOKEN)
 ```
 
-### **🧵 Threading Architecture**
+### Threading Architecture
 
 **File: `discord_bot/main.py` (Lines 64-75)**
 ```python
@@ -383,7 +455,7 @@ oauth_app.run(
 )
 ```
 
-### **🌐 Flask OAuth Route Definitions**
+### Flask OAuth Route Definitions
 
 **File: `discord_bot/src/bot/auth.py` (Lines 40-49)**
 ```python
@@ -421,7 +493,7 @@ def start_oauth(discord_user_id):
         return redirect(url_for("github.login"))
 ```
 
-### **🔄 GitHub OAuth Callback Processing**
+### GitHub OAuth Callback Processing
 
 **File: `discord_bot/src/bot/auth.py` (Lines 75-95)**
 ```python
@@ -447,7 +519,7 @@ def github_callback():
         resp = github.get("/user")
 ```
 
-### **💾 Inter-Thread Communication**
+### Inter-Thread Communication
 
 **File: `discord_bot/src/bot/auth.py` (Lines 11-13)**
 ```python
@@ -474,11 +546,11 @@ def wait_for_username(discord_user_id, max_wait_time=300):
                     return github_username
 ```
 
-### **🌍 The Network Magic: How Cloud Run URL → Flask App**
+### The Network Magic: How Cloud Run URL → Flask App
 
 **Key Question:** How does `https://discord-bot-999242429166.us-central1.run.app/auth/start/123` actually reach your Flask code?
 
-### **🔧 Step 1: Cloud Run Sets Up a Reverse Proxy**
+### Step 1: Cloud Run Sets Up a Reverse Proxy
 
 When you deploy, Cloud Run automatically creates a **reverse proxy**:
 
@@ -489,7 +561,7 @@ gcloud run deploy discord-bot --port=8080
 # Cloud Run thinks: "I'll listen on the public URL and forward to port 8080 inside the container"
 ```
 
-### **🚪 Step 2: Flask Binds to Port 8080 Inside Container**
+### Step 2: Flask Binds to Port 8080 Inside Container
 
 **File: `discord_bot/main.py` (Lines 85-90)**
 ```python
@@ -503,7 +575,7 @@ oauth_app.run(
 )
 ```
 
-### **🌐 Step 3: The Network Translation**
+### Step 3: The Network Translation
 
 ```
 User types: https://discord-bot-999242429166.us-central1.run.app/auth/start/123
@@ -521,7 +593,7 @@ Container Network: "localhost:8080/auth/start/123"
 Flask App: "@app.route('/auth/start/<id>') matches! Call start_oauth(id='123')"
 ```
 
-### **🔍 The Actual HTTP Translation**
+### The Actual HTTP Translation
 
 **What the user sends:**
 ```http
@@ -537,7 +609,7 @@ X-Forwarded-Host: discord-bot-999242429166.us-central1.run.app  # ← Original h
 X-Forwarded-Proto: https               # ← Original protocol saved
 ```
 
-### **🏠 Why `host="0.0.0.0"` is Critical**
+### Why `host="0.0.0.0"` is Critical
 
 **File: `discord_bot/main.py` (Line 87)**
 ```python
@@ -548,7 +620,7 @@ oauth_app.run(host="0.0.0.0", port=8080)
 - **If you used `host="127.0.0.1"`**: Flask only listens on localhost interface
 - **With `host="0.0.0.0"`**: Flask listens on ALL network interfaces, including container's external interface
 
-### **🐳 Inside the Container Network**
+### Inside the Container Network
 
 ```bash
 # Inside your container, this is what the network looks like:
@@ -562,7 +634,7 @@ tcp  0.0.0.0:8080  LISTEN   # Flask listening on ALL interfaces
 # Cloud Run forwards from eth0 (10.4.0.15:8080) to your Flask app
 ```
 
-### **🎯 The Complete Flow**
+### The Complete Flow
 
 ```
 1. 🌍 Public Internet
@@ -586,7 +658,7 @@ tcp  0.0.0.0:8080  LISTEN   # Flask listening on ALL interfaces
 
 **The KEY insight:** Your Flask app never knows about the public domain! It just sees `localhost:8080/auth/start/123` and Cloud Run handles all the networking magic invisibly.
 
-### **🤖 Discord Command Integration**
+### Discord Command Integration
 
 **File: `discord_bot/src/bot/init_discord_bot.py` (Lines 74-85)**
 ```python
@@ -606,7 +678,7 @@ async def link(interaction: discord.Interaction):
         oauth_url = get_github_username_for_user(discord_user_id)
 ```
 
-### **🌍 Cloud Run Environment Configuration**
+### Cloud Run Environment Configuration
 
 **File: `discord_bot/main.py` (Lines 42-49)**
 ```python
@@ -635,7 +707,7 @@ github_blueprint = make_github_blueprint(
 )
 ```
 
-### **🎯 Key Networking Concepts Demonstrated**
+### Key Networking Concepts Demonstrated
 
 1. **Single Process, Multiple Services**: `main.py` Lines 64-94 show how one container runs both Discord bot (background thread) and Flask (main thread)
 
@@ -649,7 +721,7 @@ github_blueprint = make_github_blueprint(
 
 6. **Thread-Safe Operations**: `auth.py` Lines 56-60 and 174-178 demonstrate proper locking for shared data structures
 
-### **🔍 Debugging Your Networking**
+### Debugging Your Networking
 
 - **View Flask logs**: Check Cloud Run logs for HTTP request patterns
 - **Inspect OAuth sessions**: Add debug prints in `auth.py` Lines 56 and 110

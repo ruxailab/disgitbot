@@ -2,7 +2,7 @@ name: Update Discord Roles
 
 on:
   schedule:
-    - cron: '0 * * * *'  # Run hourly at minute 0
+    - cron: '0 0 * * *'  # Run daily at midnight UTC
   workflow_dispatch:  # Allow manual trigger
 
 jobs:

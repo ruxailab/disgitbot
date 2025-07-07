@@ -61,11 +61,11 @@ async def update_roles_for_guild(guild: discord.Guild):
             try:
                 print(f"Creating role: {role_name}")
                 # Set special colors for medal roles
-                if role_name == "🥇 PR Champion":
+                if role_name == "PR Champion":
                     roles[role_name] = await guild.create_role(name=role_name, color=discord.Color.gold())
-                elif role_name == "🥈 PR Runner-up":
+                elif role_name == "PR Runner-up":
                     roles[role_name] = await guild.create_role(name=role_name, color=discord.Color.from_rgb(192, 192, 192))  # Silver
-                elif role_name == "🥉 PR Bronze":
+                elif role_name == "PR Bronze":
                     roles[role_name] = await guild.create_role(name=role_name, color=discord.Color.from_rgb(205, 127, 50))  # Bronze
                 else:
                     roles[role_name] = await guild.create_role(name=role_name)

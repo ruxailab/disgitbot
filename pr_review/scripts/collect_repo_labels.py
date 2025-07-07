@@ -230,15 +230,15 @@ def main():
     collector = RepositoryLabelsCollector()
     
     # Collect labels from all RUXAILAB repositories
-    print("🔍 Collecting labels from RUXAILAB repositories...")
+    print("Collecting labels from RUXAILAB repositories...")
     labels_data = collector.collect_all_labels()
     
     # Save the data
-    print("💾 Saving labels data...")
+    print("Saving labels data...")
     collector.save_labels_data(labels_data)
     
     # Generate and save report
-    print("📊 Generating report...")
+    print("Generating report...")
     report = collector.generate_labels_report(labels_data)
     
     with open("data/labels_collection_report.md", 'w') as f:
