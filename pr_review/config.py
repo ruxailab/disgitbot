@@ -19,9 +19,7 @@ GITHUB_CLIENT_SECRET = os.getenv('GITHUB_CLIENT_SECRET')
 # Repository Configuration
 REPO_OWNER = os.getenv('REPO_OWNER', 'ruxailab')
 
-# Vertex AI Configuration
-VERTEX_AI_PROJECT_ID = os.getenv('VERTEX_AI_PROJECT_ID')
-VERTEX_AI_LOCATION = os.getenv('VERTEX_AI_LOCATION', 'us-central1')
+# Google AI Configuration
 GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
 
 # PR Automation Configuration
@@ -32,20 +30,15 @@ POST_METRICS_COMMENT = os.getenv('POST_METRICS_COMMENT', 'true').lower() == 'tru
 # Paths
 BASE_DIR = Path(__file__).parent
 DATA_DIR = BASE_DIR / 'data'
-LOGS_DIR = BASE_DIR / 'logs'
-OUTPUT_DIR = BASE_DIR / 'output'
 
 # Ensure directories exist
 DATA_DIR.mkdir(exist_ok=True)
-LOGS_DIR.mkdir(exist_ok=True)
-OUTPUT_DIR.mkdir(exist_ok=True)
 
 # Validation
 if not GITHUB_TOKEN:
     raise ValueError("GITHUB_TOKEN environment variable is required")
 
-if not VERTEX_AI_PROJECT_ID:
-    print("Warning: VERTEX_AI_PROJECT_ID not set. AI-powered reviews will be disabled.")
+
 
 if not GOOGLE_API_KEY:
     print("Warning: GOOGLE_API_KEY not set. AI-powered reviews will be disabled.")

@@ -12,7 +12,7 @@ import json
 # Add the current directory to Python path for imports
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from config import GITHUB_TOKEN, GOOGLE_API_KEY
+from config import GITHUB_TOKEN, GOOGLE_API_KEY, REPO_OWNER
 from utils.github_client import GitHubClient
 from utils.metrics_calculator import MetricsCalculator
 from utils.ai_pr_labeler import AIPRLabeler
@@ -130,17 +130,17 @@ class PRReviewSystem:
             }
     
     def _build_comprehensive_comment(self, metrics: Dict, labels: List[Dict], reviewers: Dict, ai_review: Dict) -> str:
-        """Build a focused comment with metrics and automation info (per mentor requirements)"""
+        """Build a focused comment with metrics and automation info"""
         
         comment = "# Automated PR Analysis\n\n"
         
         # Add metrics section
-        comment += "## Code Metrics\n\n"
-        comment += f"**In this PR introducing {metrics.get('functions_added', 0)} more functions:**\n"
-        comment += f"- **Cyclomatic complexity will increase by:** {metrics.get('cyclomatic_complexity_added', 0)}\n"
-        comment += f"- **Line number will increase by:** {metrics.get('lines_added', 0)}\n"
-        comment += f"- **Files changed:** {metrics.get('files_changed', 0)}\n"
-        comment += f"- **Risk Level:** {metrics.get('risk_level', 'UNKNOWN')}\n\n"
+        comment += "## Code Metrics\n"
+        comment += f"In this PR introducing {metrics.get('functions_added', 0)} more functions:\n\n"
+        comment += f"- Cyclomatic complexity will increase by: {metrics.get('cyclomatic_complexity_added', 0)}\n"
+        comment += f"- Line number will increase by: {metrics.get('lines_added', 0)}\n"
+        comment += f"- Files changed: {metrics.get('files_changed', 0)}\n"
+        comment += f"- Risk Level: {metrics.get('risk_level', 'UNKNOWN')}\n\n"
         
         # Risk factors (if any)
         if metrics.get('risk_factors'):
@@ -150,27 +150,27 @@ class PRReviewSystem:
             comment += "\n"
         
         # Add labels section
-        comment += "## Auto-Applied Labels\n\n"
+        comment += "## Auto-Applied Labels\n"
         
         # AI-predicted labels
         if labels:
             for label in labels:
                 confidence_percent = int(label["confidence"] * 100)
-                comment += f"- **{label['name']}** ({confidence_percent}% confidence)\n"
+                comment += f"- {label['name']} ({confidence_percent}% confidence)\n"
             comment += "\n"
         
         # Add reviewers section
-        comment += "## Auto-Assigned Reviewers\n\n"
+        comment += "## Auto-Assigned Reviewers\n"
         
         # Reviewer assignments
         if reviewers.get('reviewers'):
             for reviewer in reviewers['reviewers']:
-                comment += f"- **@{reviewer['username']}** "
+                comment += f"- @{reviewer['username']} "
                 comment += f"({reviewer.get('expertise', 'General')} expertise)\n"
             comment += "\n"
         
         comment += "---\n"
-        comment += "*Automated analysis by RUXAILAB PR System • Metrics calculated, labels applied, reviewers assigned*"
+        comment += f"*Automated analysis by {REPO_OWNER.upper()} PR System*"
         
         return comment
     
@@ -206,7 +206,7 @@ def main():
     """Main entry point for testing"""
     if len(sys.argv) < 3:
         print("Usage: python main.py <repo> <pr_number> [experience_level]")
-        print("Example: python main.py ruxailab/test-repo 123 intermediate")
+        print(f"Example: python main.py {REPO_OWNER}/test-repo 123 intermediate")
         sys.exit(1)
     
     repo = sys.argv[1]

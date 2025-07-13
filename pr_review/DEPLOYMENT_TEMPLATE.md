@@ -1,10 +1,10 @@
-# 🚀 RUXAILAB PR Automation Deployment Guide
+# RUXAILAB PR Automation Deployment Guide
 
 ## 📋 Overview
 
 This guide shows how to deploy the PR automation system to any RUXAILAB repository using the **reusable workflow** approach.
 
-## 🎯 Master Workflow Location
+## Master Workflow Location
 
 The master workflow is located in: `ruxailab/disgitbot/.github/workflows/pr-automation.yml`
 
@@ -18,7 +18,7 @@ In any RUXAILAB repository, create this file:
 ### Step 2: Copy This Template
 
 ```yaml
-# 🤖 RUXAILAB PR Automation - Caller Workflow
+# RUXAILAB PR Automation - Caller Workflow
 # This calls the master workflow from ruxailab/disgitbot
 
 name: PR Automation
@@ -83,9 +83,9 @@ jobs:
       GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
 ```
 
-## 📊 Deployment Status
+## Deployment Status
 
-### ✅ Deployed Repositories
+### Deployed Repositories
 - [ ] ruxailab/eye-tracking-analysis
 - [ ] ruxailab/sentiment-analysis-tool
 - [ ] ruxailab/heuristic-evaluation-framework
@@ -94,7 +94,7 @@ jobs:
 - [ ] ruxailab/vr-ar-research-tools
 - [ ] ruxailab/research-data-pipeline
 
-### 🎯 Benefits of This Approach
+### Benefits of This Approach
 
 1. **Single Source of Truth** - All logic in `ruxailab/disgitbot`
 2. **Easy Updates** - Change master workflow, all repos get updates
@@ -102,7 +102,7 @@ jobs:
 4. **Centralized Maintenance** - Fix bugs in one place
 5. **Consistent Behavior** - All repos use same AI logic
 
-## 🔍 Testing
+## Testing
 
 Test the deployment:
 1. Create a PR in the target repository

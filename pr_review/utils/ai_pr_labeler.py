@@ -257,7 +257,7 @@ Only select labels that are highly relevant. Be selective and accurate.
                     retry_delay = base_delay * (2 ** attempt) + random.randint(1, 5)
                     
                     logger.warning(
-                        f"⚠️  Unknown error on attempt {attempt + 1}: {e}. "
+                        f"Unknown error on attempt {attempt + 1}: {e}. "
                         f"Retrying in {retry_delay} seconds..."
                     )
                     

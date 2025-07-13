@@ -14,7 +14,7 @@ from typing import Dict, List, Set
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from utils.github_client import GitHubClient
-from config import GITHUB_TOKEN
+from config import GITHUB_TOKEN, REPO_OWNER
 
 # Configure logging
 logging.basicConfig(
@@ -29,7 +29,7 @@ class RepositoryLabelsCollector:
     def __init__(self):
         """Initialize the collector"""
         self.github_client = GitHubClient()
-        self.organization = "ruxailab"
+        self.organization = REPO_OWNER
     
     def get_organization_repositories(self) -> List[str]:
         """
