@@ -6,7 +6,7 @@ Reviewer Assigner for automatically assigning reviewers to pull requests.
 import json
 import random
 import logging
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 class ReviewerAssigner:
     """Automatically assigns reviewers to pull requests using random selection."""
     
-    def __init__(self, config_path: str | None = None):
+    def __init__(self, config_path: Optional[str] = None):
         """Initialize the reviewer assigner with configuration."""
         self.config_path = config_path if config_path is not None else "data/reviewers_config.json"
         self.reviewers = self._load_reviewers()
@@ -36,7 +36,7 @@ class ReviewerAssigner:
             logger.error(f"Failed to load reviewers config: {e}")
             return ["marcgc21", "xemyst", "KarinePistili", "hvini", "sergiobeltranguerrero", "leoruas", "JulioManoel"]
     
-    def assign_reviewers(self, pr_data: Dict[str, Any], repo: str | None = None) -> Dict[str, Any]:
+    def assign_reviewers(self, pr_data: Dict[str, Any], repo: Optional[str] = None) -> Dict[str, Any]:
         """
         Assign reviewers to a pull request using random selection.
         
