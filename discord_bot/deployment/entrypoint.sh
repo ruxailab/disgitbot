@@ -2,7 +2,7 @@
 set -e
 
 echo "=== Starting Discord Bot with Flask OAuth ==="
-echo "🚀 Discord Bot + Flask OAuth Integration"
+echo "Discord Bot + Flask OAuth Integration"
 
 # Check for environment variables
 echo "Checking for environment variables..."
@@ -10,28 +10,28 @@ for ENV_VAR in DISCORD_BOT_TOKEN GITHUB_TOKEN GITHUB_CLIENT_ID GITHUB_CLIENT_SEC
   if [ -n "${!ENV_VAR}" ]; then
     # Print first 5 characters followed by ...
     VALUE="${!ENV_VAR}"
-    echo "✅ Found $ENV_VAR: ${VALUE:0:5}..."
+    echo "Found $ENV_VAR: ${VALUE:0:5}..."
   else
-    echo "❌ $ENV_VAR not found!"
+    echo "$ENV_VAR not found!"
   fi
 done
 
 # Check for credentials
 echo "Checking for Firebase credentials..."
 if [ -f "/secret/firebase-credentials" ]; then
-  echo "✅ Found credentials at /secret/firebase-credentials (production mode)"
+  echo "Found credentials at /secret/firebase-credentials (production mode)"
   # Copy to expected location
   cp /secret/firebase-credentials config/credentials.json
 elif [ -f "config/credentials.json" ]; then
-  echo "✅ Found credentials.json in config directory"
+  echo "Found credentials.json in config directory"
 else
-  echo "❌ No Firebase credentials found! Application will fail to start."
-  echo "➡️ In production: Mount secret to /secret/firebase-credentials"
-  echo "➡️ In development: Place credentials.json in config/ directory"
+  echo "No Firebase credentials found! Application will fail to start."
+  echo "In production: Mount secret to /secret/firebase-credentials"
+  echo "In development: Place credentials.json in config/ directory"
 fi
 
 # List current directory for debugging
-echo "📂 Directory contents:"
+echo "Directory contents:"
 ls -la
 
 # Create a simple status file to record running processes

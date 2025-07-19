@@ -24,15 +24,15 @@ print_step() {
 }
 
 print_success() {
-    echo -e "${GREEN}✅ $1${NC}"
+    echo -e "${GREEN}$1${NC}"
 }
 
 print_warning() {
-    echo -e "${YELLOW}⚠️  $1${NC}"
+    echo -e "${YELLOW}$1${NC}"
 }
 
 print_error() {
-    echo -e "${RED}❌ $1${NC}"
+    echo -e "${RED}$1${NC}"
 }
 
 print_header
@@ -76,7 +76,7 @@ interactive_select() {
         
         for i in "${!options[@]}"; do
             if [ $i -eq $selected ]; then
-                echo -e "${GREEN}▶ ${options[i]}${NC}"
+                echo -e "${GREEN}${options[i]}${NC}"
             else
                 echo -e "  ${options[i]}"
             fi
@@ -112,7 +112,7 @@ interactive_select() {
                 ;;
             ' '|'') # Space or Enter
                 clear
-                echo -e "\n${GREEN}✅ Selected: ${options[$selected]}${NC}\n"
+                echo -e "\n${GREEN}Selected: ${options[$selected]}${NC}\n"
                 # Use a global variable to store the selection
                 INTERACTIVE_SELECTION=$selected
                 return 0
@@ -255,7 +255,7 @@ main() {
       --format="value(status.url)")
     
     print_success "Placeholder deployment complete!"
-    echo -e "\n${GREEN}🎉 Your Cloud Run URL is ready!${NC}"
+    echo -e "\n${GREEN}Your Cloud Run URL is ready!${NC}"
     echo -e "${BLUE}Service URL:${NC} $SERVICE_URL"
     echo
     echo -e "${YELLOW}IMPORTANT: Save this URL!${NC}"

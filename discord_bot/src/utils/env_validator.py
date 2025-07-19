@@ -413,7 +413,7 @@ def main():
         sys.exit(0 if result['valid'] else 1)
         
     except Exception as e:
-        print(f"💥 CRITICAL ERROR in validator:")
+        print(f"CRITICAL ERROR in validator:")
         print(f"Exception type: {type(e).__name__}")
         print(f"Exception message: {str(e)}")
         import traceback

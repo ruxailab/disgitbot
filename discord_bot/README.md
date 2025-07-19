@@ -79,17 +79,17 @@ pip install -r discord_bot/config/discord_bot_requirements.txt
 
 ```
 discord_bot/
-├── main.py                     # Entry point with Flask OAuth integration
-├── src/
-│   ├── bot/
-│   │   ├── init_discord_bot.py # Main bot code with slash commands
-│   │   └── auth.py             # GitHub OAuth handling
-│   └── utils/                  # Database and role utilities
-├── config/
-│   ├── .env                    # Your environment variables
-│   ├── credentials.json        # Firebase service account key
-│   └── discord_bot_requirements.txt
-└── deployment/                 # Cloud deployment scripts
+ main.py                     # Entry point with Flask OAuth integration
+ src/
+    bot/
+       init_discord_bot.py # Main bot code with slash commands
+       auth.py             # GitHub OAuth handling
+    utils/                  # Database and role utilities
+ config/
+    .env                    # Your environment variables
+    credentials.json        # Firebase service account key
+    discord_bot_requirements.txt
+ deployment/                 # Cloud deployment scripts
 ```
 
 # 3. Complete Setup Guide
@@ -377,12 +377,12 @@ This section explains the technical details of how our Discord bot serves both D
 
 ```
 discord_bot/
-├── main.py                          # Entry point - orchestrates everything
-├── src/bot/
-│   ├── init_discord_bot.py         # Discord bot with all commands
-│   └── auth.py                     # Flask OAuth server
-└── deployment/
-    └── entrypoint.sh               # Container startup script
+ main.py                          # Entry point - orchestrates everything
+ src/bot/
+    init_discord_bot.py         # Discord bot with all commands
+    auth.py                     # Flask OAuth server
+ deployment/
+     entrypoint.sh               # Container startup script
 ```
 
 ### Container Startup Flow
@@ -404,10 +404,10 @@ def run_discord_bot_async():
     
     try:
         # Import the existing Discord bot with all commands
-        print("📦 Importing existing Discord bot setup...")
+        print(" Importing existing Discord bot setup...")
         import src.bot.init_discord_bot as discord_bot_module
         
-        print("✅ Discord bot setup imported successfully")
+        print(" Discord bot setup imported successfully")
         
         # Get the bot instance and run it
         print("🤖 Starting Discord bot connection...")
@@ -427,7 +427,7 @@ def start_discord_bot():
         print("🤖 Starting Discord bot in thread...")
         run_discord_bot_async()
     except Exception as e:
-        print(f"❌ Discord bot error: {e}")
+        print(f" Discord bot error: {e}")
         import traceback
         traceback.print_exc()
 
@@ -499,7 +499,7 @@ def github_callback():
             return "Authentication failed: No Discord user session", 400
         
         if not github.authorized:
-            print("❌ GitHub OAuth not authorized")
+            print(" GitHub OAuth not authorized")
             with oauth_sessions_lock:
                 oauth_sessions[discord_user_id] = {
                     'status': 'failed',
@@ -629,22 +629,22 @@ tcp  0.0.0.0:8080  LISTEN   # Flask listening on ALL interfaces
 ### The Complete Flow
 
 ```
-1. 🌍 Public Internet
+1.  Public Internet
    User: "I want https://discord-bot-999242429166.us-central1.run.app/auth/start/123"
    
-2. 🌐 Google's Load Balancer  
+2.  Google's Load Balancer  
    LB: "discord-bot-999242429166 → Container cluster in us-central1"
    
-3. ⚙️ Container Orchestrator
+3.  Container Orchestrator
    K8s: "discord-bot service → Pod #abc123 at IP 10.4.0.15"
    
-4. 🔌 Network Proxy
+4.  Network Proxy
    Proxy: "Forward HTTP to 10.4.0.15:8080/auth/start/123"
    
-5. 🐳 Container Network
+5.  Container Network
    Container: "Incoming request on eth0:8080"
    
-6. 🌶️ Flask Application
+6.  Flask Application
    Flask: "@app.route('/auth/start/<id>') → start_oauth(id='123')"
 ```
 

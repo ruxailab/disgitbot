@@ -1,6 +1,6 @@
 # RUXAILAB PR Automation Deployment Guide
 
-## 📋 Overview
+## Overview
 
 This guide shows how to deploy the PR automation system to any RUXAILAB repository using the **reusable workflow** approach.
 
@@ -8,7 +8,7 @@ This guide shows how to deploy the PR automation system to any RUXAILAB reposito
 
 The master workflow is located in: `ruxailab/disgitbot/.github/workflows/pr-automation.yml`
 
-## 📁 How to Deploy to Other Repos
+## How to Deploy to Other Repos
 
 ### Step 1: Create the Workflow File
 
@@ -46,7 +46,7 @@ Each repository needs these secrets:
 - `GITHUB_TOKEN` (automatically available)
 - `GOOGLE_API_KEY` (add to repository secrets)
 
-## 🔧 Advanced Usage
+## Advanced Usage
 
 ### Manual Trigger for Labels Collection
 
@@ -110,7 +110,7 @@ Test the deployment:
 3. Verify the workflow runs and processes the PR
 4. Check for AI-generated comments, labels, and reviewer assignments
 
-## 🆘 Troubleshooting
+## Troubleshooting
 
 ### Common Issues:
 
@@ -127,7 +127,7 @@ Test the deployment:
    - Verify `GITHUB_TOKEN` has necessary permissions
    - Check if repository is private/public access
 
-## 📞 Support
+## Support
 
 For issues or questions:
 - Check the master workflow: `ruxailab/disgitbot/.github/workflows/pr-automation.yml`

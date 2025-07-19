@@ -56,9 +56,6 @@ async def on_ready():
         print(f"{bot.user} is online! Synced {len(synced)} command(s).")
     except Exception as e:
         print(f"Failed to sync commands: {e}")
-    
-    # Start the auto-update task
-    bot.loop.create_task(auto_update_voice_stats())
 
 @bot.tree.command(name="link", description="Link your Discord to GitHub")
 async def link(interaction: discord.Interaction):
@@ -329,7 +326,7 @@ async def halloffame(interaction: discord.Interaction, type: str = "pr", period:
     period_names = {"all_time": "All Time", "monthly": "Monthly", "weekly": "Weekly", "daily": "Daily"}
     
     embed = discord.Embed(
-        title=f"🏆 {type_names[type]} Hall of Fame ({period_names[period]})",
+        title=f"{type_names[type]} Hall of Fame ({period_names[period]})",
         color=discord.Color.gold()
     )
     
@@ -386,14 +383,12 @@ async def setup_voice_stats(interaction: discord.Interaction):
         
         if existing_category:
             # Category already exists, inform user
-            await interaction.followup.send("Repository stats display already exists! Refreshing stats now.")
+            await interaction.followup.send("Repository stats display already exists! Stats are updated daily via automated workflow.")
         else:
             # Create a new category for stats
             await guild.create_category("REPOSITORY STATS")
-            await interaction.followup.send("Repository stats display created! Refreshing stats now.")
+            await interaction.followup.send("Repository stats display created! Stats will be updated daily via automated workflow.")
         
-        # Update the stats
-        await update_voice_channel_stats()
         
     except Exception as e:
         await interaction.followup.send(f"Error setting up voice stats: {str(e)}")
@@ -401,121 +396,7 @@ async def setup_voice_stats(interaction: discord.Interaction):
         import traceback
         traceback.print_exc()
 
-async def update_voice_channel_stats():
-    """Update voice channel names to display repository stats (minimal approach)."""
-    try:
-        # Get the first guild (server) the bot is in
-        guild = None
-        for g in bot.guilds:
-            guild = g
-            break
-            
-        if not guild:
-            print("Bot is not in any guild. Cannot update voice channel stats.")
-            return
-            
-        # Check basic permission
-        assert bot.user is not None, "Bot user should be available"
-        bot_member = guild.get_member(bot.user.id)
-        assert bot_member is not None, "Bot should be a member of the guild"
-        if not bot_member.guild_permissions.manage_channels:
-            print("Bot lacks 'Manage Channels' permission")
-            return
-            
-        # Fetch all data from Firestore
-        repo_metrics, discord_contributions, _ = get_firestore_data()
-        print(f"Retrieved repo metrics from Firestore: {repo_metrics}")
-        
-        # If repo_metrics is empty, just use zeros
-        if not repo_metrics:
-            print("WARNING: No repo metrics found in Firestore. Using zeros.")
-            repo_metrics = {"stars_count": 0, "forks_count": 0, "total_contributors": 0}
-            
-        # Get stats from repo metrics
-        stars_count = repo_metrics.get('stars_count', 0)
-        forks_count = repo_metrics.get('forks_count', 0) 
-        total_contributors = repo_metrics.get('total_contributors', 0)  
-        total_prs = repo_metrics.get('pr_count', 0)
-        total_issues = repo_metrics.get('issues_count', 0)
-        total_commits = repo_metrics.get('commits_count', 0)
-        
-        # Find or create the stats category
-        stats_category = discord.utils.get(guild.categories, name="REPOSITORY STATS")
-        if not stats_category:
-            print("Creating REPOSITORY STATS category...")
-            stats_category = await guild.create_category("REPOSITORY STATS")
-        
-        # Define channel names with stats
-        channel_names = [
-            f"Stars: {stars_count}",
-            f"Forks: {forks_count}",
-            f"Issues: {total_issues}",
-            f"PRs: {total_prs}",
-            f"Contributors: {total_contributors}",
-            f"Commits: {total_commits}"
-        ]
-        
-        # Find existing stats channels (look for channels starting with keywords)
-        stats_keywords = ["Stars:", "Forks:", "Issues:", "PRs:", "Contributors:", "Commits:"]
-        existing_stats_channels = {}
-        
-        # Map existing channels by their keyword prefix (only in the stats category)
-        for channel in stats_category.voice_channels:
-            for keyword in stats_keywords:
-                if channel.name.startswith(keyword):
-                    existing_stats_channels[keyword] = channel
-                    break
-        
-        print(f"Found {len(existing_stats_channels)} existing stats channels")
-        
-        # Update existing channels or create new ones
-        for target_name in channel_names:
-            # Extract keyword from target name
-            keyword = target_name.split()[0] + ":"
-            
-            try:
-                if keyword in existing_stats_channels:
-                    # Update existing channel name if different
-                    channel = existing_stats_channels[keyword]
-                    if channel.name != target_name:
-                        print(f"Updating channel: {channel.name} → {target_name}")
-                        await channel.edit(name=target_name)
-                        print(f"Updated: {target_name}")
-                    else:
-                        print(f"Channel already up to date: {target_name}")
-                else:
-                    # Create new channel only if it doesn't exist
-                    print(f"Creating new channel: {target_name}")
-                    await guild.create_voice_channel(name=target_name, category=stats_category)
-                    print(f"Created: {target_name}")
-                    
-            except discord.Forbidden as e:
-                print(f"Permission denied for '{target_name}': {e}")
-                print(f"   This channel was probably created by a higher-role user")
-                print(f"   Skipping update to avoid creating duplicates...")
-                # Don't create new channels - just skip to avoid duplicates
-            except Exception as e:
-                print(f"Error with '{target_name}': {e}")
-                
-        print(f"Stats update completed at {datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}")
-            
-    except Exception as e:
-        print(f"Error updating voice channel stats: {e}")
 
-async def auto_update_voice_stats():
-    """Background task to automatically update voice channel stats."""
-    await bot.wait_until_ready()
-    
-    # Initial update
-    await update_voice_channel_stats()
-    
-    while not bot.is_closed():
-        try:
-            await asyncio.sleep(3600)  # 1 hour
-            await update_voice_channel_stats()
-        except Exception as e:
-            print(f"Error in auto update voice stats task: {e}")
-            await asyncio.sleep(300)  # Wait 5 minutes on error
 
 # Bot is now run from main.py, not here
 if __name__ == "__main__":

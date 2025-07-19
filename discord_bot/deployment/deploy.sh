@@ -24,15 +24,15 @@ print_step() {
 }
 
 print_success() {
-    echo -e "${GREEN}✅ $1${NC}"
+    echo -e "${GREEN}$1${NC}"
 }
 
 print_warning() {
-    echo -e "${YELLOW}⚠️  $1${NC}"
+    echo -e "${YELLOW}$1${NC}"
 }
 
 print_error() {
-    echo -e "${RED}❌ $1${NC}"
+    echo -e "${RED}$1${NC}"
 }
 
 # Get script directory
@@ -82,7 +82,7 @@ interactive_select() {
         
         for i in "${!options[@]}"; do
             if [ $i -eq $selected ]; then
-                echo -e "${GREEN}▶ ${options[i]}${NC}"
+                echo -e "${GREEN}${options[i]}${NC}"
             else
                 echo -e "  ${options[i]}"
             fi
@@ -118,7 +118,7 @@ interactive_select() {
                 ;;
             ' '|'') # Space or Enter
                 clear
-                echo -e "\n${GREEN}✅ Selected: ${options[$selected]}${NC}\n"
+                echo -e "\n${GREEN}Selected: ${options[$selected]}${NC}\n"
                 # Use a global variable to store the selection
                 INTERACTIVE_SELECTION=$selected
                 return 0
@@ -192,7 +192,7 @@ validate_env_file() {
     fi
     
     # Run Python validator and capture output (disable set -e temporarily)
-    echo "🔍 Running strict format validation..."
+    echo "Running strict format validation..."
     set +e  # Temporarily disable exit on error
     VALIDATOR_OUTPUT=$(python3 "$VALIDATOR_PATH" "$EXAMPLE_PATH" "$ENV_PATH" 2>&1)
     VALIDATOR_EXIT_CODE=$?
@@ -200,18 +200,18 @@ validate_env_file() {
     
     if [ $VALIDATOR_EXIT_CODE -eq 0 ]; then
         # Check if there are warnings in the output
-        if echo "$VALIDATOR_OUTPUT" | grep -q "⚠️ Warnings:"; then
+        if echo "$VALIDATOR_OUTPUT" | grep -q " Warnings:"; then
             # Show output only if there are warnings
             echo "$VALIDATOR_OUTPUT"
             echo
-            print_warning "⚠️ Validation passed but with warnings!"
+            print_warning "Validation passed but with warnings!"
             echo -e "${YELLOW}Please review the warnings above.${NC}"
             echo -e "${BLUE}This is often normal for optional configuration fields.${NC}"
             echo -e "${BLUE}Check each warning to ensure it's expected for your deployment.${NC}"
             echo
             read -p "Press Enter to continue with deployment, or Ctrl+C to cancel..." dummy
         fi
-        print_success "✅ .env file validation passed!"
+        print_success ".env file validation passed!"
         sleep 1  # Brief pause so users can see the success message
         return 0
     else
@@ -375,14 +375,14 @@ handle_credentials_file() {
     
     # Check if default credentials file exists
     if [ -f "$DEFAULT_CREDENTIALS_PATH" ]; then
-        echo -e "\n${GREEN}✅ Found credentials file at default location:${NC}"
+        echo -e "\n${GREEN} Found credentials file at default location:${NC}"
         echo -e "${BLUE}$DEFAULT_CREDENTIALS_PATH${NC}"
         echo
         
         declare -a cred_options=(
-            "✅ Use default credentials file (recommended)"
-            "📁 Specify different credentials file path"
-            "❓ What is this file?"
+            " Use default credentials file (recommended)"
+            " Specify different credentials file path"
+            " What is this file?"
         )
         
         interactive_select "Choose credentials file option:" "${cred_options[@]}"
@@ -432,7 +432,7 @@ get_custom_credentials_path() {
 }
 
 show_credentials_help() {
-    echo -e "\n${BLUE}ℹ️ About the credentials file:${NC}"
+    echo -e "\n${BLUE}ℹ About the credentials file:${NC}"
     echo "This is your Google Cloud/Firebase service account key file."
     echo "You can download it from:"
     echo "• Google Cloud Console → IAM & Admin → Service Accounts"
@@ -580,7 +580,7 @@ main() {
     # Prepare environment variables
     print_step "Preparing environment variables..."
     ENV_VARS=""
-    echo "🔍 DEBUG: Processing .env file line by line:"
+    echo " DEBUG: Processing .env file line by line:"
     
     # Ensure file ends with newline to avoid last line parsing issues
     echo "" >> "$ENV_PATH"
@@ -589,19 +589,19 @@ main() {
         echo "  Raw line: '$line'"
         if [[ ! $line =~ ^# && -n $line ]]; then
             clean_line=$(echo "$line" | sed 's/[[:space:]]*=[[:space:]]*/=/g')
-            echo "  ✅ Adding: '$clean_line'"
+            echo "   Adding: '$clean_line'"
             if [ -n "$ENV_VARS" ]; then
                 ENV_VARS="$ENV_VARS,$clean_line"
             else
                 ENV_VARS="$clean_line"
             fi
         else
-            echo "  ❌ Skipping: comment or empty"
+            echo "   Skipping: comment or empty"
         fi
     done < "$ENV_PATH"
     
     # Debug: Show what we parsed
-    echo -e "\n${BLUE}🔍 DEBUG: Environment variables parsing:${NC}"
+    echo -e "\n${BLUE} DEBUG: Environment variables parsing:${NC}"
     echo "ENV_VARS length: ${#ENV_VARS}"
     echo "ENV_VARS content: '$ENV_VARS'"
     echo "Number of variables: $(echo "$ENV_VARS" | tr ',' '\n' | wc -l)"
@@ -618,7 +618,7 @@ main() {
         echo "  • Hidden characters or encoding issues"
         echo "  • Different shell/platform behavior"
         echo
-        echo -e "${BLUE}🔍 Let's debug the .env file:${NC}"
+        echo -e "${BLUE} Let's debug the .env file:${NC}"
         echo "File exists: $([ -f "$ENV_PATH" ] && echo 'YES' || echo 'NO')"
         echo "File size: $(wc -c < "$ENV_PATH" 2>/dev/null || echo 'ERROR')"
         echo "File encoding: $(file "$ENV_PATH" 2>/dev/null || echo 'UNKNOWN')"
@@ -649,7 +649,7 @@ main() {
     
     # Build and push Docker image using Google Cloud Build
     print_step "Building and pushing Docker image using Google Cloud Build..."
-    print_step "This eliminates the need for local Docker daemon - building in the cloud! 🚀"
+    print_step "This eliminates the need for local Docker daemon - building in the cloud! "
     
     # Copy Dockerfile to root directory for Cloud Build
     print_step "Preparing Dockerfile for Cloud Build..."
@@ -702,7 +702,7 @@ main() {
       --format="value(status.url)")
     
     print_success "Deployment complete!"
-    echo -e "\n${GREEN}🎉 Your Discord bot is now deployed!${NC}"
+    echo -e "\n${GREEN} Your Discord bot is now deployed!${NC}"
     echo -e "${BLUE}Service URL:${NC} $SERVICE_URL"
     
     # Check logs

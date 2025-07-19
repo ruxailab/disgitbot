@@ -241,7 +241,7 @@ Only select labels that are highly relevant. Be selective and accurate.
                     retry_delay = min(base_delay * (2 ** attempt), 60) + random.randint(1, 5)
                     
                     logger.warning(
-                        f"🌐 Network error on attempt {attempt + 1}: {e}. "
+                        f"Network error on attempt {attempt + 1}: {e}. "
                         f"Retrying in {retry_delay} seconds..."
                     )
                     
@@ -284,7 +284,7 @@ Only select labels that are highly relevant. Be selective and accurate.
             
             if match:
                 delay = int(match.group(1))
-                logger.info(f"🕒 API provided retry delay: {delay} seconds")
+                logger.info(f"API provided retry delay: {delay} seconds")
                 return delay + 5  # Add 5 second buffer
             
             return None
@@ -313,13 +313,13 @@ Only select labels that are highly relevant. Be selective and accurate.
             progress = (i / total_seconds) * 100
             bar_length = 20
             filled_length = int(bar_length * progress // 100)
-            bar = "█" * filled_length + "░" * (bar_length - filled_length)
+            bar = "" * filled_length + "" * (bar_length - filled_length)
             
             print(f"\r[{bar}] {progress:5.1f}% - {remaining:3d}s remaining", end="", flush=True)
             
             time.sleep(chunk_wait)
         
-        print(f"\r[{'█' * 20}] 100.0% - Ready to retry!           ")
+        print(f"\r[{'' * 20}] 100.0% - Ready to retry!           ")
         print()
     
     def _parse_ai_response(self, response_text: str, available_labels: List[str]) -> List[Dict[str, Any]]:
@@ -379,7 +379,7 @@ Only select labels that are highly relevant. Be selective and accurate.
         formatted = "## AI-Predicted Labels\n\n"
         
         for i, label in enumerate(predictions, 1):
-            confidence_bar = "█" * int(label["confidence"] * 10)
+            confidence_bar = "" * int(label["confidence"] * 10)
             confidence_percent = int(label["confidence"] * 100)
             
             formatted += f"{i}. **{label['name']}** "
