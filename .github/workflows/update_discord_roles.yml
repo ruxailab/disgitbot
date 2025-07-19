@@ -37,20 +37,28 @@ jobs:
       - name: Set up Google Credentials
         run: echo "${{ secrets.GOOGLE_CREDENTIALS_JSON }}" | base64 --decode > discord_bot/config/credentials.json
 
-      - name: Fetch GitHub contributions 
-        env:
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
-        run: | 
-          python discord_bot/src/utils/fetch_contributors.py   
+      # - name: Fetch GitHub contributions 
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+      #   run: | 
+      #     python discord_bot/src/utils/fetch_contributors.py   
 
-      - name: Update Firestore
-        env:
-          GOOGLE_APPLICATION_CREDENTIALS: discord_bot/config/credentials.json
-        run: |
-          python discord_bot/src/utils/firestore.py
+      # - name: Update Firestore
+      #   env:
+      #     GOOGLE_APPLICATION_CREDENTIALS: discord_bot/config/credentials.json
+      #   run: |
+      #     python discord_bot/src/utils/firestore.py
 
       - name: Update Discord roles
         env: 
             DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
         run: |  
           python discord_bot/src/utils/update_discord_roles.py
+
+      - name: Update Discord channel stats
+        env:
+          DISCORD_BOT_TOKEN: ${{ secrets.DEV_DISCORD_BOT_TOKEN }}
+          GOOGLE_APPLICATION_CREDENTIALS: discord_bot/config/credentials.json
+        run: |
+          cd discord_bot
+          python src/utils/update_discord_channels.py
