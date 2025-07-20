@@ -5,6 +5,10 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
 
+  push:
+    branches:
+      - post_visualization_refactor
+
   workflow_dispatch:
     inputs:
       action:
