@@ -38,7 +38,7 @@ class AIPRLabeler:
     
     def get_repository_labels(self, repo: str) -> List[str]:
         """
-        Fetch all available labels from the repository
+        Fetch all available labels from Firestore for the repository
         
         Args:
             repo: Repository name in format "owner/repo"
@@ -47,14 +47,37 @@ class AIPRLabeler:
             List of available label names
         """
         try:
-            labels_data = self.github_client.get_repository_labels(repo)
-            label_names = [label['name'] for label in labels_data if 'name' in label]
+            # Try to import Firestore functions
+            import sys
+            import os
+            firestore_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'discord_bot', 'src', 'utils')
+            sys.path.append(firestore_path)
             
-            logger.info(f"Fetched {len(label_names)} labels from repository {repo}")
+            from firestore import get_repository_labels, get_all_ruxailab_labels
+            
+            # First try to get specific repository labels
+            label_names = get_repository_labels(repo)
+            
+            # If no specific labels found, get all RUXAILAB labels
+            if not label_names:
+                logger.info(f"No specific labels found for {repo}, using all RUXAILAB labels")
+                label_names = get_all_ruxailab_labels()
+            
+            # If still no labels, use fallback
+            if not label_names:
+                logger.warning(f"No labels found in Firestore, using fallback labels")
+                label_names = [
+                    "accessibility", "user-testing", "eye-tracking", "vr-ar", 
+                    "research", "figma-integration", "documentation", "feature", 
+                    "bug", "enhancement", "testing", "ui/ux", "backend", 
+                    "security", "performance", "dependencies", "ci/cd"
+                ]
+            
+            logger.info(f"Using {len(label_names)} labels for repository {repo}")
             return label_names
             
         except Exception as e:
-            logger.error(f"Failed to fetch repository labels: {e}")
+            logger.error(f"Failed to fetch repository labels from Firestore: {e}")
             # Return default RUXAILAB labels as fallback
             return [
                 "accessibility", "user-testing", "eye-tracking", "vr-ar", 

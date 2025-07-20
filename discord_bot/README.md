@@ -151,6 +151,7 @@ Go to your GitHub repository → Settings → Secrets and variables → Actions 
      - [x] `Use Slash Commands`
      - [x] `Use Embedded Activities`
      - [x] `Connect`
+     - [x] `Attach Files`
 5. **Invite Bot to Your Server:**
    - Copy the generated URL from the OAuth2 page
    - Paste it in your browser and invite the bot to your Discord server
@@ -328,6 +329,9 @@ The deployment script will:
    - `/getstats` - View your GitHub contribution stats
    - `/halloffame` - See top contributors
    - `/setup_voice_stats` - Create voice channels showing repo stats
+   - `/show-top-contributors` - Show top contributors by PR count
+   - `/show-activity-comparison` - Show contributor activity comparison
+   - `/show-activity-trends` - Show recent activity trends
 
 3. **Test Role Updates:**
    ```bash

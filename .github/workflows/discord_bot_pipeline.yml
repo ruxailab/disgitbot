@@ -1,0 +1,72 @@
+name: Discord Bot Data Pipeline
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # Run daily at midnight UTC
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  # Unified Pipeline - All stages orchestrated with dependency injection
+  unified-pipeline:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python 3.13.2
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.13.2'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libffi-dev libnacl-dev python3-dev
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r discord_bot/config/discord_bot_requirements.txt
+
+      - name: Set up Google Credentials
+        run: echo "${{ secrets.GOOGLE_CREDENTIALS_JSON }}" | base64 --decode > discord_bot/config/credentials.json
+
+      - name: Collect raw GitHub data
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          ORG_NAME: ${{ secrets.ORG_NAME }}
+        run: | 
+          python discord_bot/src/pipeline/collect_raw_data.py
+
+      - name: Execute unified pipeline
+        env:
+          DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          ORG_NAME: ${{ secrets.ORG_NAME }}
+          GOOGLE_APPLICATION_CREDENTIALS: discord_bot/config/credentials.json
+        run: |
+          cd discord_bot
+          python -c "
+          import sys
+          import asyncio
+          sys.path.append('src')
+          from src.pipeline.orchestrator import run_full_pipeline
+          
+          async def main():
+              try:
+                  result = await run_full_pipeline()
+                  print('Pipeline execution summary:')
+                  print(f'- Contributors processed: {len(result.get(\"contributions\", {}))}')
+                  print(f'- Repository metrics: {bool(result.get(\"repo_metrics\"))}')
+                  print(f'- Hall of fame data: {bool(result.get(\"hall_of_fame\"))}')
+                  print(f'- Analytics data: {bool(result.get(\"analytics_data\"))}')
+                  return True
+              except Exception as e:
+                  print(f'Pipeline execution failed: {e}')
+                  import traceback
+                  traceback.print_exc()
+                  return False
+          
+          success = asyncio.run(main())
+          sys.exit(0 if success else 1)
+          "

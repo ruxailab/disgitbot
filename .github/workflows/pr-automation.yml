@@ -4,9 +4,7 @@ on:
   # Original triggers for this repo
   pull_request:
     types: [opened, synchronize, reopened]
-  schedule:
-    # Update labels cache weekly on Sundays at 2 AM UTC
-    - cron: '0 2 * * 0'
+
   workflow_dispatch:
     inputs:
       action:
@@ -17,7 +15,6 @@ on:
         options:
           - process_pr
           - collect_labels
-          - update_cache
   
   # NEW: Make this workflow reusable for other repos
   workflow_call:
@@ -94,10 +91,11 @@ jobs:
         path: ${{ github.event_name == 'workflow_call' && 'pr-automation/' || '' }}pr_review/logs/
         retention-days: 7
 
-  # Job 2: Collect labels from all RUXAILAB repositories
+
+
+  # Job 2: Collect labels from all RUXAILAB repositories and store in Firestore
   collect-labels:
     if: |
-      github.event_name == 'schedule' || 
       (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'collect_labels') ||
       (github.event_name == 'workflow_call' && inputs.action == 'collect_labels')
     runs-on: ubuntu-latest
@@ -120,86 +118,12 @@ jobs:
         cd ${{ github.event_name == 'workflow_call' && 'pr-automation/' || '' }}pr_review
         pip install -r requirements.txt
         
-    - name: Collect repository labels
+    - name: Collect repository labels and store in Firestore
       env:
         GITHUB_TOKEN: ${{ secrets.GH_TOKEN || github.token }}
       run: |
         cd ${{ github.event_name == 'workflow_call' && 'pr-automation/' || '' }}pr_review
         python scripts/collect_repo_labels.py
-        
-    - name: Commit and push updated labels (only for master repo)
-      if: github.event_name != 'workflow_call'
-      run: |
-        cd pr_review
-        git config --local user.email "action@github.com"
-        git config --local user.name "GitHub Action"
-        
-        # Check if files exist before adding them
-        if [ -f "data/collected_repo_labels.json" ]; then
-          git add data/collected_repo_labels.json
-        fi
-        if [ -f "data/collected_repo_labels_simplified.json" ]; then
-          git add data/collected_repo_labels_simplified.json
-        fi
-        if [ -f "data/labels_collection_report.md" ]; then
-          git add data/labels_collection_report.md
-        fi
-        
-        # Only commit if there are changes
-        if ! git diff --staged --quiet; then
-          git commit -m "Update repository labels cache [automated]"
-          git push
-        else
-          echo "No changes to commit"
-        fi
-        
-    - name: Upload labels data
-      uses: actions/upload-artifact@v4
-      with:
-        name: repository-labels-data
-        path: |
-          ${{ github.event_name == 'workflow_call' && 'pr-automation/' || '' }}pr_review/data/collected_repo_labels.json
-          ${{ github.event_name == 'workflow_call' && 'pr-automation/' || '' }}pr_review/data/collected_repo_labels_simplified.json
-          ${{ github.event_name == 'workflow_call' && 'pr-automation/' || '' }}pr_review/data/labels_collection_report.md
-        retention-days: 30
-
-  # Job 3: Update labels cache for specific repository
-  update-cache:
-    if: |
-      (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'update_cache') ||
-      (github.event_name == 'workflow_call' && inputs.action == 'update_cache')
-    runs-on: ubuntu-latest
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      with:
-        repository: ${{ github.event_name == 'workflow_call' && 'ruxailab/disgitbot' || github.repository }}
-        path: ${{ github.event_name == 'workflow_call' && 'pr-automation' || '.' }}
-        token: ${{ secrets.GH_TOKEN || github.token }}
-      
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.9'
-        
-    - name: Install dependencies
-      run: |
-        cd ${{ github.event_name == 'workflow_call' && 'pr-automation/' || '' }}pr_review
-        pip install -r requirements.txt
-        
-    - name: Update repository cache
-      env:
-        GITHUB_TOKEN: ${{ secrets.GH_TOKEN || github.token }}
-        GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
-      run: |
-        cd ${{ github.event_name == 'workflow_call' && 'pr-automation/' || '' }}pr_review
-        python -c "
-        from main import PRReviewSystem
-        system = PRReviewSystem()
-        result = system.update_repository_labels_cache('${{ inputs.repository || github.repository }}')
-        print('Cache update result:', result)
-        "
 
 # Global environment variables for all jobs
 env:

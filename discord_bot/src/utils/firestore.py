@@ -39,94 +39,54 @@ except Exception as e:
     traceback.print_exc()
     exit(1)
 
-# ---------- Firestore Helper Functions ----------
-def update_user_in_firestore(discord_id, user_data):
-    """
-    Update a user's contribution data in Firestore.
-    
-    Args:
-        discord_id: The Discord user ID
-        user_data: Dictionary containing the user's contribution data
-    """
-    doc_ref = db.collection('discord').document(discord_id)
-    doc = doc_ref.get()
-    
-    # Extract the basic contribution counts
-    pr_count = user_data.get('pr_count', 0)
-    issues_count = user_data.get('issues_count', 0)
-    commits_count = user_data.get('commits_count', 0)
-    
-    # Determine the role using the determine_role function
-    pr_role, issue_role, commit_role = determine_role(pr_count, issues_count, commits_count)
-    
-    # Format the roles as a comma-separated string
-    role = ', '.join(filter(None, [pr_role, issue_role, commit_role]))  # Filter out None values and join
-
-    # Create the update data
-    update_data = {
-        'pr_count': pr_count,
-        'issues_count': issues_count,
-        'commits_count': commits_count,
-        'role': role
-    }
-    
-    # Add enhanced stats if available
-    if 'stats' in user_data:
-        update_data['stats'] = user_data['stats']
-    
-    # Add rankings if available
-    if 'rankings' in user_data:
-        update_data['rankings'] = user_data['rankings']
-
-    if doc.exists:
-        doc_ref.update(update_data)
-    else:
-        # Set default values for missing fields
-        doc_ref.set({
-            **update_data,
-            'github_id': None
-        })
-
-def update_repo_metrics_in_firestore(repo_metrics):
-    """
-    Update repository metrics (stars, forks) in Firestore.
-    
-    Args:
-        repo_metrics: Dictionary containing repository metrics like stars_count and forks_count
-    """
+# ---------- Generic Firestore Utilities ----------
+def set_document(collection_name, document_id, data, merge=False):
+    """Generic function to set a document in Firestore."""
     try:
-        # Ensure we have a metrics document
-        print(f"DEBUG: In update_repo_metrics_in_firestore with metrics: {repo_metrics}")
-        doc_ref = db.collection('repo_stats').document('metrics')
-        
-        # Add debug log to show what's in the document before update
-        doc_before = doc_ref.get()
-        if doc_before.exists:
-            print(f"DEBUG: Existing metrics document: {doc_before.to_dict()}")
-        else:
-            print("DEBUG: No existing metrics document found")
-        
-        # Convert numeric values to integers to ensure proper storage
-        if 'stars_count' in repo_metrics:
-            repo_metrics['stars_count'] = int(repo_metrics['stars_count'])
-        if 'forks_count' in repo_metrics:
-            repo_metrics['forks_count'] = int(repo_metrics['forks_count'])
-            
-        print(f"DEBUG: Setting metrics with values: {repo_metrics}")
-        doc_ref.set(repo_metrics, merge=True)
-        
-        # Verify the update
-        doc_after = doc_ref.get()
-        if doc_after.exists:
-            print(f"DEBUG: Metrics after update: {doc_after.to_dict()}")
-        
-        print(f"Repository metrics updated in Firestore: Stars: {repo_metrics.get('stars_count', 0)}, Forks: {repo_metrics.get('forks_count', 0)}")
+        doc_ref = db.collection(collection_name).document(document_id)
+        doc_ref.set(data, merge=merge)
         return True
     except Exception as e:
-        print(f"Error updating repository metrics in Firestore: {e}")
-        import traceback
-        traceback.print_exc()
+        print(f"Error setting document {collection_name}/{document_id}: {e}")
         return False
+
+def get_document(collection_name, document_id):
+    """Generic function to get a document from Firestore."""
+    try:
+        doc_ref = db.collection(collection_name).document(document_id)
+        doc = doc_ref.get()
+        return doc.to_dict() if doc.exists else None
+    except Exception as e:
+        print(f"Error getting document {collection_name}/{document_id}: {e}")
+        return None
+
+def update_document(collection_name, document_id, data):
+    """Generic function to update a document in Firestore."""
+    try:
+        doc_ref = db.collection(collection_name).document(document_id)
+        doc_ref.update(data)
+        return True
+    except Exception as e:
+        print(f"Error updating document {collection_name}/{document_id}: {e}")
+        return False
+
+def query_collection(collection_name, field_name, operator, value):
+    """Generic function to query a collection in Firestore."""
+    try:
+        docs = db.collection(collection_name).where(field_name, operator, value).stream()
+        return [doc for doc in docs if doc.exists]
+    except Exception as e:
+        print(f"Error querying collection {collection_name}: {e}")
+        return []
+
+def get_collection(collection_name):
+    """Generic function to get all documents from a collection."""
+    try:
+        docs = db.collection(collection_name).stream()
+        return [doc for doc in docs if doc.exists]
+    except Exception as e:
+        print(f"Error getting collection {collection_name}: {e}")
+        return []
 
 def get_firestore_data():
     """
@@ -210,52 +170,174 @@ def get_hall_of_fame_data():
         traceback.print_exc()
         return None
 
-# ---------- Load JSON Contributions ----------
-if not os.path.exists('contributions.json'):
-    with open('contributions.json', 'w') as f:
-        json.dump({}, f)
-
-with open('contributions.json', 'r') as f:
+def get_contributor_analytics_data():
+    """
+    Get contributor analytics data from Firestore for visualization.
+    
+    Returns:
+        Dictionary with contributor activity data
+    """
     try:
-        contributions = json.load(f)
-    except json.JSONDecodeError:
-        print("Invalid JSON format in contributions.json.")
-        contributions = {}
-
-# ---------- Sync to Firestore ----------
-for github_id, user_data in contributions.items():
-    try:
-        docs = db.collection('discord').where('github_id', '==', github_id).stream()
+        contributors_data = {}
+        
+        # Get all contributor data from discord collection
+        docs = db.collection('discord').stream()
         for doc in docs:
             if not doc.exists:
                 continue
-            discord_id = doc.id
+                
+            data = doc.to_dict()
+            github_id = data.get('github_id')
+            if not github_id:
+                continue
+                
+            # Extract analytics-relevant data
+            contributor_stats = {
+                'github_username': github_id,
+                'pr_count': data.get('pr_count', 0),
+                'issues_count': data.get('issues_count', 0),
+                'commits_count': data.get('commits_count', 0)
+            }
             
-            # Pass the entire user_data object
-            update_user_in_firestore(discord_id, user_data)
+            # Add enhanced stats if available
+            if 'stats' in data:
+                stats = data['stats']
+                contributor_stats.update({
+                    'daily_prs': stats.get('prs', {}).get('daily', 0),
+                    'weekly_prs': stats.get('prs', {}).get('weekly', 0),
+                    'monthly_prs': stats.get('prs', {}).get('monthly', 0),
+                    'daily_issues': stats.get('issues', {}).get('daily', 0),
+                    'weekly_issues': stats.get('issues', {}).get('weekly', 0),
+                    'monthly_issues': stats.get('issues', {}).get('monthly', 0),
+                    'daily_commits': stats.get('commits', {}).get('daily', 0),
+                    'weekly_commits': stats.get('commits', {}).get('weekly', 0),
+                    'monthly_commits': stats.get('commits', {}).get('monthly', 0),
+                    'last_updated': stats.get('last_updated', '')
+                })
+            
+            # Add rankings if available
+            if 'rankings' in data:
+                rankings = data['rankings']
+                contributor_stats.update({
+                    'pr_rank': rankings.get('pr', 0),
+                    'issue_rank': rankings.get('issue', 0),
+                    'commit_rank': rankings.get('commit', 0)
+                })
+            
+            contributors_data[github_id] = contributor_stats
+        
+        return contributors_data
+        
     except Exception as e:
-        print(f"Error updating Firestore for GitHub user {github_id}: {e}")
+        print(f"Error retrieving contributor analytics data from Firestore: {e}")
+        import traceback
+        traceback.print_exc()
+        return {}
 
-print("Firestore update completed.")
-
-# ---------- Load Repository Metrics (Moved to function) ----------
-def load_repo_metrics_from_file():
+def store_repository_labels(repo_name, labels_data):
     """
-    Load repository metrics from repo_metrics.json file and update Firestore.
+    Store repository labels in Firestore for AI PR labeling.
+    
+    Args:
+        repo_name: Repository name (e.g., 'ruxailab/disgitbot')
+        labels_data: List of label dictionaries with name, description, color
     """
-    if os.path.exists('repo_metrics.json'):
-        with open('repo_metrics.json', 'r') as f:
-            try:
-                repo_metrics = json.load(f)
-                # Update repository metrics in Firestore
-                doc_ref = db.collection('repo_stats').document('metrics')
-                doc_ref.set(repo_metrics, merge=True)
-                print(f"Repository metrics updated in Firestore: Stars: {repo_metrics.get('stars_count', 0)}, Forks: {repo_metrics.get('forks_count', 0)}")
-            except json.JSONDecodeError:
-                print("Invalid JSON format in repo_metrics.json.")
-    else:
-        print("repo_metrics.json not found. Skipping repository metrics update.")
+    try:
+        doc_ref = db.collection('repo_labels').document(repo_name.replace('/', '_'))
+        
+        labels_formatted = []
+        for label in labels_data:
+            labels_formatted.append({
+                'name': label.get('name', ''),
+                'description': label.get('description', ''),
+                'color': label.get('color', '')
+            })
+        
+        from datetime import datetime
+        doc_ref.set({
+            'repository': repo_name,
+            'labels': labels_formatted,
+            'last_updated': datetime.now().isoformat()
+        })
+        
+        print(f"Stored {len(labels_formatted)} labels for repository {repo_name}")
+        return True
+        
+    except Exception as e:
+        print(f"Error storing repository labels in Firestore: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
 
-# Call the function when this file is run directly
-if __name__ == "__main__":
-    load_repo_metrics_from_file()
+def get_repository_labels(repo_name):
+    """
+    Get repository labels from Firestore for AI PR labeling.
+    
+    Args:
+        repo_name: Repository name (e.g., 'ruxailab/disgitbot')
+        
+    Returns:
+        List of label names for AI classification
+    """
+    try:
+        doc_ref = db.collection('repo_labels').document(repo_name.replace('/', '_'))
+        doc = doc_ref.get()
+        
+        if doc.exists:
+            data = doc.to_dict()
+            if data:
+                labels = data.get('labels', [])
+                label_names = [label.get('name', '') for label in labels if label.get('name')]
+                print(f"Retrieved {len(label_names)} labels for repository {repo_name}")
+                return label_names
+        else:
+            print(f"No labels found for repository {repo_name}")
+            return []
+            
+    except Exception as e:
+        print(f"Error retrieving repository labels from Firestore: {e}")
+        import traceback
+        traceback.print_exc()
+        return []
+
+def get_all_ruxailab_labels():
+    """
+    Get aggregated labels from all RUXAILAB repositories for comprehensive AI training.
+    
+    Returns:
+        List of unique label names across all repositories
+    """
+    try:
+        docs = db.collection('repo_labels').stream()
+        all_labels = set()
+        
+        for doc in docs:
+            if not doc.exists:
+                continue
+                
+            data = doc.to_dict()
+            labels = data.get('labels', [])
+            for label in labels:
+                label_name = label.get('name', '')
+                if label_name:
+                    all_labels.add(label_name)
+        
+        label_list = sorted(list(all_labels))
+        print(f"Retrieved {len(label_list)} unique labels across all repositories")
+        return label_list
+        
+    except Exception as e:
+        print(f"Error retrieving all repository labels from Firestore: {e}")
+        import traceback
+        traceback.print_exc()
+        return []
+
+def store_analytics_data(analytics_data):
+    """Store analytics data in Firestore."""
+    from datetime import datetime
+    analytics_data['last_updated'] = datetime.now().isoformat()
+    return set_document('analytics', 'contributor_stats', analytics_data)
+
+def get_analytics_data():
+    """Get analytics data from Firestore."""
+    return get_document('analytics', 'contributor_stats') or {}
