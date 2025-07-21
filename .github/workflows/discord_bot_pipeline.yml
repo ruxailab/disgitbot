@@ -51,31 +51,32 @@ jobs:
         run: |
           cd discord_bot
           python -u -c "
-          import sys
+          import sys, json
           sys.path.insert(0, 'src')
           from core.github_service import GitHubService
           print('Collecting GitHub data...')
           github_service = GitHubService()
           raw_data = github_service.collect_organization_data()
           print(f'Collected data for {len(raw_data.get(\"repositories\", {}))} repositories')
+          print('Saving raw data...')
+          with open('raw_data.json', 'w') as f:
+            json.dump(raw_data, f)
+          print('Raw data saved to raw_data.json')
           "
 
       - name: Process Contributions & Analytics
         env:
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
-          REPO_OWNER: ${{ secrets.REPO_OWNER }}
           PYTHONUNBUFFERED: 1
         run: |
           cd discord_bot
           python -u -c "
           import sys, json
           sys.path.insert(0, 'src')
-          from core.github_service import GitHubService
           from pipeline.processors import ContributionProcessor, AnalyticsProcessor, MetricsProcessor
           
-          print('Loading GitHub data...')
-          github_service = GitHubService()
-          raw_data = github_service.collect_organization_data()
+          print('Loading raw data...')
+          with open('raw_data.json', 'r') as f:
+            raw_data = json.load(f)
           
           print('Processing contributions...')
           contrib_processor = ContributionProcessor()
@@ -93,48 +94,47 @@ jobs:
           repo_metrics = metrics_processor.create_repo_metrics(raw_data, contributions)
           
           print(f'Processed {len(contributions)} contributors')
+          
+          print('Saving processed data...')
+          processed_data = {
+            'raw_data': raw_data,
+            'contributions': contributions,
+            'hall_of_fame': hall_of_fame,
+            'analytics_data': analytics_data,
+            'repo_metrics': repo_metrics
+          }
+          with open('processed_data.json', 'w') as f:
+            json.dump(processed_data, f)
+          print('Processed data saved to processed_data.json')
           "
 
       - name: Store Data in Firestore
         env:
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
-          REPO_OWNER: ${{ secrets.REPO_OWNER }}
           GOOGLE_APPLICATION_CREDENTIALS: discord_bot/config/credentials.json
           PYTHONUNBUFFERED: 1
         run: |
           cd discord_bot
           python -u -c "
-          import sys
+          import sys, json
           sys.path.insert(0, 'src')
-          from core.github_service import GitHubService
           from core.services import FirestoreService
-          from pipeline.processors import ContributionProcessor, AnalyticsProcessor, MetricsProcessor
           
-          print('Collecting and processing data...')
-          github_service = GitHubService()
-          raw_data = github_service.collect_organization_data()
+          print('Loading processed data...')
+          with open('processed_data.json', 'r') as f:
+            data = json.load(f)
           
-          contrib_processor = ContributionProcessor()
-          contributions = contrib_processor.process_raw_data(raw_data)
-          contributions = contrib_processor.calculate_rankings(contributions)
-          contributions = contrib_processor.calculate_streaks_and_averages(contributions)
-          
-          analytics_processor = AnalyticsProcessor()
-          hall_of_fame = analytics_processor.create_hall_of_fame_data(contributions)
-          analytics_data = analytics_processor.create_analytics_data(contributions)
-          
-          metrics_processor = MetricsProcessor()
-          repo_metrics = metrics_processor.create_repo_metrics(raw_data, contributions)
+          contributions = data['contributions']
+          hall_of_fame = data['hall_of_fame']
+          analytics_data = data['analytics_data']
+          repo_metrics = data['repo_metrics']
           
           print('Storing data in Firestore...')
           storage = FirestoreService()
           
-          # Store metrics, hall of fame, analytics
           storage.set_document('repo_stats', 'metrics', repo_metrics)
           storage.set_document('repo_stats', 'hall_of_fame', hall_of_fame)
           storage.set_document('repo_stats', 'analytics', analytics_data)
           
-          # Store user contributions
           user_mappings = storage.query_collection('discord')
           stored_count = 0
           
@@ -153,32 +153,23 @@ jobs:
 
       - name: Update Discord Roles & Channels
         env:
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
-          REPO_OWNER: ${{ secrets.REPO_OWNER }}
           DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
           GOOGLE_APPLICATION_CREDENTIALS: discord_bot/config/credentials.json
           PYTHONUNBUFFERED: 1
         run: |
           cd discord_bot
           python -u -c "
-          import sys
+          import sys, json
           sys.path.insert(0, 'src')
-          from core.github_service import GitHubService
           from core.services import FirestoreService, DiscordBotService
           from core.role_service import RoleService
-          from pipeline.processors import ContributionProcessor, AnalyticsProcessor, MetricsProcessor
           
-          print('Collecting and processing data...')
-          github_service = GitHubService()
-          raw_data = github_service.collect_organization_data()
+          print('Loading processed data...')
+          with open('processed_data.json', 'r') as f:
+            data = json.load(f)
           
-          contrib_processor = ContributionProcessor()
-          contributions = contrib_processor.process_raw_data(raw_data)
-          contributions = contrib_processor.calculate_rankings(contributions)
-          contributions = contrib_processor.calculate_streaks_and_averages(contributions)
-          
-          metrics_processor = MetricsProcessor()
-          repo_metrics = metrics_processor.create_repo_metrics(raw_data, contributions)
+          contributions = data['contributions']
+          repo_metrics = data['repo_metrics']
           
           print('Initializing Discord services...')
           storage = FirestoreService()
