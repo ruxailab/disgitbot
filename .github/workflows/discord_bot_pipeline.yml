@@ -21,55 +21,63 @@ jobs:
         with:
           python-version: '3.13.2'
 
-      - name: Cache pip dependencies and built wheels
+      - name: Cache pip and build artifacts
         uses: actions/cache@v3
         with:
           path: |
             ~/.cache/pip
+            ~/.cache/pip-tools
             ~/.local/lib/python3.13/site-packages
-            /tmp/pip-build-*
-            /tmp/pip-install-*
+            ~/.local/bin
+            /tmp/pip-*
+            /opt/hostedtoolcache/Python/3.13.2/x64/lib/python3.13/site-packages
           key: ${{ runner.os }}-pip-py313-${{ hashFiles('discord_bot/config/discord_bot_requirements.txt') }}
           restore-keys: |
             ${{ runner.os }}-pip-py313-
-            ${{ runner.os }}-pip-
 
-      - name: Cache build dependencies  
+      - name: Cache compiled packages and wheels
         uses: actions/cache@v3
         with:
           path: |
             ~/.cache/matplotlib
             ~/.cache/numpy
-            /tmp/build-env-*
-          key: ${{ runner.os }}-build-py313-${{ hashFiles('discord_bot/config/discord_bot_requirements.txt') }}
+            ~/.cache/pip/wheels
+            ~/.local/lib/python3.13/site-packages/matplotlib*
+            ~/.local/lib/python3.13/site-packages/numpy*
+            ~/.local/lib/python3.13/site-packages/discord*
+          key: ${{ runner.os }}-compiled-py313-${{ hashFiles('discord_bot/config/discord_bot_requirements.txt') }}
           restore-keys: |
-            ${{ runner.os }}-build-py313-
-            ${{ runner.os }}-build-
+            ${{ runner.os }}-compiled-py313-
 
-      - name: Cache system packages
+      - name: Cache system build tools
         uses: actions/cache@v3
         with:
-          path: /var/cache/apt
-          key: ${{ runner.os }}-apt-${{ github.run_id }}
+          path: |
+            /var/cache/apt
+            /usr/lib/x86_64-linux-gnu
+            /usr/include
+          key: ${{ runner.os }}-system-${{ github.run_id }}
           restore-keys: |
-            ${{ runner.os }}-apt-
+            ${{ runner.os }}-system-
 
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libffi-dev libnacl-dev python3-dev
+          sudo apt-get install -y libffi-dev libnacl-dev python3-dev build-essential
 
-      - name: Install dependencies
+      - name: Install dependencies with aggressive caching
         run: |
           python -m pip install --upgrade pip setuptools wheel
-          # Install build dependencies for faster compilation
-          pip install --user --cache-dir ~/.cache/pip build numpy setuptools-scm
-          # Set parallel build jobs for faster compilation
+          pip install --user --cache-dir ~/.cache/pip --find-links ~/.cache/pip/wheels build numpy setuptools-scm
+          
           export NPY_NUM_BUILD_JOBS=4
           export MAKEFLAGS="-j4"
-          # Try binary wheels first, fallback to building with optimizations
-          pip install --user --cache-dir ~/.cache/pip --only-binary=all -r discord_bot/config/discord_bot_requirements.txt || \
-          pip install --user --cache-dir ~/.cache/pip --prefer-binary -r discord_bot/config/discord_bot_requirements.txt
+          export PIP_CACHE_DIR=~/.cache/pip
+          export PIP_FIND_LINKS=~/.cache/pip/wheels
+          
+          pip install --user --cache-dir ~/.cache/pip --find-links ~/.cache/pip/wheels --only-binary=:all: -r discord_bot/config/discord_bot_requirements.txt || \
+          pip install --user --cache-dir ~/.cache/pip --find-links ~/.cache/pip/wheels --prefer-binary -r discord_bot/config/discord_bot_requirements.txt || \
+          pip install --user --cache-dir ~/.cache/pip -r discord_bot/config/discord_bot_requirements.txt
 
       - name: Set up Google Credentials
         run: echo "${{ secrets.GOOGLE_CREDENTIALS_JSON }}" | base64 --decode > discord_bot/config/credentials.json
@@ -145,18 +153,9 @@ jobs:
           if [ -f pipeline_context.json ]; then
             echo "Pipeline execution completed!"
             echo "Final context summary:"
-            python -c "
-            import json
-            try:
-                with open('pipeline_context.json', 'r') as f:
-                    context = json.load(f)
-                print(f'- Contributors processed: {len(context.get(\"contributions\", {}))}')
-                print(f'- Repository metrics: {bool(context.get(\"repo_metrics\"))}')
-                print(f'- Hall of fame data: {bool(context.get(\"hall_of_fame\"))}')
-                print(f'- Analytics data: {bool(context.get(\"analytics_data\"))}')
-            except Exception as e:
-                print(f'Could not read pipeline context: {e}')
-            "
+            echo "- Pipeline context file size: $(wc -c < pipeline_context.json) bytes"
+            echo "- Data collection completed: $(grep -q 'contributions' pipeline_context.json && echo 'Yes' || echo 'No')"
+            echo "- Analytics generated: $(grep -q 'analytics_data' pipeline_context.json && echo 'Yes' || echo 'No')"
           else
             echo "No pipeline context found - pipeline may have failed early"
           fi
