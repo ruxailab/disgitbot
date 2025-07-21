@@ -144,25 +144,6 @@ jobs:
           
           print(f'Stored labels for {labels_stored} repositories')
           
-          print('Initializing PR reviewer configuration...')
-          from core.services import get_document
-          import time
-          
-          existing_reviewers = get_document('pr_config', 'reviewers')
-          if not existing_reviewers:
-            default_reviewer_config = {
-              'reviewers': ['marcgc21', 'xemyst', 'KarinePistili', 'hvini', 'sergiobeltranguerrero', 'leoruas', 'JulioManoel'],
-              'count': 7,
-              'last_updated': time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime()),
-              'initialized_by': 'pipeline_bootstrap'
-            }
-            if set_document('pr_config', 'reviewers', default_reviewer_config):
-              print('Initialized default reviewer configuration')
-            else:
-              print('Failed to initialize reviewer configuration')
-          else:
-            print('PR reviewer configuration already exists, skipping initialization')
-          
           user_mappings = query_collection('discord')
           stored_count = 0
           
