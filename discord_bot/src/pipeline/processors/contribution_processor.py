@@ -55,15 +55,15 @@ class ContributionProcessor:
             all_usernames.add(contributor.get('login'))
         
         for pr in pull_requests:
-            if pr.get('user', {}).get('login'):
+            if pr and pr.get('user', {}).get('login'):
                 all_usernames.add(pr['user']['login'])
         
         for issue in issues:
-            if issue.get('user', {}).get('login') and not issue.get('pull_request'):
+            if issue and issue.get('user', {}).get('login') and not issue.get('pull_request'):
                 all_usernames.add(issue['user']['login'])
         
         for commit in commits:
-            if commit.get('author', {}).get('login'):
+            if commit and commit.get('author', {}).get('login'):
                 all_usernames.add(commit['author']['login'])
         
         return all_usernames
@@ -106,7 +106,7 @@ class ContributionProcessor:
     
     def _process_user_prs(self, username, pull_requests, all_contributions):
         """Process pull requests for a user."""
-        user_prs = [pr for pr in pull_requests if pr.get('user', {}).get('login') == username]
+        user_prs = [pr for pr in pull_requests if pr and pr.get('user', {}).get('login') == username]
         all_contributions[username]["pr_count"] += len(user_prs)
         all_contributions[username]["stats"]["prs"]["all_time"] += len(user_prs)
         
@@ -119,7 +119,7 @@ class ContributionProcessor:
     
     def _process_user_issues(self, username, issues, all_contributions):
         """Process issues for a user."""
-        user_issues = [issue for issue in issues if issue.get('user', {}).get('login') == username and not issue.get('pull_request')]
+        user_issues = [issue for issue in issues if issue and issue.get('user', {}).get('login') == username and not issue.get('pull_request')]
         all_contributions[username]["issues_count"] += len(user_issues)
         all_contributions[username]["stats"]["issues"]["all_time"] += len(user_issues)
         
@@ -132,12 +132,12 @@ class ContributionProcessor:
     
     def _process_user_commits(self, username, commits, all_contributions):
         """Process commits for a user."""
-        user_commits = [commit for commit in commits if commit.get('author', {}).get('login') == username]
+        user_commits = [commit for commit in commits if commit and commit.get('author', {}).get('login') == username]
         all_contributions[username]["commits_count"] += len(user_commits)
         all_contributions[username]["stats"]["commits"]["all_time"] += len(user_commits)
         
         for commit in user_commits:
-            commit_date = commit.get('commit', {}).get('author', {}).get('date')
+            commit_date = commit.get('commit', {}).get('author', {}).get('date') if commit else None
             if commit_date:
                 date_str = commit_date.split('T')[0]
                 self._update_time_based_stats(date_str, all_contributions[username]["stats"]["commits"])
