@@ -26,22 +26,18 @@ jobs:
         with:
           path: |
             ~/.cache/pip
-            ~/.cache/pip-tools
             ~/.local/lib/python3.13/site-packages
             ~/.local/bin
-            /tmp/pip-*
-            /opt/hostedtoolcache/Python/3.13.2/x64/lib/python3.13/site-packages
           key: ${{ runner.os }}-pip-py313-${{ hashFiles('discord_bot/config/discord_bot_requirements.txt') }}
           restore-keys: |
             ${{ runner.os }}-pip-py313-
 
-      - name: Cache compiled packages and wheels
+      - name: Cache compiled packages
         uses: actions/cache@v3
         with:
           path: |
             ~/.cache/matplotlib
             ~/.cache/numpy
-            ~/.cache/pip/wheels
             ~/.local/lib/python3.13/site-packages/matplotlib*
             ~/.local/lib/python3.13/site-packages/numpy*
             ~/.local/lib/python3.13/site-packages/discord*
@@ -65,18 +61,17 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libffi-dev libnacl-dev python3-dev build-essential
 
-      - name: Install dependencies with aggressive caching
+      - name: Install dependencies with improved caching
         run: |
           python -m pip install --upgrade pip setuptools wheel
-          pip install --user --cache-dir ~/.cache/pip --find-links ~/.cache/pip/wheels build numpy setuptools-scm
+          pip install --user --cache-dir ~/.cache/pip build numpy setuptools-scm
           
           export NPY_NUM_BUILD_JOBS=4
           export MAKEFLAGS="-j4"
           export PIP_CACHE_DIR=~/.cache/pip
-          export PIP_FIND_LINKS=~/.cache/pip/wheels
           
-          pip install --user --cache-dir ~/.cache/pip --find-links ~/.cache/pip/wheels --only-binary=:all: -r discord_bot/config/discord_bot_requirements.txt || \
-          pip install --user --cache-dir ~/.cache/pip --find-links ~/.cache/pip/wheels --prefer-binary -r discord_bot/config/discord_bot_requirements.txt || \
+          pip install --user --cache-dir ~/.cache/pip --only-binary=:all: -r discord_bot/config/discord_bot_requirements.txt || \
+          pip install --user --cache-dir ~/.cache/pip --prefer-binary -r discord_bot/config/discord_bot_requirements.txt || \
           pip install --user --cache-dir ~/.cache/pip -r discord_bot/config/discord_bot_requirements.txt
 
       - name: Set up Google Credentials
