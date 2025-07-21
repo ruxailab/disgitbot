@@ -13,19 +13,21 @@ from pathlib import Path
 from typing import Dict, Any
 
 # Ensure src is in path for imports
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+src_path = os.path.join(os.path.dirname(__file__), '..')
+sys.path.insert(0, os.path.abspath(src_path))
 
-from .orchestrator import (
+# Use absolute imports to avoid relative import issues
+from pipeline.orchestrator import (
     DataCollectionStage, 
     DataProcessingStage, 
     DataStorageStage, 
     DiscordUpdateStage
 )
-from ..core.container import container
-from ..core.interfaces import IStorageService, IDiscordService, IGitHubService, IRoleService
-from ..core.services import FirestoreService, DiscordBotService
-from ..core.github_service import GitHubService
-from ..core.role_service import RoleService
+from core.container import container
+from core.interfaces import IStorageService, IDiscordService, IGitHubService, IRoleService
+from core.services import FirestoreService, DiscordBotService
+from core.github_service import GitHubService
+from core.role_service import RoleService
 
 CONTEXT_FILE = "pipeline_context.json"
 

@@ -21,6 +21,14 @@ jobs:
         with:
           python-version: '3.13.2'
 
+      - name: Cache pip dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('discord_bot/config/discord_bot_requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
       - name: Install system dependencies
         run: |
           sudo apt-get update
@@ -42,7 +50,13 @@ jobs:
           GOOGLE_APPLICATION_CREDENTIALS: discord_bot/config/credentials.json
         run: |
           cd discord_bot
-          python src/pipeline/stage_runners.py collection
+          python -c "
+          import sys, os, asyncio
+          sys.path.insert(0, 'src')
+          from pipeline.stage_runners import run_data_collection_stage
+          success = asyncio.run(run_data_collection_stage())
+          sys.exit(0 if success else 1)
+          "
 
       - name: Stage 2 - Data Processing
         env:
@@ -52,7 +66,13 @@ jobs:
           GOOGLE_APPLICATION_CREDENTIALS: discord_bot/config/credentials.json
         run: |
           cd discord_bot
-          python src/pipeline/stage_runners.py processing
+          python -c "
+          import sys, os, asyncio
+          sys.path.insert(0, 'src')
+          from pipeline.stage_runners import run_data_processing_stage
+          success = asyncio.run(run_data_processing_stage())
+          sys.exit(0 if success else 1)
+          "
 
       - name: Stage 3 - Data Storage
         env:
@@ -62,7 +82,13 @@ jobs:
           GOOGLE_APPLICATION_CREDENTIALS: discord_bot/config/credentials.json
         run: |
           cd discord_bot
-          python src/pipeline/stage_runners.py storage
+          python -c "
+          import sys, os, asyncio
+          sys.path.insert(0, 'src')
+          from pipeline.stage_runners import run_data_storage_stage
+          success = asyncio.run(run_data_storage_stage())
+          sys.exit(0 if success else 1)
+          "
 
       - name: Stage 4 - Discord Updates
         env:
@@ -72,7 +98,13 @@ jobs:
           GOOGLE_APPLICATION_CREDENTIALS: discord_bot/config/credentials.json
         run: |
           cd discord_bot
-          python src/pipeline/stage_runners.py discord
+          python -c "
+          import sys, os, asyncio
+          sys.path.insert(0, 'src')
+          from pipeline.stage_runners import run_discord_update_stage
+          success = asyncio.run(run_discord_update_stage())
+          sys.exit(0 if success else 1)
+          "
 
       - name: Pipeline Summary
         if: always()

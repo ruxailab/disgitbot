@@ -10,9 +10,16 @@ import json
 import os
 from datetime import datetime
 from typing import Dict, Any, List, Optional
-from ..core.interfaces import IStorageService, IDiscordService, IDataProcessor, IGitHubService
-from ..core.container import container
-from .processors import ContributionProcessor, AnalyticsProcessor, MetricsProcessor
+import sys
+import os
+# Ensure we can import from the src directory
+if 'src' not in sys.path:
+    src_path = os.path.join(os.path.dirname(__file__), '..')
+    sys.path.insert(0, os.path.abspath(src_path))
+
+from core.interfaces import IStorageService, IDiscordService, IDataProcessor, IGitHubService
+from core.container import container
+from pipeline.processors import ContributionProcessor, AnalyticsProcessor, MetricsProcessor
 
 class PipelineStage:
     """Base class for pipeline stages using Template Method pattern."""
@@ -221,10 +228,10 @@ class PipelineOrchestrator:
     
     def _setup_dependencies(self):
         """Setup dependency injection container."""
-        from ..core.interfaces import IStorageService, IDiscordService, IGitHubService, IRoleService
-        from ..core.services import FirestoreService, DiscordBotService
-        from ..core.github_service import GitHubService
-        from ..core.role_service import RoleService
+        from core.interfaces import IStorageService, IDiscordService, IGitHubService, IRoleService
+        from core.services import FirestoreService, DiscordBotService
+        from core.github_service import GitHubService
+        from core.role_service import RoleService
         
         # Register services with proper dependency order
         container.register_singleton(IStorageService, FirestoreService)
