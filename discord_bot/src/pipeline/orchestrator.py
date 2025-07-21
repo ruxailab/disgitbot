@@ -196,15 +196,13 @@ class DiscordUpdateStage(PipelineStage):
             if github_id:
                 user_mappings[discord_id] = github_id
         
-        # Update roles (assumes single guild for now)
-        guild_id = "YOUR_GUILD_ID"  # This would come from configuration
-        
-        roles_updated = await self.discord.update_roles(guild_id, user_mappings, contributions)
+        # Update roles across all guilds
+        roles_updated = await self.discord.update_roles(user_mappings, contributions)
         if not roles_updated:
             print("Warning: Role updates failed")
         
-        # Update channels
-        channels_updated = await self.discord.update_channels(guild_id, repo_metrics)
+        # Update channels across all guilds
+        channels_updated = await self.discord.update_channels(repo_metrics)
         if not channels_updated:
             print("Warning: Channel updates failed")
         
@@ -223,12 +221,14 @@ class PipelineOrchestrator:
     
     def _setup_dependencies(self):
         """Setup dependency injection container."""
-        from ..core.interfaces import IStorageService, IDiscordService, IGitHubService
+        from ..core.interfaces import IStorageService, IDiscordService, IGitHubService, IRoleService
         from ..core.services import FirestoreService, DiscordBotService
         from ..core.github_service import GitHubService
+        from ..core.role_service import RoleService
         
-        # Register services
+        # Register services with proper dependency order
         container.register_singleton(IStorageService, FirestoreService)
+        container.register_singleton(IRoleService, RoleService)
         container.register_singleton(IDiscordService, DiscordBotService)
         container.register_singleton(IGitHubService, GitHubService)
     
@@ -236,6 +236,19 @@ class PipelineOrchestrator:
         """Add a pipeline stage."""
         self.stages.append(stage)
         return self
+    
+    def _setup_default_stages(self):
+        """Setup default pipeline stages with dependency injection."""
+        storage_service = container.resolve(IStorageService)
+        discord_service = container.resolve(IDiscordService) 
+        github_service = container.resolve(IGitHubService)
+        
+        self.stages = [
+            DataCollectionStage(github_service),
+            DataProcessingStage(),
+            DataStorageStage(storage_service),
+            DiscordUpdateStage(discord_service, storage_service)
+        ]
     
     async def execute_full_pipeline(self) -> Dict[str, Any]:
         """Execute the complete pipeline with comprehensive error handling and recovery."""
@@ -448,19 +461,6 @@ class PipelineExecutionError(Exception):
         self.original_error = original_error
         self.completed_stages = completed_stages
         self.pipeline_message = message
-    
-    def _setup_default_stages(self):
-        """Setup default pipeline stages with dependency injection."""
-        storage_service = container.resolve(IStorageService)
-        discord_service = container.resolve(IDiscordService) 
-        github_service = container.resolve(IGitHubService)
-        
-        self.stages = [
-            DataCollectionStage(github_service),
-            DataProcessingStage(),
-            DataStorageStage(storage_service),
-            DiscordUpdateStage(discord_service, storage_service)
-        ]
 
 # Factory function for easy usage
 def create_pipeline_orchestrator() -> PipelineOrchestrator:

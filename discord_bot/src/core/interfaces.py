@@ -5,7 +5,7 @@ Abstract base classes for dependency injection and loose coupling.
 """
 
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Tuple, List
 
 class IStorageService(ABC):
     """Interface for data storage services."""
@@ -34,18 +34,41 @@ class IDiscordService(ABC):
     """Interface for Discord operations."""
     
     @abstractmethod
-    async def update_roles(self, guild_id: str, user_mappings: Dict[str, str], contributions: Dict[str, Any]) -> bool:
+    async def update_roles(self, user_mappings: Dict[str, str], contributions: Dict[str, Any]) -> bool:
         """Update user roles based on contributions."""
         pass
     
     @abstractmethod
-    async def update_channels(self, guild_id: str, metrics: Dict[str, Any]) -> bool:
+    async def update_channels(self, metrics: Dict[str, Any]) -> bool:
         """Update channel names with metrics."""
         pass
     
     @abstractmethod
     async def send_notification(self, channel_id: str, message: str) -> bool:
         """Send a notification message."""
+        pass
+
+class IRoleService(ABC):
+    """Interface for role determination and management."""
+    
+    @abstractmethod
+    def determine_roles(self, pr_count: int, issues_count: int, commits_count: int) -> Tuple[str, str, str]:
+        """Determine roles based on contribution counts."""
+        pass
+    
+    @abstractmethod
+    def get_medal_assignments(self, hall_of_fame_data: Dict[str, Any]) -> Dict[str, str]:
+        """Get medal role assignments for top contributors."""
+        pass
+    
+    @abstractmethod
+    def get_all_role_names(self) -> List[str]:
+        """Get all possible role names for creation."""
+        pass
+    
+    @abstractmethod
+    def get_role_color(self, role_name: str) -> Optional[Tuple[int, int, int]]:
+        """Get RGB color for a specific role."""
         pass
 
 class IDataProcessor(ABC):

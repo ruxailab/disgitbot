@@ -11,7 +11,7 @@ from typing import Dict, Any, Optional
 import firebase_admin
 from firebase_admin import credentials, firestore
 
-from .interfaces import IStorageService, IDiscordService, IGitHubService
+from .interfaces import IStorageService, IDiscordService, IGitHubService, IRoleService
 from .config import get_config
 from .github_service import GitHubService
 
@@ -78,11 +78,12 @@ class FirestoreService(IStorageService):
 class DiscordBotService(IDiscordService):
     """Discord bot implementation of Discord service."""
     
-    def __init__(self):
+    def __init__(self, role_service: Optional[IRoleService] = None):
         self._client = None
         config = get_config()
         discord_config = config.get_discord_config()
         self._token = discord_config.bot_token
+        self._role_service = role_service
         
         if not self._token:
             raise ValueError("DISCORD_BOT_TOKEN environment variable is required")
@@ -95,39 +96,23 @@ class DiscordBotService(IDiscordService):
             intents.members = True
             self._client = discord.Client(intents=intents)
     
-    async def update_roles(self, guild_id: str, user_mappings: Dict[str, str], contributions: Dict[str, Any]) -> bool:
-        """Update user roles based on contributions."""
+    async def update_roles(self, user_mappings: Dict[str, str], contributions: Dict[str, Any]) -> bool:
+        """Update user roles based on contributions - uses bot's guild context."""
         try:
             await self._ensure_client()
             
             if not self._client.is_ready():
                 await self._client.start(self._token)
             
-            guild = self._client.get_guild(int(guild_id))
-            if not guild:
-                print(f"Guild {guild_id} not found")
-                return False
+            # Update roles in all guilds the bot is in (using your working logic)
+            total_updated = 0
+            for guild in self._client.guilds:
+                print(f"Updating roles in guild: {guild.name}")
+                updated_count = await self._update_roles_for_guild(guild, user_mappings, contributions)
+                total_updated += updated_count
+                print(f"Updated {updated_count} members in {guild.name}")
             
-            # Implementation of role update logic
-            from ..utils.role_utils import determine_role
-            
-            updated_count = 0
-            for member in guild.members:
-                github_username = user_mappings.get(str(member.id))
-                if not github_username or github_username not in contributions:
-                    continue
-                
-                user_data = contributions[github_username]
-                pr_count = user_data.get("pr_count", 0)
-                issues_count = user_data.get("issues_count", 0)
-                commits_count = user_data.get("commits_count", 0)
-                
-                pr_role, issue_role, commit_role = determine_role(pr_count, issues_count, commits_count)
-                
-                # Role update logic would go here
-                updated_count += 1
-            
-            print(f"Updated roles for {updated_count} members")
+            print(f"Updated roles for {total_updated} total members")
             return True
             
         except Exception as e:
@@ -137,38 +122,146 @@ class DiscordBotService(IDiscordService):
             if self._client and self._client.is_ready():
                 await self._client.close()
     
-    async def update_channels(self, guild_id: str, metrics: Dict[str, Any]) -> bool:
-        """Update channel names with metrics."""
+    async def _update_roles_for_guild(self, guild: discord.Guild, user_mappings: Dict[str, str], contributions: Dict[str, Any]) -> int:
+        """Update roles for a single guild using dependency-injected role service."""
+        if not self._role_service:
+            print("Role service not available - skipping role updates")
+            return 0
+        
+        # Get hall of fame data and medal assignments
+        hall_of_fame_data = self._role_service.get_hall_of_fame_data()
+        medal_assignments = self._role_service.get_medal_assignments(hall_of_fame_data or {})
+        print(f"Medal assignments: {medal_assignments}")
+        
+        roles = {}
+        existing_roles = {role.name: role for role in guild.roles}
+        
+        # Get all role names from role service
+        all_role_names = self._role_service.get_all_role_names()
+        
+        # Ensure the required roles exist or create them
+        for role_name in all_role_names:
+            if role_name in existing_roles:
+                print(f"Role {role_name} already exists, skipping creation.")
+                roles[role_name] = existing_roles[role_name]
+            else:
+                try:
+                    print(f"Creating role: {role_name}")
+                    # Get role color from service
+                    role_color = self._role_service.get_role_color(role_name)
+                    if role_color:
+                        roles[role_name] = await guild.create_role(
+                            name=role_name, 
+                            color=discord.Color.from_rgb(*role_color)
+                        )
+                    else:
+                        roles[role_name] = await guild.create_role(name=role_name)
+                except discord.Forbidden:
+                    print(f"Insufficient permissions to create role: {role_name}")
+                    continue
+                except Exception as e:
+                    print(f"Error creating role {role_name}: {e}")
+                    continue
+        
+        # Update roles for each member
+        updated_count = 0
+        for member in guild.members:
+            github_username = user_mappings.get(str(member.id))
+            if not github_username:
+                continue
+            user_data = contributions.get(github_username)
+            if not user_data:
+                continue
+            
+            # Remove all roles from the member except @everyone
+            roles_to_remove = [role for role in member.roles if role.name != "@everyone"]
+            try:
+                if roles_to_remove:
+                    await member.remove_roles(*roles_to_remove)
+                    print(f"Removed all roles from {member.name}")
+            except Exception as e:
+                print(f"Error removing roles from {member.name}: {e}")
+            
+            # Get contribution counts
+            pr_count = user_data.get("pr_count", 0)
+            issues_count = user_data.get("issues_count", 0)
+            commits_count = user_data.get("commits_count", 0)
+            
+            # Use role service to determine roles
+            pr_role, issue_role, commit_role = self._role_service.determine_roles(
+                pr_count, issues_count, commits_count
+            )
+            print(pr_role, issue_role, commit_role)
+            new_role_names = [pr_role, issue_role, commit_role]
+            
+            # Add medal role if user is in top 3 all-time PRs
+            if github_username in medal_assignments:
+                medal_role = medal_assignments[github_username]
+                new_role_names.append(medal_role)
+                print(f"Adding medal role {medal_role} to {member.name}")
+            
+            # Add new roles
+            for role_name in new_role_names:
+                if role_name and role_name in roles:
+                    try:
+                        await member.add_roles(roles[role_name])
+                        print(f"Added role {role_name} to {member.name}")
+                    except Exception as e:
+                        print(f"Error adding role {role_name} to {member.name}: {e}")
+            
+            updated_count += 1
+        
+        print(f"Role update completed for {updated_count} members in guild {guild.name}")
+        return updated_count
+    
+    async def update_channels(self, metrics: Dict[str, Any]) -> bool:
+        """Update channel names with metrics - works exactly like your voice channel updater."""
         try:
             await self._ensure_client()
             
             if not self._client.is_ready():
                 await self._client.start(self._token)
             
-            guild = self._client.get_guild(int(guild_id))
-            if not guild:
-                print(f"Guild {guild_id} not found")
-                return False
-            
-            # Find or create stats category
-            stats_category = discord.utils.get(guild.categories, name="REPOSITORY STATS")
-            if not stats_category:
-                stats_category = await guild.create_category("REPOSITORY STATS")
-            
-            # Update channel names with metrics
-            channels_to_update = {
-                f"⭐ Stars: {metrics.get('stars_count', 0)}": "stars",
-                f"🍴 Forks: {metrics.get('forks_count', 0)}": "forks",
-                f"👥 Contributors: {metrics.get('total_contributors', 0)}": "contributors"
-            }
-            
-            for channel_name, channel_type in channels_to_update.items():
-                existing_channel = discord.utils.get(stats_category.voice_channels, name__contains=channel_type)
+            # Same logic as your update_voice_channel_stats function
+            for guild in self._client.guilds:
+                print(f"Updating channels in guild: {guild.name}")
                 
-                if existing_channel:
-                    await existing_channel.edit(name=channel_name)
-                else:
-                    await guild.create_voice_channel(channel_name, category=stats_category)
+                # Find or create stats category (same as your code)
+                stats_category = discord.utils.get(guild.categories, name="REPOSITORY STATS")
+                if not stats_category:
+                    stats_category = await guild.create_category("REPOSITORY STATS")
+                
+                # Channel names (similar to your channel_names list)
+                channels_to_update = [
+                    f"Stars: {metrics.get('stars_count', 0)}",
+                    f"Forks: {metrics.get('forks_count', 0)}",
+                    f"Contributors: {metrics.get('total_contributors', 0)}",
+                    f"PRs: {metrics.get('pr_count', 0)}",
+                    f"Issues: {metrics.get('issues_count', 0)}",
+                    f"Commits: {metrics.get('commits_count', 0)}"
+                ]
+                
+                # Same update logic as your code
+                stats_keywords = ["Stars:", "Forks:", "Contributors:", "PRs:", "Issues:", "Commits:"]
+                existing_stats_channels = {}
+                
+                for channel in stats_category.voice_channels:
+                    for keyword in stats_keywords:
+                        if channel.name.startswith(keyword):
+                            existing_stats_channels[keyword] = channel
+                            break
+                
+                for target_name in channels_to_update:
+                    keyword = target_name.split(":")[0] + ":"
+                    
+                    if keyword in existing_stats_channels:
+                        channel = existing_stats_channels[keyword]
+                        if channel.name != target_name:
+                            await channel.edit(name=target_name)
+                    else:
+                        await guild.create_voice_channel(name=target_name, category=stats_category)
+                
+                print(f"Channels updated in {guild.name}")
             
             print("Channel metrics updated successfully")
             return True
