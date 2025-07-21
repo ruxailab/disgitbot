@@ -114,7 +114,7 @@ jobs:
           python -u -c "
           import sys, json
           sys.path.insert(0, 'src')
-          from core.services import FirestoreService
+          from core.services import set_document, query_collection, update_document
           
           print('Loading processed data...')
           with open('processed_data.json', 'r') as f:
@@ -126,8 +126,6 @@ jobs:
           repo_metrics = data['repo_metrics']
           
           print('Storing data in Firestore...')
-          from core.services import set_document, query_collection, update_document
-          
           set_document('repo_stats', 'metrics', repo_metrics)
           set_document('repo_stats', 'hall_of_fame', hall_of_fame)
           set_document('repo_stats', 'analytics', analytics_data)
@@ -158,7 +156,7 @@ jobs:
           python -u -c "
           import sys, json
           sys.path.insert(0, 'src')
-          from core.services import FirestoreService, DiscordBotService
+          from core.services import query_collection, DiscordBotService
           from core.role_service import RoleService
           
           print('Loading processed data...')
@@ -169,7 +167,6 @@ jobs:
           repo_metrics = data['repo_metrics']
           
           print('Initializing Discord services...')
-          from core.services import query_collection
           role_service = RoleService()
           discord_service = DiscordBotService(role_service)
           
