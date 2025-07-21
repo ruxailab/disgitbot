@@ -6,7 +6,7 @@ Handles role determination and medal assignment logic.
 
 from typing import Dict, Any, Optional, Tuple, List
 
-from .interfaces import IRoleService
+
 
 class RoleConfiguration:
     """Configuration for role thresholds and settings."""
@@ -49,7 +49,7 @@ class RoleConfiguration:
             "PR Bronze": (205, 127, 50)        # Bronze
         }
 
-class RoleService(IRoleService):
+class RoleService:
     """Service for role determination and management with clean separation of concerns."""
     
     def __init__(self, storage_service):

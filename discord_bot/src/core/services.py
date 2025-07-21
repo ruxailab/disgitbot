@@ -11,7 +11,7 @@ from typing import Dict, Any, Optional
 import firebase_admin
 from firebase_admin import credentials, firestore
 
-from .interfaces import IRoleService
+
 from .config import get_config
 
 class FirestoreService:
@@ -77,7 +77,7 @@ class FirestoreService:
 class DiscordBotService:
     """Discord bot implementation for role and channel management."""
     
-    def __init__(self, role_service: Optional[IRoleService] = None):
+    def __init__(self, role_service = None):
         self._client = None
         config = get_config()
         discord_config = config.get_discord_config()
