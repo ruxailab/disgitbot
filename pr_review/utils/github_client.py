@@ -220,16 +220,55 @@ class GitHubClient:
     
     def get_repository_labels(self, repo: str) -> List[Dict[str, Any]]:
         """
-        Get all labels for a repository.
+        Get repository labels from stored Discord bot pipeline data.
         
         Args:
-            repo: Repository name in format "owner/repo"
+            repo: Repository in format 'owner/repo'
             
         Returns:
-            List of repository labels
+            List of label dictionaries with name, color, description
         """
-        endpoint = f"repos/{repo}/labels"
-        return self._make_request(endpoint)
+        try:
+            import sys
+            import os
+            discord_bot_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'discord_bot', 'src')
+            if discord_bot_path not in sys.path:
+                sys.path.insert(0, discord_bot_path)
+            
+            from core.services import get_document
+            
+            doc_id = repo.replace('/', '_')
+            label_data = get_document('repository_labels', doc_id)
+            
+            if label_data and 'labels' in label_data:
+                labels = label_data['labels']
+                self.logger.info(f"Retrieved {len(labels)} labels for {repo} from stored data")
+                return labels
+            else:
+                self.logger.warning(f"No stored labels found for {repo}, using fallback API call")
+                # Fallback to direct API call if no stored data
+                return self._get_labels_from_api(repo)
+                
+        except Exception as e:
+            self.logger.error(f"Error getting stored labels for {repo}: {e}")
+            # Fallback to direct API call
+            return self._get_labels_from_api(repo)
+    
+    def _get_labels_from_api(self, repo: str) -> List[Dict[str, Any]]:
+        """Fallback method to get labels directly from GitHub API."""
+        try:
+            endpoint = f"repos/{repo}/labels"
+            response = self._make_request(endpoint)
+            
+            if response.get('status_code') == 200:
+                return response.get('data', [])
+            
+            self.logger.warning(f"Failed to get labels for {repo} via API")
+            return []
+            
+        except Exception as e:
+            self.logger.error(f"Error getting labels from API for {repo}: {e}")
+            return []
     
     def add_labels_to_pull_request(self, repo: str, pr_number: int, labels: List[str]) -> Dict[str, Any]:
         """

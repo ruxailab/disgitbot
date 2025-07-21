@@ -18,7 +18,6 @@ on:
         type: choice
         options:
           - process_pr
-          - collect_labels
   
   # NEW: Make this workflow reusable for other repos
   workflow_call:
@@ -48,12 +47,12 @@ on:
         required: true
 
 jobs:
-  # Job 1: Process PR with AI automation
+  # Process PR with AI automation
   process-pr:
     if: |
       github.event_name == 'pull_request' || 
-      (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'process_pr') ||
-      (github.event_name == 'workflow_call' && inputs.action == 'process_pr')
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'workflow_call'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     
@@ -97,37 +96,8 @@ jobs:
 
 
 
-  # Job 2: Collect labels from all RUXAILAB repositories and store in Firestore
-  collect-labels:
-    if: |
-      (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'collect_labels') ||
-      (github.event_name == 'workflow_call' && inputs.action == 'collect_labels')
-    runs-on: ubuntu-latest
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      with:
-        repository: ${{ github.event_name == 'workflow_call' && 'ruxailab/disgitbot' || github.repository }}
-        path: ${{ github.event_name == 'workflow_call' && 'pr-automation' || '.' }}
-        token: ${{ secrets.GH_TOKEN || github.token }}
-      
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.9'
-        
-    - name: Install dependencies
-      run: |
-        cd ${{ github.event_name == 'workflow_call' && 'pr-automation/' || '' }}pr_review
-        pip install -r requirements.txt
-        
-    - name: Collect repository labels and store in Firestore
-      env:
-        GITHUB_TOKEN: ${{ secrets.GH_TOKEN || github.token }}
-      run: |
-        cd ${{ github.event_name == 'workflow_call' && 'pr-automation/' || '' }}pr_review
-        python scripts/collect_repo_labels.py
+  # Note: Label collection is now integrated into the Discord bot pipeline
+  # Labels are automatically collected during the daily Discord bot data pipeline run
 
 # Global environment variables for all jobs
 env:

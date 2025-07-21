@@ -7,9 +7,10 @@ Simple functions for Discord bot functionality.
 import os
 import discord
 from discord.ext import commands
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 import firebase_admin
 from firebase_admin import credentials, firestore
+import time
 
 from .config import get_discord_token, get_firebase_credentials_path
 

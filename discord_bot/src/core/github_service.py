@@ -232,20 +232,29 @@ class GitHubService:
         contributors_url = f"{self.api_url}/repos/{owner}/{repo}/contributors"
         return self._paginate_list_results(contributors_url, 'core')
     
+    def fetch_repository_labels(self, owner: str, repo: str) -> List[Dict[str, Any]]:
+        """Fetch all labels for a repository."""
+        labels_url = f"{self.api_url}/repos/{owner}/{repo}/labels"
+        return self._paginate_list_results(labels_url, 'core')
+
     def fetch_organization_repositories(self) -> List[Dict[str, str]]:
-        """Fetch ALL repositories in the organization."""
-        repos_url = f"{self.api_url}/orgs/{self.repo_owner}/repos"
-        repo_list = self._paginate_list_results(repos_url, 'core')
-        
-        repos = []
-        for repo in repo_list:
-            repos.append({
-                "name": repo["name"],
-                "owner": repo["owner"]["login"]
-            })
-        
-        print(f"DEBUG - Found {len(repos)} repositories in the {self.repo_owner} organization.")
-        return repos
+        """Fetch all repositories for the organization."""
+        try:
+            org_url = f"{self.api_url}/orgs/{self.repo_owner}/repos"
+            response = self._make_request(org_url, 'core')
+            
+            if response and response.status_code == 200:
+                repos_data = response.json()
+                repos = [{'name': repo['name'], 'owner': repo['owner']['login']} for repo in repos_data]
+                print(f"Found {len(repos)} repositories in {self.repo_owner}")
+                return repos
+            
+            print(f"Failed to fetch repositories for {self.repo_owner}")
+            return []
+            
+        except Exception as e:
+            print(f"Error fetching repositories: {e}")
+            return []
     
     def search_pull_requests(self, owner: str, repo: str) -> Dict[str, Any]:
         """Search for ALL pull requests in a repository with complete pagination."""
@@ -292,7 +301,8 @@ class GitHubService:
             'contributors': self.fetch_contributors(owner, repo),
             'pull_requests': self.search_pull_requests(owner, repo),
             'issues': self.search_issues(owner, repo),
-            'commits_search': self.search_commits(owner, repo)
+            'commits_search': self.search_commits(owner, repo),
+            'labels': self.fetch_repository_labels(owner, repo)
         }
         
         # Log summary of collected data
@@ -301,9 +311,10 @@ class GitHubService:
         print(f"  - Pull Requests: {repo_data['pull_requests']['total_count']}")
         print(f"  - Issues: {repo_data['issues']['total_count']}")
         print(f"  - Commits: {repo_data['commits_search']['total_count']}")
+        print(f"  - Labels: {len(repo_data['labels'])}")
         
         return repo_data
-    
+
     def collect_organization_data(self) -> Dict[str, Any]:
         """Collect complete data for all repositories in the organization."""
         print("========== Collecting Organization Data ==========")

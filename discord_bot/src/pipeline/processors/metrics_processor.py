@@ -46,4 +46,37 @@ def create_repo_metrics(raw_data, all_contributions):
         'commits_count': commits_count,
         'total_contributors': len(all_contributions),
         'last_updated': time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime())
-    } 
+    }
+
+def process_repository_labels(raw_data):
+    """Process repository labels from raw data for storage."""
+    print("Processing repository labels...")
+    
+    repositories = raw_data.get('repositories', {})
+    processed_labels = {}
+    
+    for repo_name, repo_data in repositories.items():
+        labels = repo_data.get('labels', [])
+        if labels:
+            repo_full_name = f"{repo_data.get('owner', 'unknown')}/{repo_name}"
+            
+            # Process labels into storage format
+            processed_labels[repo_full_name] = {
+                'repository': repo_full_name,
+                'labels': [
+                    {
+                        'name': label.get('name', ''),
+                        'color': label.get('color', ''),
+                        'description': label.get('description', ''),
+                        'url': label.get('url', ''),
+                        'id': label.get('id', 0)
+                    }
+                    for label in labels
+                ],
+                'count': len(labels),
+                'last_updated': time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime())
+            }
+            print(f"Processed {len(labels)} labels for {repo_full_name}")
+    
+    print(f"Processed labels for {len(processed_labels)} repositories")
+    return processed_labels 

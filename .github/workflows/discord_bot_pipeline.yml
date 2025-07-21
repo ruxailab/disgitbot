@@ -90,15 +90,18 @@ jobs:
           print('Calculating metrics...')
           repo_metrics = metrics_functions.create_repo_metrics(raw_data, contributions)
           
+          print('Processing repository labels...')
+          processed_labels = metrics_functions.process_repository_labels(raw_data)
+          
           print(f'Processed {len(contributions)} contributors')
           
           print('Saving processed data...')
           processed_data = {
-            'raw_data': raw_data,
             'contributions': contributions,
             'hall_of_fame': hall_of_fame,
             'analytics_data': analytics_data,
-            'repo_metrics': repo_metrics
+            'repo_metrics': repo_metrics,
+            'processed_labels': processed_labels
           }
           with open('processed_data.json', 'w') as f:
             json.dump(processed_data, f)
@@ -124,11 +127,41 @@ jobs:
           hall_of_fame = data['hall_of_fame']
           analytics_data = data['analytics_data']
           repo_metrics = data['repo_metrics']
+          processed_labels = data['processed_labels']
           
           print('Storing data in Firestore...')
           set_document('repo_stats', 'metrics', repo_metrics)
           set_document('repo_stats', 'hall_of_fame', hall_of_fame)
           set_document('repo_stats', 'analytics', analytics_data)
+          
+          print('Storing repository labels...')
+          labels_stored = 0
+          for repo_name, label_data in processed_labels.items():
+            doc_id = repo_name.replace('/', '_')
+            if set_document('repository_labels', doc_id, label_data):
+              labels_stored += 1
+              print(f\"Stored {label_data['count']} labels for {repo_name}\")
+          
+          print(f'Stored labels for {labels_stored} repositories')
+          
+          print('Initializing PR reviewer configuration...')
+          from core.services import get_document
+          import time
+          
+          existing_reviewers = get_document('pr_config', 'reviewers')
+          if not existing_reviewers:
+            default_reviewer_config = {
+              'reviewers': ['marcgc21', 'xemyst', 'KarinePistili', 'hvini', 'sergiobeltranguerrero', 'leoruas', 'JulioManoel'],
+              'count': 7,
+              'last_updated': time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime()),
+              'initialized_by': 'pipeline_bootstrap'
+            }
+            if set_document('pr_config', 'reviewers', default_reviewer_config):
+              print('Initialized default reviewer configuration')
+            else:
+              print('Failed to initialize reviewer configuration')
+          else:
+            print('PR reviewer configuration already exists, skipping initialization')
           
           user_mappings = query_collection('discord')
           stored_count = 0
