@@ -98,23 +98,37 @@ class DiscordBotService:
     async def update_roles(self, user_mappings: Dict[str, str], contributions: Dict[str, Any]) -> bool:
         """Update user roles based on contributions."""
         try:
+            print("Initializing Discord client...")
             await self._ensure_client()
             
+            print("Checking client connection status...")
             if not self._client.is_ready():
+                print("Client not ready, starting connection...")
                 await self._client.start(self._token)
+                print("Discord client started successfully")
+            else:
+                print("Discord client already connected")
+            
+            print(f"Discord client connected to {len(self._client.guilds)} guilds")
+            
+            if not self._client.guilds:
+                print("WARNING: Bot is not connected to any Discord servers")
+                return False
             
             total_updated = 0
             for guild in self._client.guilds:
-                print(f"Updating roles in guild: {guild.name}")
+                print(f"Updating roles in guild: {guild.name} (ID: {guild.id})")
                 updated_count = await self._update_roles_for_guild(guild, user_mappings, contributions)
                 total_updated += updated_count
                 print(f"Updated {updated_count} members in {guild.name}")
             
-            print(f"Updated roles for {total_updated} total members")
+            print(f"Updated roles for {total_updated} total members across all guilds")
             return True
             
         except Exception as e:
             print(f"Error updating roles: {e}")
+            import traceback
+            traceback.print_exc()
             return False
         finally:
             if self._client and self._client.is_ready():
@@ -211,13 +225,26 @@ class DiscordBotService:
     async def update_channels(self, metrics: Dict[str, Any]) -> bool:
         """Update channel names with repository metrics."""
         try:
+            print("Initializing Discord client for channel updates...")
             await self._ensure_client()
             
+            print("Checking client connection status for channels...")
             if not self._client.is_ready():
+                print("Client not ready, starting connection for channels...")
                 await self._client.start(self._token)
+                print("Discord client started successfully for channels")
+            else:
+                print("Discord client already connected for channels")
+            
+            print(f"Processing channel updates for {len(self._client.guilds)} guilds")
+            print(f"Repository metrics to display: {metrics}")
+            
+            if not self._client.guilds:
+                print("WARNING: Bot is not connected to any Discord servers for channel updates")
+                return False
             
             for guild in self._client.guilds:
-                print(f"Updating channels in guild: {guild.name}")
+                print(f"Updating channels in guild: {guild.name} (ID: {guild.id})")
                 
                 # Find or create stats category
                 stats_category = discord.utils.get(guild.categories, name="REPOSITORY STATS")
@@ -255,15 +282,19 @@ class DiscordBotService:
                     else:
                         await guild.create_voice_channel(name=target_name, category=stats_category)
                 
-                print(f"Channels updated in {guild.name}")
+                print(f"✓ Channels updated successfully in {guild.name}")
             
+            print("All channel updates completed successfully")
             return True
             
         except Exception as e:
             print(f"Error updating channels: {e}")
+            import traceback
+            traceback.print_exc()
             return False
         finally:
             if self._client and self._client.is_ready():
+                print("Closing Discord client connection after channel updates...")
                 await self._client.close()
     
     async def send_notification(self, channel_id: str, message: str) -> bool:

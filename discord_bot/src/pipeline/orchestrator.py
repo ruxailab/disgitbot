@@ -130,14 +130,21 @@ async def update_discord(context: Dict[str, Any]) -> Dict[str, Any]:
     """Stage 4: Discord role and channel updates."""
     print("========== Stage 4: Discord Updates ==========")
     
+    # Initialize services with logging
+    print("Initializing Discord bot services...")
     storage = FirestoreService()
     role_service = RoleService(storage)
     discord_service = DiscordBotService(role_service)
     
+    # Extract data from context with logging
     contributions = context.get('contributions', {})
     repo_metrics = context.get('repo_metrics', {})
     
-    # Get user mappings from storage
+    print(f"Found {len(contributions)} contributors in context")
+    print(f"Repository metrics available: {bool(repo_metrics)}")
+    
+    # Get user mappings from storage with logging
+    print("Querying Discord user mappings from Firestore...")
     user_mappings_data = storage.query_collection('discord')
     user_mappings = {}
     
@@ -146,15 +153,26 @@ async def update_discord(context: Dict[str, Any]) -> Dict[str, Any]:
         if github_id:
             user_mappings[discord_id] = github_id
     
-    # Update roles across all guilds
-    roles_updated = await discord_service.update_roles(user_mappings, contributions)
-    if not roles_updated:
-        print("Warning: Role updates failed")
+    print(f"Found {len(user_mappings)} Discord-to-GitHub user mappings")
     
-    # Update channels across all guilds
+    if not user_mappings:
+        print("WARNING: No user mappings found. Discord updates will be limited.")
+    
+    # Update roles across all guilds with detailed logging
+    print("Starting Discord role updates...")
+    roles_updated = await discord_service.update_roles(user_mappings, contributions)
+    if roles_updated:
+        print("✓ Role updates completed successfully")
+    else:
+        print("✗ Role updates failed")
+    
+    # Update channels across all guilds with detailed logging
+    print("Starting Discord channel updates...")
     channels_updated = await discord_service.update_channels(repo_metrics)
-    if not channels_updated:
-        print("Warning: Channel updates failed")
+    if channels_updated:
+        print("✓ Channel updates completed successfully")
+    else:
+        print("✗ Channel updates failed")
     
     print("Stage 4: Discord Updates - COMPLETED")
     return context
