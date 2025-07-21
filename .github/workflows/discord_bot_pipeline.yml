@@ -153,7 +153,7 @@ jobs:
 
       - name: Update Discord Roles & Channels
         env:
-          DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+          DISCORD_BOT_TOKEN: ${{ secrets.DEV_DISCORD_BOT_TOKEN }}
           GOOGLE_APPLICATION_CREDENTIALS: discord_bot/config/credentials.json
           PYTHONUNBUFFERED: 1
         run: |
