@@ -702,7 +702,6 @@ github_blueprint = make_github_blueprint(
     redirect_url=f"{base_url}/auth/callback"  # ← GitHub will redirect here
 )
 ```
-
 ### Key Networking Concepts Demonstrated
 
 1. **Single Process, Multiple Services**: `main.py` Lines 64-94 show how one container runs both Discord bot (background thread) and Flask (main thread)

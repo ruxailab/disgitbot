@@ -9,8 +9,8 @@ on:
       - post_visualization_refactor
 
 jobs:
-  # Unified Pipeline - All stages orchestrated with dependency injection
-  unified-pipeline:
+  # Discord Bot Data Pipeline - Individual stages for better visibility
+  discord-bot-pipeline:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -34,7 +34,7 @@ jobs:
       - name: Set up Google Credentials
         run: echo "${{ secrets.GOOGLE_CREDENTIALS_JSON }}" | base64 --decode > discord_bot/config/credentials.json
 
-      - name: Execute unified pipeline
+      - name: Stage 1 - Data Collection
         env:
           DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
@@ -42,27 +42,57 @@ jobs:
           GOOGLE_APPLICATION_CREDENTIALS: discord_bot/config/credentials.json
         run: |
           cd discord_bot
-          python -c "
-          import sys
-          import asyncio
-          sys.path.append('src')
-          from src.pipeline.orchestrator import run_full_pipeline
-          
-          async def main():
-              try:
-                  result = await run_full_pipeline()
-                  print('Pipeline execution summary:')
-                  print(f'- Contributors processed: {len(result.get(\"contributions\", {}))}')
-                  print(f'- Repository metrics: {bool(result.get(\"repo_metrics\"))}')
-                  print(f'- Hall of fame data: {bool(result.get(\"hall_of_fame\"))}')
-                  print(f'- Analytics data: {bool(result.get(\"analytics_data\"))}')
-                  return True
-              except Exception as e:
-                  print(f'Pipeline execution failed: {e}')
-                  import traceback
-                  traceback.print_exc()
-                  return False
-          
-          success = asyncio.run(main())
-          sys.exit(0 if success else 1)
-          "
+          python src/pipeline/stage_runners.py collection
+
+      - name: Stage 2 - Data Processing
+        env:
+          DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          REPO_OWNER: ${{ secrets.REPO_OWNER }}
+          GOOGLE_APPLICATION_CREDENTIALS: discord_bot/config/credentials.json
+        run: |
+          cd discord_bot
+          python src/pipeline/stage_runners.py processing
+
+      - name: Stage 3 - Data Storage
+        env:
+          DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          REPO_OWNER: ${{ secrets.REPO_OWNER }}
+          GOOGLE_APPLICATION_CREDENTIALS: discord_bot/config/credentials.json
+        run: |
+          cd discord_bot
+          python src/pipeline/stage_runners.py storage
+
+      - name: Stage 4 - Discord Updates
+        env:
+          DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          REPO_OWNER: ${{ secrets.REPO_OWNER }}
+          GOOGLE_APPLICATION_CREDENTIALS: discord_bot/config/credentials.json
+        run: |
+          cd discord_bot
+          python src/pipeline/stage_runners.py discord
+
+      - name: Pipeline Summary
+        if: always()
+        run: |
+          cd discord_bot
+          if [ -f pipeline_context.json ]; then
+            echo "Pipeline execution completed!"
+            echo "Final context summary:"
+            python -c "
+            import json
+            try:
+                with open('pipeline_context.json', 'r') as f:
+                    context = json.load(f)
+                print(f'- Contributors processed: {len(context.get(\"contributions\", {}))}')
+                print(f'- Repository metrics: {bool(context.get(\"repo_metrics\"))}')
+                print(f'- Hall of fame data: {bool(context.get(\"hall_of_fame\"))}')
+                print(f'- Analytics data: {bool(context.get(\"analytics_data\"))}')
+            except Exception as e:
+                print(f'Could not read pipeline context: {e}')
+            "
+          else
+            echo "No pipeline context found - pipeline may have failed early"
+          fi
