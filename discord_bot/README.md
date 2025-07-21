@@ -119,6 +119,7 @@ Go to your GitHub repository → Settings → Secrets and variables → Actions 
 - `DISCORD_BOT_TOKEN`
 - `GH_TOKEN` 
 - `GOOGLE_CREDENTIALS_JSON`
+- `REPO_OWNER`
 
 ---
 
@@ -282,10 +283,11 @@ Go to your GitHub repository → Settings → Secrets and variables → Actions 
    - Copy the "Client ID" → **Add to `.env`:** `GITHUB_CLIENT_ID=your_client_id`
    - Click "Generate a new client secret" → Copy it → **Add to `.env`:** `GITHUB_CLIENT_SECRET=your_secret`
 
-### Step 6: Get REPO_OWNER (.env)
+### Step 6: Get REPO_OWNER (.env) + REPO_OWNER (GitHub Secret)
 
 **What this configures:** 
 - `.env` file: `REPO_OWNER=your_org_name`
+- GitHub Secret: `REPO_OWNER`
 
 **What this does:** Tells the bot which GitHub organization's repositories to monitor for contributions.
 
@@ -294,6 +296,7 @@ Go to your GitHub repository → Settings → Secrets and variables → Actions 
    - The organization name is the part after `/orgs/` (example: `ruxailab`)
 2. **Set in Configuration:**
    - **Add to `.env`:** `REPO_OWNER=your_org_name` (example: `REPO_OWNER=ruxailab`)
+   - **Add to GitHub Secrets:** Create secret named `REPO_OWNER` with the same value
    - **Important:** Use ONLY the organization name, NOT the full URL
 
 ---
