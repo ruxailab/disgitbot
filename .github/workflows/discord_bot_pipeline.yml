@@ -16,21 +16,35 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Set up Python 3.11.8
+      - name: Set up Python 3.13.2
         uses: actions/setup-python@v4
         with:
-          python-version: '3.11.8'
+          python-version: '3.13.2'
 
       - name: Cache pip dependencies and built wheels
         uses: actions/cache@v3
         with:
           path: |
             ~/.cache/pip
-            ~/.local/lib/python3.11/site-packages
-          key: ${{ runner.os }}-pip-py311-${{ hashFiles('discord_bot/config/discord_bot_requirements.txt') }}
+            ~/.local/lib/python3.13/site-packages
+            /tmp/pip-build-*
+            /tmp/pip-install-*
+          key: ${{ runner.os }}-pip-py313-${{ hashFiles('discord_bot/config/discord_bot_requirements.txt') }}
           restore-keys: |
-            ${{ runner.os }}-pip-py311-
+            ${{ runner.os }}-pip-py313-
             ${{ runner.os }}-pip-
+
+      - name: Cache build dependencies  
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/matplotlib
+            ~/.cache/numpy
+            /tmp/build-env-*
+          key: ${{ runner.os }}-build-py313-${{ hashFiles('discord_bot/config/discord_bot_requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-build-py313-
+            ${{ runner.os }}-build-
 
       - name: Cache system packages
         uses: actions/cache@v3
@@ -48,10 +62,14 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip setuptools wheel
-          # Try to install only binary wheels first (fastest)
+          # Install build dependencies for faster compilation
+          pip install --user --cache-dir ~/.cache/pip build numpy setuptools-scm
+          # Set parallel build jobs for faster compilation
+          export NPY_NUM_BUILD_JOBS=4
+          export MAKEFLAGS="-j4"
+          # Try binary wheels first, fallback to building with optimizations
           pip install --user --cache-dir ~/.cache/pip --only-binary=all -r discord_bot/config/discord_bot_requirements.txt || \
-          # Fallback to allow building from source if needed
-          pip install --user --cache-dir ~/.cache/pip -r discord_bot/config/discord_bot_requirements.txt
+          pip install --user --cache-dir ~/.cache/pip --prefer-binary -r discord_bot/config/discord_bot_requirements.txt
 
       - name: Set up Google Credentials
         run: echo "${{ secrets.GOOGLE_CREDENTIALS_JSON }}" | base64 --decode > discord_bot/config/credentials.json
