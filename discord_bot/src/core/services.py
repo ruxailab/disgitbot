@@ -78,7 +78,6 @@ class DiscordBotService:
     """Discord bot implementation for role and channel management."""
     
     def __init__(self, role_service = None):
-        self._client = None
         config = get_config()
         discord_config = config.get_discord_config()
         self._token = discord_config.bot_token
@@ -87,52 +86,56 @@ class DiscordBotService:
         if not self._token:
             raise ValueError("DISCORD_BOT_TOKEN environment variable is required")
     
-    async def _ensure_client(self):
-        """Ensure Discord client is initialized."""
-        if not self._client:
-            intents = discord.Intents.default()
-            intents.message_content = True
-            intents.members = True
-            self._client = discord.Client(intents=intents)
-    
-    async def update_roles(self, user_mappings: Dict[str, str], contributions: Dict[str, Any]) -> bool:
-        """Update user roles based on contributions."""
+    async def update_roles_and_channels(self, user_mappings: Dict[str, str], contributions: Dict[str, Any], metrics: Dict[str, Any]) -> bool:
+        """Update Discord roles and channels in a single connection session."""
+        intents = discord.Intents.default()
+        intents.message_content = True
+        intents.members = True
+        client = discord.Client(intents=intents)
+        
+        success = False
+        
+        @client.event
+        async def on_ready():
+            nonlocal success
+            try:
+                print(f"Connected as {client.user}")
+                print(f"Discord client connected to {len(client.guilds)} guilds")
+                
+                if not client.guilds:
+                    print("WARNING: Bot is not connected to any Discord servers")
+                    return
+                
+                for guild in client.guilds:
+                    print(f"Processing guild: {guild.name} (ID: {guild.id})")
+                    
+                    # Update roles
+                    updated_count = await self._update_roles_for_guild(guild, user_mappings, contributions)
+                    print(f"Updated {updated_count} members in {guild.name}")
+                    
+                    # Update channels
+                    await self._update_channels_for_guild(guild, metrics)
+                    print(f"Updated channels in {guild.name}")
+                
+                success = True
+                print("Discord updates completed successfully")
+                
+            except Exception as e:
+                print(f"Error in update process: {e}")
+                import traceback
+                traceback.print_exc()
+                success = False
+            finally:
+                await client.close()
+        
         try:
-            print("Initializing Discord client...")
-            await self._ensure_client()
-            
-            print("Checking client connection status...")
-            if not self._client.is_ready():
-                print("Client not ready, starting connection...")
-                await self._client.start(self._token)
-                print("Discord client started successfully")
-            else:
-                print("Discord client already connected")
-            
-            print(f"Discord client connected to {len(self._client.guilds)} guilds")
-            
-            if not self._client.guilds:
-                print("WARNING: Bot is not connected to any Discord servers")
-                return False
-            
-            total_updated = 0
-            for guild in self._client.guilds:
-                print(f"Updating roles in guild: {guild.name} (ID: {guild.id})")
-                updated_count = await self._update_roles_for_guild(guild, user_mappings, contributions)
-                total_updated += updated_count
-                print(f"Updated {updated_count} members in {guild.name}")
-            
-            print(f"Updated roles for {total_updated} total members across all guilds")
-            return True
-            
+            await client.start(self._token)
+            return success
         except Exception as e:
-            print(f"Error updating roles: {e}")
+            print(f"Error connecting to Discord: {e}")
             import traceback
             traceback.print_exc()
             return False
-        finally:
-            if self._client and self._client.is_ready():
-                await self._client.close()
     
     async def _update_roles_for_guild(self, guild: discord.Guild, user_mappings: Dict[str, str], contributions: Dict[str, Any]) -> int:
         """Update roles for a single guild using role service."""
@@ -222,101 +225,57 @@ class DiscordBotService:
         
         return updated_count
     
-    async def update_channels(self, metrics: Dict[str, Any]) -> bool:
-        """Update channel names with repository metrics."""
+    async def _update_channels_for_guild(self, guild: discord.Guild, metrics: Dict[str, Any]) -> None:
+        """Update channel names with repository metrics for a single guild."""
         try:
-            print("Initializing Discord client for channel updates...")
-            await self._ensure_client()
+            print(f"Updating channels in guild: {guild.name}")
             
-            print("Checking client connection status for channels...")
-            if not self._client.is_ready():
-                print("Client not ready, starting connection for channels...")
-                await self._client.start(self._token)
-                print("Discord client started successfully for channels")
-            else:
-                print("Discord client already connected for channels")
+            # Find or create stats category
+            stats_category = discord.utils.get(guild.categories, name="REPOSITORY STATS")
+            if not stats_category:
+                stats_category = await guild.create_category("REPOSITORY STATS")
             
-            print(f"Processing channel updates for {len(self._client.guilds)} guilds")
-            print(f"Repository metrics to display: {metrics}")
+            # Channel names for all repository metrics
+            channels_to_update = [
+                f"Stars: {metrics.get('stars_count', 0)}",
+                f"Forks: {metrics.get('forks_count', 0)}",
+                f"Contributors: {metrics.get('total_contributors', 0)}",
+                f"PRs: {metrics.get('pr_count', 0)}",
+                f"Issues: {metrics.get('issues_count', 0)}",
+                f"Commits: {metrics.get('commits_count', 0)}"
+            ]
             
-            if not self._client.guilds:
-                print("WARNING: Bot is not connected to any Discord servers for channel updates")
-                return False
+            # Keywords for matching existing channels
+            stats_keywords = ["Stars:", "Forks:", "Contributors:", "PRs:", "Issues:", "Commits:"]
+            existing_stats_channels = {}
             
-            for guild in self._client.guilds:
-                print(f"Updating channels in guild: {guild.name} (ID: {guild.id})")
+            for channel in stats_category.voice_channels:
+                for keyword in stats_keywords:
+                    if channel.name.startswith(keyword):
+                        existing_stats_channels[keyword] = channel
+                        break
+            
+            # Update or create channels
+            for target_name in channels_to_update:
+                keyword = target_name.split(":")[0] + ":"
                 
-                # Find or create stats category
-                stats_category = discord.utils.get(guild.categories, name="REPOSITORY STATS")
-                if not stats_category:
-                    stats_category = await guild.create_category("REPOSITORY STATS")
-                
-                # Channel names for all repository metrics
-                channels_to_update = [
-                    f"Stars: {metrics.get('stars_count', 0)}",
-                    f"Forks: {metrics.get('forks_count', 0)}",
-                    f"Contributors: {metrics.get('total_contributors', 0)}",
-                    f"PRs: {metrics.get('pr_count', 0)}",
-                    f"Issues: {metrics.get('issues_count', 0)}",
-                    f"Commits: {metrics.get('commits_count', 0)}"
-                ]
-                
-                # Keywords for matching existing channels
-                stats_keywords = ["Stars:", "Forks:", "Contributors:", "PRs:", "Issues:", "Commits:"]
-                existing_stats_channels = {}
-                
-                for channel in stats_category.voice_channels:
-                    for keyword in stats_keywords:
-                        if channel.name.startswith(keyword):
-                            existing_stats_channels[keyword] = channel
-                            break
-                
-                # Update or create channels
-                for target_name in channels_to_update:
-                    keyword = target_name.split(":")[0] + ":"
-                    
+                try:
                     if keyword in existing_stats_channels:
                         channel = existing_stats_channels[keyword]
                         if channel.name != target_name:
                             await channel.edit(name=target_name)
+                            print(f"Updated channel: {target_name}")
                     else:
                         await guild.create_voice_channel(name=target_name, category=stats_category)
-                
-                print(f"✓ Channels updated successfully in {guild.name}")
+                        print(f"Created channel: {target_name}")
+                except discord.Forbidden:
+                    print(f"Permission denied for channel: {target_name}")
+                except Exception as e:
+                    print(f"Error with channel {target_name}: {e}")
             
-            print("All channel updates completed successfully")
-            return True
+            print(f"Channels updated successfully in {guild.name}")
             
         except Exception as e:
-            print(f"Error updating channels: {e}")
+            print(f"Error updating channels for guild {guild.name}: {e}")
             import traceback
-            traceback.print_exc()
-            return False
-        finally:
-            if self._client and self._client.is_ready():
-                print("Closing Discord client connection after channel updates...")
-                await self._client.close()
-    
-    async def send_notification(self, channel_id: str, message: str) -> bool:
-        """Send a notification message to a specific channel."""
-        try:
-            await self._ensure_client()
-            
-            if not self._client.is_ready():
-                await self._client.start(self._token)
-            
-            channel = self._client.get_channel(int(channel_id))
-            if channel:
-                await channel.send(message)
-                print(f"Sent notification to channel {channel_id}")
-                return True
-            else:
-                print(f"Channel {channel_id} not found")
-                return False
-                
-        except Exception as e:
-            print(f"Error sending notification: {e}")
-            return False
-        finally:
-            if self._client and self._client.is_ready():
-                await self._client.close() 
+            traceback.print_exc() 

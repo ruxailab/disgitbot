@@ -188,12 +188,7 @@ jobs:
           
           print('Updating Discord roles and channels...')
           import asyncio
-          async def update_discord():
-            roles_ok = await discord_service.update_roles(user_mappings, contributions)
-            channels_ok = await discord_service.update_channels(repo_metrics)
-            return roles_ok and channels_ok
-          
-          success = asyncio.run(update_discord())
+          success = asyncio.run(discord_service.update_roles_and_channels(user_mappings, contributions, repo_metrics))
           print(f'Discord updates completed: {success}')
           "
 
