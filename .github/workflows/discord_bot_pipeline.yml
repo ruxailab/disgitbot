@@ -9,70 +9,36 @@ on:
       - post_visualization_refactor
 
 jobs:
-  # Discord Bot Data Pipeline - Individual stages for better visibility
   discord-bot-pipeline:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      - name: Set up Python 3.13.2
-        uses: actions/setup-python@v4
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.13.2'
+          python-version: '3.13'
+          cache: 'pip'
+          cache-dependency-path: 'discord_bot/config/discord_bot_requirements.txt'
 
-      - name: Cache pip and build artifacts
-        uses: actions/cache@v3
+      - name: Cache system dependencies
+        uses: actions/cache@v4
+        id: system-deps
         with:
-          path: |
-            ~/.cache/pip
-            ~/.local/lib/python3.13/site-packages
-            ~/.local/bin
-          key: ${{ runner.os }}-pip-py313-${{ hashFiles('discord_bot/config/discord_bot_requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-py313-
-
-      - name: Cache compiled packages
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cache/matplotlib
-            ~/.cache/numpy
-            ~/.local/lib/python3.13/site-packages/matplotlib*
-            ~/.local/lib/python3.13/site-packages/numpy*
-            ~/.local/lib/python3.13/site-packages/discord*
-          key: ${{ runner.os }}-compiled-py313-${{ hashFiles('discord_bot/config/discord_bot_requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-compiled-py313-
-
-      - name: Cache system build tools
-        uses: actions/cache@v3
-        with:
-          path: |
-            /var/cache/apt
-            /usr/lib/x86_64-linux-gnu
-            /usr/include
-          key: ${{ runner.os }}-system-${{ github.run_id }}
-          restore-keys: |
-            ${{ runner.os }}-system-
+          path: /var/cache/apt/archives
+          key: system-deps-${{ runner.os }}-${{ hashFiles('.github/workflows/discord_bot_pipeline.yml') }}
 
       - name: Install system dependencies
+        if: steps.system-deps.outputs.cache-hit != 'true'
         run: |
           sudo apt-get update
           sudo apt-get install -y libffi-dev libnacl-dev python3-dev build-essential
 
-      - name: Install dependencies with improved caching
+      - name: Install Python dependencies
         run: |
-          python -m pip install --upgrade pip setuptools wheel
-          pip install --user --cache-dir ~/.cache/pip build numpy setuptools-scm
-          
-          export NPY_NUM_BUILD_JOBS=4
-          export MAKEFLAGS="-j4"
-          export PIP_CACHE_DIR=~/.cache/pip
-          
-          pip install --user --cache-dir ~/.cache/pip --only-binary=:all: -r discord_bot/config/discord_bot_requirements.txt || \
-          pip install --user --cache-dir ~/.cache/pip --prefer-binary -r discord_bot/config/discord_bot_requirements.txt || \
-          pip install --user --cache-dir ~/.cache/pip -r discord_bot/config/discord_bot_requirements.txt
+          python -m pip install --upgrade pip wheel setuptools
+          pip install -r discord_bot/config/discord_bot_requirements.txt
 
       - name: Set up Google Credentials
         run: echo "${{ secrets.DEV_GOOGLE_CREDENTIALS_JSON }}" | base64 --decode > discord_bot/config/credentials.json
