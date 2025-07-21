@@ -135,12 +135,13 @@ class ContributionProcessor:
     
     def _process_user_commits(self, username, commits, all_contributions):
         """Process commits for a user."""
-        user_commits = [commit for commit in commits if commit and commit.get('author', {}).get('login') == username]
+        user_commits = [commit for commit in commits if commit and commit.get('author') and commit.get('author', {}).get('login') == username]
         all_contributions[username]["commits_count"] += len(user_commits)
         all_contributions[username]["stats"]["commits"]["all_time"] += len(user_commits)
         
         for commit in user_commits:
-            commit_date = commit.get('commit', {}).get('author', {}).get('date') if commit else None
+            commit_obj = commit.get('commit') if commit else None
+            commit_date = commit_obj.get('author', {}).get('date') if commit_obj else None
             if commit_date:
                 date_str = commit_date.split('T')[0]
                 self._update_time_based_stats(date_str, all_contributions[username]["stats"]["commits"])
