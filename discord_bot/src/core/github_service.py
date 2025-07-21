@@ -10,8 +10,6 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional
 import os
 
-from .interfaces import IGitHubService
-
 class GitHubConfig:
     """Configuration for GitHub API access."""
     
@@ -23,7 +21,7 @@ class GitHubConfig:
         if not self.token:
             raise ValueError("GITHUB_TOKEN environment variable is required")
 
-class GitHubService(IGitHubService):
+class GitHubService:
     """Professional GitHub API service with comprehensive data collection and rate limiting."""
     
     def __init__(self):
