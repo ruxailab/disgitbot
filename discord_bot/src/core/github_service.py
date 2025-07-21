@@ -10,8 +10,8 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional
 import os
 
-class GitHubConfig:
-    """Configuration for GitHub API access."""
+class GitHubService:
+    """Professional GitHub API service with comprehensive data collection and rate limiting."""
     
     def __init__(self):
         self.api_url = "https://api.github.com"
@@ -20,24 +20,19 @@ class GitHubConfig:
         
         if not self.token:
             raise ValueError("GITHUB_TOKEN environment variable is required")
-
-class GitHubService:
-    """Professional GitHub API service with comprehensive data collection and rate limiting."""
-    
-    def __init__(self):
-        self._github_config = GitHubConfig()
+        
         self._request_count = 0
     
     def _get_headers(self) -> Dict[str, str]:
         """Get GitHub API headers with authentication."""
         return {
-            "Authorization": f"token {self._github_config.token}",
+            "Authorization": f"token {self.token}",
             "Accept": "application/vnd.github.v3+json"
         }
     
     def _check_rate_limit(self) -> Optional[Dict[str, Any]]:
         """Check GitHub API rate limit status with detailed logging."""
-        response = requests.get(f"{self._github_config.api_url}/rate_limit", headers=self._get_headers())
+        response = requests.get(f"{self.api_url}/rate_limit", headers=self._get_headers())
         
         if response.status_code != 200:
             print(f"DEBUG - Rate limit check failed: {response.status_code} - {response.text}")
@@ -224,7 +219,7 @@ class GitHubService:
     
     def fetch_repository_data(self, owner: str, repo: str) -> Dict[str, Any]:
         """Fetch basic repository information."""
-        repo_url = f"{self._github_config.api_url}/repos/{owner}/{repo}"
+        repo_url = f"{self.api_url}/repos/{owner}/{repo}"
         response = self._make_request(repo_url, 'core')
         
         if response and response.status_code == 200:
@@ -234,12 +229,12 @@ class GitHubService:
     
     def fetch_contributors(self, owner: str, repo: str) -> List[Dict[str, Any]]:
         """Fetch ALL contributors for a repository."""
-        contributors_url = f"{self._github_config.api_url}/repos/{owner}/{repo}/contributors"
+        contributors_url = f"{self.api_url}/repos/{owner}/{repo}/contributors"
         return self._paginate_list_results(contributors_url, 'core')
     
     def fetch_organization_repositories(self) -> List[Dict[str, str]]:
         """Fetch ALL repositories in the organization."""
-        repos_url = f"{self._github_config.api_url}/orgs/{self._github_config.repo_owner}/repos"
+        repos_url = f"{self.api_url}/orgs/{self.repo_owner}/repos"
         repo_list = self._paginate_list_results(repos_url, 'core')
         
         repos = []
@@ -249,12 +244,12 @@ class GitHubService:
                 "owner": repo["owner"]["login"]
             })
         
-        print(f"DEBUG - Found {len(repos)} repositories in the {self._github_config.repo_owner} organization.")
+        print(f"DEBUG - Found {len(repos)} repositories in the {self.repo_owner} organization.")
         return repos
     
     def search_pull_requests(self, owner: str, repo: str) -> Dict[str, Any]:
         """Search for ALL pull requests in a repository with complete pagination."""
-        pr_url = f"{self._github_config.api_url}/search/issues?q=repo:{owner}/{repo}+type:pr+is:merged"
+        pr_url = f"{self.api_url}/search/issues?q=repo:{owner}/{repo}+type:pr+is:merged"
         print(f"DEBUG - Collecting ALL PRs for {owner}/{repo}")
         
         results = self._paginate_search_results(pr_url, 'search')
@@ -264,7 +259,7 @@ class GitHubService:
     
     def search_issues(self, owner: str, repo: str) -> Dict[str, Any]:
         """Search for ALL issues in a repository with complete pagination."""
-        issue_url = f"{self._github_config.api_url}/search/issues?q=repo:{owner}/{repo}+type:issue"
+        issue_url = f"{self.api_url}/search/issues?q=repo:{owner}/{repo}+type:issue"
         print(f"DEBUG - Collecting ALL issues for {owner}/{repo}")
         
         results = self._paginate_search_results(issue_url, 'search')
@@ -274,7 +269,7 @@ class GitHubService:
     
     def search_commits(self, owner: str, repo: str) -> Dict[str, Any]:
         """Get ALL commits for a repository using complete pagination."""
-        commits_url = f"{self._github_config.api_url}/repos/{owner}/{repo}/commits"
+        commits_url = f"{self.api_url}/repos/{owner}/{repo}/commits"
         print(f"DEBUG - Collecting ALL commits for {owner}/{repo}")
         
         commits_list = self._paginate_list_results(commits_url, 'core')
@@ -314,10 +309,10 @@ class GitHubService:
         print("========== Collecting Organization Data ==========")
         
         # Validate GitHub token
-        if not self._github_config.token:
+        if not self.token:
             raise ValueError("GitHub token is required for API access")
         
-        masked_token = self._github_config.token[:4] + "..." + self._github_config.token[-4:] if len(self._github_config.token) > 8 else "***"
+        masked_token = self.token[:4] + "..." + self.token[-4:] if len(self.token) > 8 else "***"
         print(f"Using GitHub token: {masked_token}")
         
         # Initial rate limit check
@@ -331,7 +326,7 @@ class GitHubService:
         # Collect data for each repository
         all_data = {
             'repositories': {},
-            'organization': self._github_config.repo_owner,
+            'organization': self.repo_owner,
             'collection_timestamp': datetime.now().isoformat(),
             'total_repos': len(repos),
             'total_api_requests': 0
