@@ -62,6 +62,8 @@ jobs:
 
       - name: Process Contributions & Analytics
         env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          REPO_OWNER: ${{ secrets.REPO_OWNER }}
           PYTHONUNBUFFERED: 1
         run: |
           cd discord_bot
@@ -95,6 +97,8 @@ jobs:
 
       - name: Store Data in Firestore
         env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          REPO_OWNER: ${{ secrets.REPO_OWNER }}
           GOOGLE_APPLICATION_CREDENTIALS: discord_bot/config/credentials.json
           PYTHONUNBUFFERED: 1
         run: |
@@ -149,6 +153,8 @@ jobs:
 
       - name: Update Discord Roles & Channels
         env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          REPO_OWNER: ${{ secrets.REPO_OWNER }}
           DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
           GOOGLE_APPLICATION_CREDENTIALS: discord_bot/config/credentials.json
           PYTHONUNBUFFERED: 1
