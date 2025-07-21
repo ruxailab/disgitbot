@@ -75,7 +75,7 @@ jobs:
           pip install --user --cache-dir ~/.cache/pip -r discord_bot/config/discord_bot_requirements.txt
 
       - name: Set up Google Credentials
-        run: echo "${{ secrets.GOOGLE_CREDENTIALS_JSON }}" | base64 --decode > discord_bot/config/credentials.json
+        run: echo "${{ secrets.DEV_GOOGLE_CREDENTIALS_JSON }}" | base64 --decode > discord_bot/config/credentials.json
 
       - name: Stage 1 - Data Collection
         env:
