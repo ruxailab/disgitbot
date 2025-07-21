@@ -62,9 +62,23 @@ class ContributionProcessor:
             if issue and issue.get('user', {}).get('login') and not issue.get('pull_request'):
                 all_usernames.add(issue['user']['login'])
         
-        for commit in commits:
-            if commit and commit.get('author', {}).get('login'):
-                all_usernames.add(commit['author']['login'])
+        for i, commit in enumerate(commits):
+            print(f"DEBUG - Processing commit {i}: type={type(commit)}, value={commit}")
+            if commit is None:
+                print(f"DEBUG - Commit {i} is None, skipping")
+                continue
+            print(f"DEBUG - Commit {i} keys: {list(commit.keys()) if isinstance(commit, dict) else 'Not a dict'}")
+            author = commit.get('author')
+            print(f"DEBUG - Commit {i} author: type={type(author)}, value={author}")
+            if author is None:
+                print(f"DEBUG - Commit {i} has no author, skipping")
+                continue
+            if isinstance(author, dict) and author.get('login'):
+                login = author.get('login')
+                print(f"DEBUG - Commit {i} adding username: {login}")
+                all_usernames.add(login)
+            else:
+                print(f"DEBUG - Commit {i} author invalid: {author}")
         
         return all_usernames
     
