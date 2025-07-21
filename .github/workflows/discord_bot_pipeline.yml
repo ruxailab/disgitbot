@@ -43,84 +43,165 @@ jobs:
       - name: Set up Google Credentials
         run: echo "${{ secrets.DEV_GOOGLE_CREDENTIALS_JSON }}" | base64 --decode > discord_bot/config/credentials.json
 
-      - name: Stage 1 - Data Collection
+      - name: Collect GitHub Data
         env:
-          DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
           REPO_OWNER: ${{ secrets.REPO_OWNER }}
-          GOOGLE_APPLICATION_CREDENTIALS: discord_bot/config/credentials.json
+          PYTHONUNBUFFERED: 1
         run: |
           cd discord_bot
-          python -c "
-          import sys, os, asyncio
+          python -u -c "
+          import sys
           sys.path.insert(0, 'src')
-          from pipeline.stage_runners import run_data_collection_stage
-          success = asyncio.run(run_data_collection_stage())
-          sys.exit(0 if success else 1)
+          from core.github_service import GitHubService
+          print('Collecting GitHub data...')
+          github_service = GitHubService()
+          raw_data = github_service.collect_organization_data()
+          print(f'Collected data for {len(raw_data.get(\"repositories\", {}))} repositories')
           "
 
-      - name: Stage 2 - Data Processing
+      - name: Process Contributions & Analytics
         env:
-          DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
-          REPO_OWNER: ${{ secrets.REPO_OWNER }}
-          GOOGLE_APPLICATION_CREDENTIALS: discord_bot/config/credentials.json
+          PYTHONUNBUFFERED: 1
         run: |
           cd discord_bot
-          python -c "
-          import sys, os, asyncio
+          python -u -c "
+          import sys, json
           sys.path.insert(0, 'src')
-          from pipeline.stage_runners import run_data_processing_stage
-          success = asyncio.run(run_data_processing_stage())
-          sys.exit(0 if success else 1)
+          from core.github_service import GitHubService
+          from pipeline.processors import ContributionProcessor, AnalyticsProcessor, MetricsProcessor
+          
+          print('Loading GitHub data...')
+          github_service = GitHubService()
+          raw_data = github_service.collect_organization_data()
+          
+          print('Processing contributions...')
+          contrib_processor = ContributionProcessor()
+          contributions = contrib_processor.process_raw_data(raw_data)
+          contributions = contrib_processor.calculate_rankings(contributions)
+          contributions = contrib_processor.calculate_streaks_and_averages(contributions)
+          
+          print('Creating analytics...')
+          analytics_processor = AnalyticsProcessor()
+          hall_of_fame = analytics_processor.create_hall_of_fame_data(contributions)
+          analytics_data = analytics_processor.create_analytics_data(contributions)
+          
+          print('Calculating metrics...')
+          metrics_processor = MetricsProcessor()
+          repo_metrics = metrics_processor.create_repo_metrics(raw_data, contributions)
+          
+          print(f'Processed {len(contributions)} contributors')
           "
 
-      - name: Stage 3 - Data Storage
+      - name: Store Data in Firestore
         env:
-          DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
-          REPO_OWNER: ${{ secrets.REPO_OWNER }}
-          GOOGLE_APPLICATION_CREDENTIALS: discord_bot/config/credentials.json
-        run: |
-          cd discord_bot
-          python -c "
-          import sys, os, asyncio
-          sys.path.insert(0, 'src')
-          from pipeline.stage_runners import run_data_storage_stage
-          success = asyncio.run(run_data_storage_stage())
-          sys.exit(0 if success else 1)
-          "
-
-      - name: Stage 4 - Discord Updates
-        env:
-          DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
-          REPO_OWNER: ${{ secrets.REPO_OWNER }}
           GOOGLE_APPLICATION_CREDENTIALS: discord_bot/config/credentials.json
           PYTHONUNBUFFERED: 1
         run: |
           cd discord_bot
           python -u -c "
-          import sys, os, asyncio
+          import sys
           sys.path.insert(0, 'src')
-          print('Starting Discord Updates Stage...', flush=True)
-          from pipeline.stage_runners import run_discord_update_stage
-          print('Stage runner imported, executing...', flush=True)
-          success = asyncio.run(run_discord_update_stage())
-          print(f'Stage completed with success: {success}', flush=True)
-          sys.exit(0 if success else 1)
+          from core.github_service import GitHubService
+          from core.services import FirestoreService
+          from pipeline.processors import ContributionProcessor, AnalyticsProcessor, MetricsProcessor
+          
+          print('Collecting and processing data...')
+          github_service = GitHubService()
+          raw_data = github_service.collect_organization_data()
+          
+          contrib_processor = ContributionProcessor()
+          contributions = contrib_processor.process_raw_data(raw_data)
+          contributions = contrib_processor.calculate_rankings(contributions)
+          contributions = contrib_processor.calculate_streaks_and_averages(contributions)
+          
+          analytics_processor = AnalyticsProcessor()
+          hall_of_fame = analytics_processor.create_hall_of_fame_data(contributions)
+          analytics_data = analytics_processor.create_analytics_data(contributions)
+          
+          metrics_processor = MetricsProcessor()
+          repo_metrics = metrics_processor.create_repo_metrics(raw_data, contributions)
+          
+          print('Storing data in Firestore...')
+          storage = FirestoreService()
+          
+          # Store metrics, hall of fame, analytics
+          storage.set_document('repo_stats', 'metrics', repo_metrics)
+          storage.set_document('repo_stats', 'hall_of_fame', hall_of_fame)
+          storage.set_document('repo_stats', 'analytics', analytics_data)
+          
+          # Store user contributions
+          user_mappings = storage.query_collection('discord')
+          stored_count = 0
+          
+          for username, user_data in contributions.items():
+            discord_id = None
+            for uid, data in user_mappings.items():
+              if data.get('github_id') == username:
+                discord_id = uid
+                break
+            if discord_id:
+              if storage.update_document('discord', discord_id, user_data):
+                stored_count += 1
+          
+          print(f'Stored data for {stored_count} users')
+          "
+
+      - name: Update Discord Roles & Channels
+        env:
+          DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+          GOOGLE_APPLICATION_CREDENTIALS: discord_bot/config/credentials.json
+          PYTHONUNBUFFERED: 1
+        run: |
+          cd discord_bot
+          python -u -c "
+          import sys
+          sys.path.insert(0, 'src')
+          from core.github_service import GitHubService
+          from core.services import FirestoreService, DiscordBotService
+          from core.role_service import RoleService
+          from pipeline.processors import ContributionProcessor, AnalyticsProcessor, MetricsProcessor
+          
+          print('Collecting and processing data...')
+          github_service = GitHubService()
+          raw_data = github_service.collect_organization_data()
+          
+          contrib_processor = ContributionProcessor()
+          contributions = contrib_processor.process_raw_data(raw_data)
+          contributions = contrib_processor.calculate_rankings(contributions)
+          contributions = contrib_processor.calculate_streaks_and_averages(contributions)
+          
+          metrics_processor = MetricsProcessor()
+          repo_metrics = metrics_processor.create_repo_metrics(raw_data, contributions)
+          
+          print('Initializing Discord services...')
+          storage = FirestoreService()
+          role_service = RoleService(storage)
+          discord_service = DiscordBotService(role_service)
+          
+          print('Getting user mappings...')
+          user_mappings_data = storage.query_collection('discord')
+          user_mappings = {}
+          for discord_id, data in user_mappings_data.items():
+            github_id = data.get('github_id')
+            if github_id:
+              user_mappings[discord_id] = github_id
+          
+          print(f'Found {len(user_mappings)} user mappings')
+          
+          print('Updating Discord roles and channels...')
+          import asyncio
+          async def update_discord():
+            roles_ok = await discord_service.update_roles(user_mappings, contributions)
+            channels_ok = await discord_service.update_channels(repo_metrics)
+            return roles_ok and channels_ok
+          
+          success = asyncio.run(update_discord())
+          print(f'Discord updates completed: {success}')
           "
 
       - name: Pipeline Summary
         if: always()
         run: |
-          cd discord_bot
-          if [ -f pipeline_context.json ]; then
-            echo "Pipeline execution completed!"
-            echo "Final context summary:"
-            echo "- Pipeline context file size: $(wc -c < pipeline_context.json) bytes"
-            echo "- Data collection completed: $(grep -q 'contributions' pipeline_context.json && echo 'Yes' || echo 'No')"
-            echo "- Analytics generated: $(grep -q 'analytics_data' pipeline_context.json && echo 'Yes' || echo 'No')"
-          else
-            echo "No pipeline context found - pipeline may have failed early"
-          fi
+          echo 'Discord Bot Pipeline completed!'
+          echo 'All steps executed successfully.'
