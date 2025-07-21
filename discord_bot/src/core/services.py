@@ -1,7 +1,7 @@
 """
 Core Services
 
-Concrete implementations of core interfaces.
+Concrete implementations for Discord bot functionality.
 """
 
 import os
@@ -11,12 +11,11 @@ from typing import Dict, Any, Optional
 import firebase_admin
 from firebase_admin import credentials, firestore
 
-from .interfaces import IStorageService, IDiscordService, IGitHubService, IRoleService
+from .interfaces import IRoleService
 from .config import get_config
-from .github_service import GitHubService
 
-class FirestoreService(IStorageService):
-    """Firestore implementation of storage service."""
+class FirestoreService:
+    """Firestore implementation for data storage."""
     
     def __init__(self):
         self._db = None
@@ -75,8 +74,8 @@ class FirestoreService(IStorageService):
             print(f"Error querying collection {collection}: {e}")
             return {}
 
-class DiscordBotService(IDiscordService):
-    """Discord bot implementation of Discord service."""
+class DiscordBotService:
+    """Discord bot implementation for role and channel management."""
     
     def __init__(self, role_service: Optional[IRoleService] = None):
         self._client = None
@@ -97,14 +96,13 @@ class DiscordBotService(IDiscordService):
             self._client = discord.Client(intents=intents)
     
     async def update_roles(self, user_mappings: Dict[str, str], contributions: Dict[str, Any]) -> bool:
-        """Update user roles based on contributions - uses bot's guild context."""
+        """Update user roles based on contributions."""
         try:
             await self._ensure_client()
             
             if not self._client.is_ready():
                 await self._client.start(self._token)
             
-            # Update roles in all guilds the bot is in (using your working logic)
             total_updated = 0
             for guild in self._client.guilds:
                 print(f"Updating roles in guild: {guild.name}")
@@ -123,12 +121,11 @@ class DiscordBotService(IDiscordService):
                 await self._client.close()
     
     async def _update_roles_for_guild(self, guild: discord.Guild, user_mappings: Dict[str, str], contributions: Dict[str, Any]) -> int:
-        """Update roles for a single guild using dependency-injected role service."""
+        """Update roles for a single guild using role service."""
         if not self._role_service:
             print("Role service not available - skipping role updates")
             return 0
         
-        # Get hall of fame data and medal assignments
         hall_of_fame_data = self._role_service.get_hall_of_fame_data()
         medal_assignments = self._role_service.get_medal_assignments(hall_of_fame_data or {})
         print(f"Medal assignments: {medal_assignments}")
@@ -136,7 +133,6 @@ class DiscordBotService(IDiscordService):
         roles = {}
         existing_roles = {role.name: role for role in guild.roles}
         
-        # Get all role names from role service
         all_role_names = self._role_service.get_all_role_names()
         
         # Ensure the required roles exist or create them
@@ -147,7 +143,6 @@ class DiscordBotService(IDiscordService):
             else:
                 try:
                     print(f"Creating role: {role_name}")
-                    # Get role color from service
                     role_color = self._role_service.get_role_color(role_name)
                     if role_color:
                         roles[role_name] = await guild.create_role(
@@ -200,7 +195,7 @@ class DiscordBotService(IDiscordService):
                 new_role_names.append(medal_role)
                 print(f"Adding medal role {medal_role} to {member.name}")
             
-            # Add new roles
+            # Add roles to the member
             for role_name in new_role_names:
                 if role_name and role_name in roles:
                     try:
@@ -211,27 +206,25 @@ class DiscordBotService(IDiscordService):
             
             updated_count += 1
         
-        print(f"Role update completed for {updated_count} members in guild {guild.name}")
         return updated_count
     
     async def update_channels(self, metrics: Dict[str, Any]) -> bool:
-        """Update channel names with metrics - works exactly like your voice channel updater."""
+        """Update channel names with repository metrics."""
         try:
             await self._ensure_client()
             
             if not self._client.is_ready():
                 await self._client.start(self._token)
             
-            # Same logic as your update_voice_channel_stats function
             for guild in self._client.guilds:
                 print(f"Updating channels in guild: {guild.name}")
                 
-                # Find or create stats category (same as your code)
+                # Find or create stats category
                 stats_category = discord.utils.get(guild.categories, name="REPOSITORY STATS")
                 if not stats_category:
                     stats_category = await guild.create_category("REPOSITORY STATS")
                 
-                # Channel names (similar to your channel_names list)
+                # Channel names for all repository metrics
                 channels_to_update = [
                     f"Stars: {metrics.get('stars_count', 0)}",
                     f"Forks: {metrics.get('forks_count', 0)}",
@@ -241,7 +234,7 @@ class DiscordBotService(IDiscordService):
                     f"Commits: {metrics.get('commits_count', 0)}"
                 ]
                 
-                # Same update logic as your code
+                # Keywords for matching existing channels
                 stats_keywords = ["Stars:", "Forks:", "Contributors:", "PRs:", "Issues:", "Commits:"]
                 existing_stats_channels = {}
                 
@@ -251,6 +244,7 @@ class DiscordBotService(IDiscordService):
                             existing_stats_channels[keyword] = channel
                             break
                 
+                # Update or create channels
                 for target_name in channels_to_update:
                     keyword = target_name.split(":")[0] + ":"
                     
@@ -263,7 +257,6 @@ class DiscordBotService(IDiscordService):
                 
                 print(f"Channels updated in {guild.name}")
             
-            print("Channel metrics updated successfully")
             return True
             
         except Exception as e:
@@ -274,7 +267,7 @@ class DiscordBotService(IDiscordService):
                 await self._client.close()
     
     async def send_notification(self, channel_id: str, message: str) -> bool:
-        """Send a notification message."""
+        """Send a notification message to a specific channel."""
         try:
             await self._ensure_client()
             
@@ -282,13 +275,14 @@ class DiscordBotService(IDiscordService):
                 await self._client.start(self._token)
             
             channel = self._client.get_channel(int(channel_id))
-            if not channel:
+            if channel:
+                await channel.send(message)
+                print(f"Sent notification to channel {channel_id}")
+                return True
+            else:
                 print(f"Channel {channel_id} not found")
                 return False
-            
-            await channel.send(message)
-            return True
-            
+                
         except Exception as e:
             print(f"Error sending notification: {e}")
             return False

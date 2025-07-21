@@ -1,16 +1,15 @@
 """
 Role Service
 
-Encapsulates role determination and management logic with proper separation of concerns.
+Handles role determination and medal assignment logic.
 """
 
-import discord
 from typing import Dict, Any, Optional, Tuple, List
-from .interfaces import IRoleService, IStorageService
-from .config import get_config
+
+from .interfaces import IRoleService
 
 class RoleConfiguration:
-    """Configuration container for role thresholds and settings."""
+    """Configuration for role thresholds and settings."""
     
     def __init__(self):
         # PR Role Thresholds
@@ -40,12 +39,8 @@ class RoleConfiguration:
             "Master (501+ Commits)": 501
         }
         
-        # Medal Roles
-        self.medal_roles = [
-            "PR Champion",
-            "PR Runner-up", 
-            "PR Bronze"
-        ]
+        # Medal roles for top 3 contributors
+        self.medal_roles = ["PR Champion", "PR Runner-up", "PR Bronze"]
         
         # Role Colors (RGB tuples)
         self.role_colors = {
@@ -57,7 +52,8 @@ class RoleConfiguration:
 class RoleService(IRoleService):
     """Service for role determination and management with clean separation of concerns."""
     
-    def __init__(self, storage_service: IStorageService):
+    def __init__(self, storage_service):
+        """Initialize with a storage service for data access."""
         self.storage = storage_service
         self.config = RoleConfiguration()
     

@@ -2,64 +2,49 @@
 Individual Pipeline Stage Runners
 
 Entry points for running individual pipeline stages from GitHub Actions.
-Each stage can be run independently and passes context via JSON files.
+Each stage runs independently and passes context via JSON files.
 """
 
 import asyncio
 import json
 import sys
 import os
-from pathlib import Path
 from typing import Dict, Any
 
 # Ensure src is in path for imports
 src_path = os.path.join(os.path.dirname(__file__), '..')
 sys.path.insert(0, os.path.abspath(src_path))
 
-# Use absolute imports to avoid relative import issues
 from pipeline.orchestrator import (
     DataCollectionStage, 
     DataProcessingStage, 
     DataStorageStage, 
     DiscordUpdateStage
 )
-from core.container import container
-from core.interfaces import IStorageService, IDiscordService, IGitHubService, IRoleService
-from core.services import FirestoreService, DiscordBotService
-from core.github_service import GitHubService
-from core.role_service import RoleService
 
 CONTEXT_FILE = "pipeline_context.json"
 
-def setup_dependencies():
-    """Setup dependency injection container for individual stages."""
-    container.register_singleton(IStorageService, FirestoreService)
-    container.register_singleton(IRoleService, RoleService)
-    container.register_singleton(IDiscordService, DiscordBotService)
-    container.register_singleton(IGitHubService, GitHubService)
-
 def save_context(context: Dict[str, Any]) -> None:
-    """Save pipeline context to JSON file for next stage."""
+    """Save pipeline context to JSON file."""
     try:
         with open(CONTEXT_FILE, 'w') as f:
             json.dump(context, f, indent=2)
-        print(f"✓ Context saved to {CONTEXT_FILE}")
     except Exception as e:
-        print(f"Warning: Failed to save context: {e}")
+        print(f"Failed to save context: {e}")
 
 def load_context() -> Dict[str, Any]:
-    """Load pipeline context from JSON file from previous stage."""
+    """Load pipeline context from JSON file."""
+    if not os.path.exists(CONTEXT_FILE):
+        print(f"✓ Context loaded from {CONTEXT_FILE}")
+        return {}
+    
     try:
-        if os.path.exists(CONTEXT_FILE):
-            with open(CONTEXT_FILE, 'r') as f:
-                context = json.load(f)
-            print(f"✓ Context loaded from {CONTEXT_FILE}")
-            return context
-        else:
-            print(f"No context file found ({CONTEXT_FILE}), starting with empty context")
-            return {}
+        with open(CONTEXT_FILE, 'r') as f:
+            context = json.load(f)
+        print(f"✓ Context loaded from {CONTEXT_FILE}")
+        return context
     except Exception as e:
-        print(f"Warning: Failed to load context: {e}")
+        print(f"Failed to load context: {e}")
         return {}
 
 async def run_data_collection_stage():
@@ -69,13 +54,9 @@ async def run_data_collection_stage():
     print("="*60)
     
     try:
-        setup_dependencies()
-        github_service = container.resolve(IGitHubService)
-        stage = DataCollectionStage(github_service)
-        
+        stage = DataCollectionStage()
         context = {}
         result = await stage.execute(context)
-        
         save_context(result)
         
         print("✓ Data collection stage completed successfully")
@@ -96,9 +77,7 @@ async def run_data_processing_stage():
     try:
         context = load_context()
         stage = DataProcessingStage()
-        
         result = await stage.execute(context)
-        
         save_context(result)
         
         print("✓ Data processing stage completed successfully")
@@ -117,13 +96,9 @@ async def run_data_storage_stage():
     print("="*60)
     
     try:
-        setup_dependencies()
-        storage_service = container.resolve(IStorageService)
-        stage = DataStorageStage(storage_service)
-        
         context = load_context()
+        stage = DataStorageStage()
         result = await stage.execute(context)
-        
         save_context(result)
         
         print("✓ Data storage stage completed successfully")
@@ -142,14 +117,9 @@ async def run_discord_update_stage():
     print("="*60)
     
     try:
-        setup_dependencies()
-        storage_service = container.resolve(IStorageService)
-        discord_service = container.resolve(IDiscordService)
-        stage = DiscordUpdateStage(discord_service, storage_service)
-        
         context = load_context()
+        stage = DiscordUpdateStage()
         result = await stage.execute(context)
-        
         save_context(result)
         
         print("✓ Discord updates stage completed successfully")
