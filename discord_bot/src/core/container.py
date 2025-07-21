@@ -5,7 +5,6 @@ Dependency injection container for managing service instances and dependencies.
 """
 
 from typing import Dict, Any, TypeVar, Type, Optional, Callable
-from .interfaces import IStorageService, IDiscordService, IDataProcessor, IGitHubService
 
 T = TypeVar('T')
 

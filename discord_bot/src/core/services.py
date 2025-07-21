@@ -11,7 +11,9 @@ from typing import Dict, Any, Optional
 import firebase_admin
 from firebase_admin import credentials, firestore
 
-from .interfaces import IStorageService, IDiscordService
+from .interfaces import IStorageService, IDiscordService, IGitHubService
+from .config import get_config
+from .github_service import GitHubService
 
 class FirestoreService(IStorageService):
     """Firestore implementation of storage service."""
@@ -21,17 +23,13 @@ class FirestoreService(IStorageService):
         self._initialize_firebase()
     
     def _initialize_firebase(self):
-        """Initialize Firebase connection."""
+        """Initialize Firebase connection using centralized configuration."""
         if not firebase_admin._apps:
-            script_dir = os.path.dirname(os.path.abspath(__file__))
-            config_path = os.path.join(script_dir, "../../../config/credentials.json")
-            config_path = os.path.abspath(config_path)
+            config = get_config()
+            config_path = config.get_firebase_credentials_path()
             
-            if os.path.exists(config_path):
-                cred = credentials.Certificate(config_path)
-                firebase_admin.initialize_app(cred)
-            else:
-                raise FileNotFoundError(f"Firebase credentials not found at {config_path}")
+            cred = credentials.Certificate(config_path)
+            firebase_admin.initialize_app(cred)
         
         self._db = firestore.client()
     
@@ -82,7 +80,10 @@ class DiscordBotService(IDiscordService):
     
     def __init__(self):
         self._client = None
-        self._token = os.getenv("DISCORD_BOT_TOKEN")
+        config = get_config()
+        discord_config = config.get_discord_config()
+        self._token = discord_config.bot_token
+        
         if not self._token:
             raise ValueError("DISCORD_BOT_TOKEN environment variable is required")
     

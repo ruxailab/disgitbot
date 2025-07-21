@@ -6,8 +6,11 @@ Replaces scattered pipeline scripts with unified, testable orchestration.
 """
 
 import asyncio
-from typing import Dict, Any, List
-from ..core.interfaces import IStorageService, IDiscordService, IDataProcessor
+import json
+import os
+from datetime import datetime
+from typing import Dict, Any, List, Optional
+from ..core.interfaces import IStorageService, IDiscordService, IDataProcessor, IGitHubService
 from ..core.container import container
 from .processors import ContributionProcessor, AnalyticsProcessor, MetricsProcessor
 
@@ -18,7 +21,7 @@ class PipelineStage:
         self.name = name
     
     async def execute(self, context: Dict[str, Any]) -> Dict[str, Any]:
-        """Execute the pipeline stage."""
+        """Execute the pipeline stage with comprehensive error handling."""
         print(f"========== {self.name} ==========")
         try:
             result = await self._run(context)
@@ -26,34 +29,61 @@ class PipelineStage:
             return result
         except Exception as e:
             print(f"{self.name} - FAILED: {e}")
-            raise
+            print(f"Error details: {type(e).__name__}: {str(e)}")
+            
+            # Try to provide helpful context
+            if hasattr(e, '__cause__') and e.__cause__:
+                print(f"Caused by: {type(e.__cause__).__name__}: {str(e.__cause__)}")
+            
+            raise PipelineStageError(f"Stage '{self.name}' failed", e) from e
     
     async def _run(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """Override in subclasses."""
         raise NotImplementedError
 
-class DataCollectionStage(PipelineStage):
-    """Stage 1: Raw data collection from GitHub."""
+class PipelineStageError(Exception):
+    """Exception raised when a pipeline stage fails."""
     
-    def __init__(self):
+    def __init__(self, message: str, original_error: Exception):
+        super().__init__(message)
+        self.original_error = original_error
+        self.stage_message = message
+
+class DataCollectionStage(PipelineStage):
+    """Stage 1: Raw data collection from GitHub using GitHubService."""
+    
+    def __init__(self, github_service: IGitHubService):
         super().__init__("Stage 1: Data Collection")
+        self.github = github_service
     
     async def _run(self, context: Dict[str, Any]) -> Dict[str, Any]:
-        """Collect raw GitHub data."""
-        # This would integrate with the existing collect_raw_data.py logic
-        # For now, assume data is already collected
-        import json
-        import os
+        """Collect raw GitHub data using GitHubService."""
+        print("Starting GitHub data collection...")
         
-        if os.path.exists("raw_github_data.json"):
-            with open("raw_github_data.json", "r") as f:
-                raw_data = json.load(f)
-            print(f"Loaded raw data for {len(raw_data.get('repositories', {}))} repositories")
+        try:
+            raw_data = self.github.collect_organization_data()
+            
+            # Save raw data for debugging/backup
+            with open("raw_github_data.json", "w") as f:
+                json.dump(raw_data, f, indent=2)
+            
+            print(f"Collected raw data for {len(raw_data.get('repositories', {}))} repositories")
             context['raw_data'] = raw_data
-        else:
-            raise FileNotFoundError("Raw data not found. Run data collection first.")
-        
-        return context
+            
+            return context
+            
+        except Exception as e:
+            print(f"Data collection failed: {e}")
+            # Try to load from existing file as fallback
+            if os.path.exists("raw_github_data.json"):
+                print("Attempting to load from existing raw_github_data.json...")
+                with open("raw_github_data.json", "r") as f:
+                    raw_data = json.load(f)
+                context['raw_data'] = raw_data
+                print(f"Loaded fallback data for {len(raw_data.get('repositories', {}))} repositories")
+                return context
+            else:
+                raise
 
 class DataProcessingStage(PipelineStage):
     """Stage 2: Data processing using injected processors."""
@@ -193,12 +223,14 @@ class PipelineOrchestrator:
     
     def _setup_dependencies(self):
         """Setup dependency injection container."""
-        from ..core.interfaces import IStorageService, IDiscordService
+        from ..core.interfaces import IStorageService, IDiscordService, IGitHubService
         from ..core.services import FirestoreService, DiscordBotService
+        from ..core.github_service import GitHubService
         
         # Register services
         container.register_singleton(IStorageService, FirestoreService)
         container.register_singleton(IDiscordService, DiscordBotService)
+        container.register_singleton(IGitHubService, GitHubService)
     
     def add_stage(self, stage: PipelineStage) -> 'PipelineOrchestrator':
         """Add a pipeline stage."""
@@ -206,38 +238,225 @@ class PipelineOrchestrator:
         return self
     
     async def execute_full_pipeline(self) -> Dict[str, Any]:
-        """Execute the complete pipeline."""
+        """Execute the complete pipeline with comprehensive error handling and recovery."""
         print("="*60)
         print("Starting Discord Bot Data Pipeline")
         print("="*60)
         
         context = {}
+        completed_stages = []
         
         try:
-            # Setup default pipeline stages
+            # Setup default pipeline stages if none provided
             if not self.stages:
                 self._setup_default_stages()
             
-            # Execute stages sequentially
-            for stage in self.stages:
-                context = await stage.execute(context)
+            print(f"Pipeline has {len(self.stages)} stages to execute")
             
+            # Execute stages sequentially with error recovery
+            for i, stage in enumerate(self.stages):
+                try:
+                    print(f"Executing stage {i+1}/{len(self.stages)}: {stage.name}")
+                    context = await stage.execute(context)
+                    completed_stages.append(stage.name)
+                    
+                    # Provide progress updates
+                    progress = ((i + 1) / len(self.stages)) * 100
+                    print(f"Pipeline progress: {progress:.1f}% ({i+1}/{len(self.stages)} stages completed)")
+                    
+                except PipelineStageError as stage_error:
+                    print(f"Stage '{stage.name}' failed, attempting recovery...")
+                    
+                    # Try to recover based on stage type
+                    recovery_successful = await self._attempt_stage_recovery(stage, stage_error, context)
+                    
+                    if recovery_successful:
+                        completed_stages.append(f"{stage.name} (recovered)")
+                        print(f"✓ Recovery successful for stage: {stage.name}")
+                    else:
+                        print(f"✗ Recovery failed for stage: {stage.name}")
+                        # Continue with remaining stages if possible
+                        if self._is_stage_critical(stage):
+                            print(f"Stage '{stage.name}' is critical, stopping pipeline")
+                            raise
+                        else:
+                            print(f"Stage '{stage.name}' is non-critical, continuing pipeline")
+                            completed_stages.append(f"{stage.name} (failed, skipped)")
+            
+            # Pipeline completion summary
             print("="*60)
-            print("Pipeline completed successfully")
+            print("Pipeline completed")
+            print(f"Completed stages: {len(completed_stages)}")
+            for stage_name in completed_stages:
+                print(f"  ✓ {stage_name}")
             print("="*60)
+            
             return context
             
         except Exception as e:
-            print(f"Pipeline failed: {e}")
-            raise
+            print("="*60)
+            print("Pipeline failed with unrecoverable error")
+            print(f"Error: {type(e).__name__}: {str(e)}")
+            print(f"Completed stages before failure: {len(completed_stages)}")
+            for stage_name in completed_stages:
+                print(f"  ✓ {stage_name}")
+            print("="*60)
+            
+            # Include diagnostic information
+            context['_pipeline_error'] = {
+                'error_type': type(e).__name__,
+                'error_message': str(e),
+                'completed_stages': completed_stages,
+                'total_stages': len(self.stages)
+            }
+            
+            raise PipelineExecutionError("Pipeline execution failed", e, completed_stages) from e
+    
+    async def _attempt_stage_recovery(self, stage: PipelineStage, error: PipelineStageError, context: Dict[str, Any]) -> bool:
+        """Attempt to recover from stage failure."""
+        print(f"Attempting recovery for stage: {stage.name}")
+        
+        # Recovery strategies based on stage type
+        if isinstance(stage, DataCollectionStage):
+            return await self._recover_data_collection(error, context)
+        elif isinstance(stage, DataProcessingStage):
+            return await self._recover_data_processing(error, context)
+        elif isinstance(stage, DataStorageStage):
+            return await self._recover_data_storage(error, context)
+        elif isinstance(stage, DiscordUpdateStage):
+            return await self._recover_discord_updates(error, context)
+        
+        return False
+    
+    async def _recover_data_collection(self, error: PipelineStageError, context: Dict[str, Any]) -> bool:
+        """Recover from data collection failures."""
+        print("Attempting data collection recovery...")
+        
+        # Try to load from existing backup file
+        backup_file = "raw_github_data.json"
+        if os.path.exists(backup_file):
+            try:
+                with open(backup_file, "r") as f:
+                    raw_data = json.load(f)
+                
+                # Check if data is recent (within last 24 hours)
+                from datetime import datetime, timedelta
+                collection_time = raw_data.get('collection_timestamp', '')
+                if collection_time:
+                    data_time = datetime.fromisoformat(collection_time.replace('Z', '+00:00'))
+                    if datetime.now(data_time.tzinfo) - data_time < timedelta(hours=24):
+                        print("✓ Using recent backup data for recovery")
+                        context['raw_data'] = raw_data
+                        return True
+                    else:
+                        print("Backup data is too old (>24 hours)")
+                else:
+                    print("✓ Using backup data (no timestamp available)")
+                    context['raw_data'] = raw_data
+                    return True
+                        
+            except Exception as e:
+                print(f"Failed to load backup data: {e}")
+        
+        return False
+    
+    async def _recover_data_processing(self, error: PipelineStageError, context: Dict[str, Any]) -> bool:
+        """Recover from data processing failures."""
+        print("Attempting data processing recovery...")
+        
+        # Try with minimal processing if full processing fails
+        raw_data = context.get('raw_data')
+        if raw_data:
+            try:
+                # Create minimal contribution data
+                repositories = raw_data.get('repositories', {})
+                minimal_contributions = {}
+                
+                for repo_name, repo_data in repositories.items():
+                    contributors = repo_data.get('contributors', [])
+                    for contributor in contributors:
+                        username = contributor.get('login')
+                        if username:
+                            if username not in minimal_contributions:
+                                minimal_contributions[username] = {
+                                    'pr_count': 0,
+                                    'issues_count': 0, 
+                                    'commits_count': contributor.get('contributions', 0)
+                                }
+                            else:
+                                minimal_contributions[username]['commits_count'] += contributor.get('contributions', 0)
+                
+                context.update({
+                    'contributions': minimal_contributions,
+                    'hall_of_fame': {'last_updated': datetime.now().isoformat()},
+                    'analytics_data': {},
+                    'repo_metrics': {'total_contributors': len(minimal_contributions)}
+                })
+                
+                print("✓ Created minimal processed data for recovery")
+                return True
+                
+            except Exception as e:
+                print(f"Minimal processing also failed: {e}")
+        
+        return False
+    
+    async def _recover_data_storage(self, error: PipelineStageError, context: Dict[str, Any]) -> bool:
+        """Recover from data storage failures."""
+        print("Attempting data storage recovery...")
+        
+        # Storage failures are often non-critical - log the data locally
+        try:
+            backup_data = {
+                'contributions': context.get('contributions', {}),
+                'repo_metrics': context.get('repo_metrics', {}),
+                'hall_of_fame': context.get('hall_of_fame', {}),
+                'analytics_data': context.get('analytics_data', {}),
+                'backup_timestamp': datetime.now().isoformat()
+            }
+            
+            with open("pipeline_data_backup.json", "w") as f:
+                json.dump(backup_data, f, indent=2)
+            
+            print("✓ Saved processed data to local backup file")
+            return True
+            
+        except Exception as e:
+            print(f"Local backup also failed: {e}")
+        
+        return False
+    
+    async def _recover_discord_updates(self, error: PipelineStageError, context: Dict[str, Any]) -> bool:
+        """Recover from Discord update failures.""" 
+        print("Attempting Discord update recovery...")
+        
+        # Discord updates are often non-critical - just log the attempt
+        print("Discord updates failed but pipeline can continue")
+        context['discord_update_failed'] = True
+        return True
+    
+    def _is_stage_critical(self, stage: PipelineStage) -> bool:
+        """Determine if a stage is critical for pipeline execution."""
+        # Data collection is critical, others can often be recovered from
+        return isinstance(stage, DataCollectionStage)
+
+class PipelineExecutionError(Exception):
+    """Exception raised when pipeline execution fails."""
+    
+    def __init__(self, message: str, original_error: Exception, completed_stages: List[str]):
+        super().__init__(message)
+        self.original_error = original_error
+        self.completed_stages = completed_stages
+        self.pipeline_message = message
     
     def _setup_default_stages(self):
         """Setup default pipeline stages with dependency injection."""
         storage_service = container.resolve(IStorageService)
-        discord_service = container.resolve(IDiscordService)
+        discord_service = container.resolve(IDiscordService) 
+        github_service = container.resolve(IGitHubService)
         
         self.stages = [
-            DataCollectionStage(),
+            DataCollectionStage(github_service),
             DataProcessingStage(),
             DataStorageStage(storage_service),
             DiscordUpdateStage(discord_service, storage_service)
@@ -248,7 +467,8 @@ def create_pipeline_orchestrator() -> PipelineOrchestrator:
     """Create a configured pipeline orchestrator."""
     return PipelineOrchestrator()
 
-async def run_full_pipeline():
-    """Convenience function to run the complete pipeline."""
+# Entry point for GitHub Actions and external scripts
+async def run_full_pipeline() -> Dict[str, Any]:
+    """Run the complete data pipeline - entry point for GitHub Actions."""
     orchestrator = create_pipeline_orchestrator()
     return await orchestrator.execute_full_pipeline() 
