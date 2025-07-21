@@ -1,7 +1,7 @@
 """
 Core Services
 
-Concrete implementations for Discord bot functionality.
+Simple functions for Discord bot functionality.
 """
 
 import os
@@ -11,80 +11,74 @@ from typing import Dict, Any, Optional
 import firebase_admin
 from firebase_admin import credentials, firestore
 
+from .config import get_discord_token, get_firebase_credentials_path
 
-from .config import get_config
+# Initialize Firebase once
+_db = None
 
-class FirestoreService:
-    """Firestore implementation for data storage."""
-    
-    def __init__(self):
-        self._db = None
-        self._initialize_firebase()
-    
-    def _initialize_firebase(self):
-        """Initialize Firebase connection using centralized configuration."""
+def _get_firestore_client():
+    """Get Firestore client, initializing if needed."""
+    global _db
+    if _db is None:
         if not firebase_admin._apps:
-            config = get_config()
-            config_path = config.get_firebase_credentials_path()
-            
+            config_path = get_firebase_credentials_path()
             cred = credentials.Certificate(config_path)
             firebase_admin.initialize_app(cred)
+        _db = firestore.client()
+    return _db
+
+def get_document(collection: str, document_id: str) -> Optional[Dict[str, Any]]:
+    """Get a document from Firestore."""
+    try:
+        db = _get_firestore_client()
+        doc = db.collection(collection).document(document_id).get()
+        return doc.to_dict() if doc.exists else None
+    except Exception as e:
+        print(f"Error getting document {collection}/{document_id}: {e}")
+        return None
+
+def set_document(collection: str, document_id: str, data: Dict[str, Any], merge: bool = False) -> bool:
+    """Set a document in Firestore."""
+    try:
+        db = _get_firestore_client()
+        db.collection(collection).document(document_id).set(data, merge=merge)
+        return True
+    except Exception as e:
+        print(f"Error setting document {collection}/{document_id}: {e}")
+        return False
+
+def update_document(collection: str, document_id: str, data: Dict[str, Any]) -> bool:
+    """Update a document in Firestore."""
+    try:
+        db = _get_firestore_client()
+        db.collection(collection).document(document_id).update(data)
+        return True
+    except Exception as e:
+        print(f"Error updating document {collection}/{document_id}: {e}")
+        return False
+
+def query_collection(collection: str, filters: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Query a collection with optional filters."""
+    try:
+        db = _get_firestore_client()
+        query = db.collection(collection)
         
-        self._db = firestore.client()
-    
-    def get_document(self, collection: str, document_id: str) -> Optional[Dict[str, Any]]:
-        """Get a document from Firestore."""
-        try:
-            doc = self._db.collection(collection).document(document_id).get()
-            return doc.to_dict() if doc.exists else None
-        except Exception as e:
-            print(f"Error getting document {collection}/{document_id}: {e}")
-            return None
-    
-    def set_document(self, collection: str, document_id: str, data: Dict[str, Any], merge: bool = False) -> bool:
-        """Set a document in Firestore."""
-        try:
-            self._db.collection(collection).document(document_id).set(data, merge=merge)
-            return True
-        except Exception as e:
-            print(f"Error setting document {collection}/{document_id}: {e}")
-            return False
-    
-    def update_document(self, collection: str, document_id: str, data: Dict[str, Any]) -> bool:
-        """Update a document in Firestore."""
-        try:
-            self._db.collection(collection).document(document_id).update(data)
-            return True
-        except Exception as e:
-            print(f"Error updating document {collection}/{document_id}: {e}")
-            return False
-    
-    def query_collection(self, collection: str, filters: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """Query a collection with optional filters."""
-        try:
-            query = self._db.collection(collection)
-            
-            if filters:
-                for field, value in filters.items():
-                    query = query.where(field, '==', value)
-            
-            docs = query.stream()
-            return {doc.id: doc.to_dict() for doc in docs}
-        except Exception as e:
-            print(f"Error querying collection {collection}: {e}")
-            return {}
+        if filters:
+            for field, value in filters.items():
+                query = query.where(field, '==', value)
+        
+        docs = query.stream()
+        return {doc.id: doc.to_dict() for doc in docs}
+    except Exception as e:
+        print(f"Error querying collection {collection}: {e}")
+        return {}
 
 class DiscordBotService:
     """Discord bot implementation for role and channel management."""
     
     def __init__(self, role_service = None):
-        config = get_config()
-        discord_config = config.get_discord_config()
-        self._token = discord_config.bot_token
+        self._token = get_discord_token()
         self._role_service = role_service
-        
-        if not self._token:
-            raise ValueError("DISCORD_BOT_TOKEN environment variable is required")
     
     async def update_roles_and_channels(self, user_mappings: Dict[str, str], contributions: Dict[str, Any], metrics: Dict[str, Any]) -> bool:
         """Update Discord roles and channels in a single connection session."""

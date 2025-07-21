@@ -4,18 +4,18 @@ Core Module
 Service management and configuration for the Discord bot.
 """
 
-
-from .services import FirestoreService, DiscordBotService
+from .services import (
+    get_document, set_document, update_document, query_collection,
+    DiscordBotService
+)
 from .github_service import GitHubService
 from .role_service import RoleService
-from .config import ConfigurationManager, get_config, create_config_manager
+from . import config
 
 __all__ = [
-    'FirestoreService',
-    'DiscordBotService', 
-    'GitHubService',
+    'get_document', 'set_document', 'update_document', 'query_collection',
+    'DiscordBotService',
+    'GitHubService', 
     'RoleService',
-    'ConfigurationManager',
-    'get_config',
-    'create_config_manager'
+    'config'
 ] 

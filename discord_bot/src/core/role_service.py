@@ -52,9 +52,8 @@ class RoleConfiguration:
 class RoleService:
     """Service for role determination and management with clean separation of concerns."""
     
-    def __init__(self, storage_service):
-        """Initialize with a storage service for data access."""
-        self.storage = storage_service
+    def __init__(self):
+        """Initialize role service."""
         self.config = RoleConfiguration()
     
     def determine_roles(self, pr_count: int, issues_count: int, commits_count: int) -> Tuple[Optional[str], Optional[str], Optional[str]]:
@@ -103,7 +102,8 @@ class RoleService:
     
     def get_hall_of_fame_data(self) -> Optional[Dict[str, Any]]:
         """Get hall of fame data from storage."""
-        return self.storage.get_document('repo_stats', 'hall_of_fame')
+        from .services import get_document
+        return get_document('repo_stats', 'hall_of_fame')
     
     def get_next_role(self, current_role: str, stats_type: str) -> str:
         """Determine the next role based on current role and stats type."""

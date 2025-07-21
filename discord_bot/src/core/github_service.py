@@ -11,7 +11,7 @@ from typing import Dict, List, Any, Optional
 import os
 
 class GitHubService:
-    """Professional GitHub API service with comprehensive data collection and rate limiting."""
+    """GitHub API service for data collection."""
     
     def __init__(self):
         self.api_url = "https://api.github.com"

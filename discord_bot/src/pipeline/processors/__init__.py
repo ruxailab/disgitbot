@@ -1,11 +1,11 @@
 """
-Data Processing Modules
+Data Processing Functions
 
-Modular processors for transforming raw GitHub data into structured analytics.
+Simple functions for transforming raw GitHub data into structured analytics.
 """
 
-from pipeline.processors.contribution_processor import ContributionProcessor
-from pipeline.processors.analytics_processor import AnalyticsProcessor
-from pipeline.processors.metrics_processor import MetricsProcessor
+import pipeline.processors.contribution_processor as contribution_functions
+import pipeline.processors.analytics_processor as analytics_functions  
+import pipeline.processors.metrics_processor as metrics_functions
 
-__all__ = ['ContributionProcessor', 'AnalyticsProcessor', 'MetricsProcessor'] 
+__all__ = ['contribution_functions', 'analytics_functions', 'metrics_functions'] 

@@ -79,19 +79,19 @@ jobs:
             raw_data = json.load(f)
           
           print('Processing contributions...')
-          contrib_processor = ContributionProcessor()
-          contributions = contrib_processor.process_raw_data(raw_data)
-          contributions = contrib_processor.calculate_rankings(contributions)
-          contributions = contrib_processor.calculate_streaks_and_averages(contributions)
+          from pipeline.processors import contribution_functions
+          contributions = contribution_functions.process_raw_data(raw_data)
+          contributions = contribution_functions.calculate_rankings(contributions)
+          contributions = contribution_functions.calculate_streaks_and_averages(contributions)
           
           print('Creating analytics...')
-          analytics_processor = AnalyticsProcessor()
-          hall_of_fame = analytics_processor.create_hall_of_fame_data(contributions)
-          analytics_data = analytics_processor.create_analytics_data(contributions)
+          from pipeline.processors import analytics_functions
+          hall_of_fame = analytics_functions.create_hall_of_fame_data(contributions)
+          analytics_data = analytics_functions.create_analytics_data(contributions)
           
           print('Calculating metrics...')
-          metrics_processor = MetricsProcessor()
-          repo_metrics = metrics_processor.create_repo_metrics(raw_data, contributions)
+          from pipeline.processors import metrics_functions
+          repo_metrics = metrics_functions.create_repo_metrics(raw_data, contributions)
           
           print(f'Processed {len(contributions)} contributors')
           
@@ -129,13 +129,13 @@ jobs:
           repo_metrics = data['repo_metrics']
           
           print('Storing data in Firestore...')
-          storage = FirestoreService()
+          from core.services import set_document, query_collection, update_document
           
-          storage.set_document('repo_stats', 'metrics', repo_metrics)
-          storage.set_document('repo_stats', 'hall_of_fame', hall_of_fame)
-          storage.set_document('repo_stats', 'analytics', analytics_data)
+          set_document('repo_stats', 'metrics', repo_metrics)
+          set_document('repo_stats', 'hall_of_fame', hall_of_fame)
+          set_document('repo_stats', 'analytics', analytics_data)
           
-          user_mappings = storage.query_collection('discord')
+          user_mappings = query_collection('discord')
           stored_count = 0
           
           for username, user_data in contributions.items():
@@ -145,7 +145,7 @@ jobs:
                 discord_id = uid
                 break
             if discord_id:
-              if storage.update_document('discord', discord_id, user_data):
+              if update_document('discord', discord_id, user_data):
                 stored_count += 1
           
           print(f'Stored data for {stored_count} users')
@@ -172,12 +172,12 @@ jobs:
           repo_metrics = data['repo_metrics']
           
           print('Initializing Discord services...')
-          storage = FirestoreService()
-          role_service = RoleService(storage)
+          from core.services import query_collection
+          role_service = RoleService()
           discord_service = DiscordBotService(role_service)
           
           print('Getting user mappings...')
-          user_mappings_data = storage.query_collection('discord')
+          user_mappings_data = query_collection('discord')
           user_mappings = {}
           for discord_id, data in user_mappings_data.items():
             github_id = data.get('github_id')
