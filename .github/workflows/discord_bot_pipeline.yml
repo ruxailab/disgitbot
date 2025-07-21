@@ -72,25 +72,22 @@ jobs:
           python -u -c "
           import sys, json
           sys.path.insert(0, 'src')
-          from pipeline.processors import ContributionProcessor, AnalyticsProcessor, MetricsProcessor
+          from pipeline.processors import contribution_functions, analytics_functions, metrics_functions
           
           print('Loading raw data...')
           with open('raw_data.json', 'r') as f:
             raw_data = json.load(f)
           
           print('Processing contributions...')
-          from pipeline.processors import contribution_functions
           contributions = contribution_functions.process_raw_data(raw_data)
           contributions = contribution_functions.calculate_rankings(contributions)
           contributions = contribution_functions.calculate_streaks_and_averages(contributions)
           
           print('Creating analytics...')
-          from pipeline.processors import analytics_functions
           hall_of_fame = analytics_functions.create_hall_of_fame_data(contributions)
           analytics_data = analytics_functions.create_analytics_data(contributions)
           
           print('Calculating metrics...')
-          from pipeline.processors import metrics_functions
           repo_metrics = metrics_functions.create_repo_metrics(raw_data, contributions)
           
           print(f'Processed {len(contributions)} contributors')
