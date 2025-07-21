@@ -15,12 +15,7 @@ from typing import Dict, Any
 src_path = os.path.join(os.path.dirname(__file__), '..')
 sys.path.insert(0, os.path.abspath(src_path))
 
-from pipeline.orchestrator import (
-    DataCollectionStage, 
-    DataProcessingStage, 
-    DataStorageStage, 
-    DiscordUpdateStage
-)
+from pipeline.orchestrator import collect_data, process_data, store_data, update_discord
 
 CONTEXT_FILE = "pipeline_context.json"
 
@@ -35,7 +30,6 @@ def save_context(context: Dict[str, Any]) -> None:
 def load_context() -> Dict[str, Any]:
     """Load pipeline context from JSON file."""
     if not os.path.exists(CONTEXT_FILE):
-        print(f"✓ Context loaded from {CONTEXT_FILE}")
         return {}
     
     try:
@@ -54,10 +48,8 @@ async def run_data_collection_stage():
     print("="*60)
     
     try:
-        stage = DataCollectionStage()
-        context = {}
-        result = await stage.execute(context)
-        save_context(result)
+        context = await collect_data()
+        save_context(context)
         
         print("✓ Data collection stage completed successfully")
         return True
@@ -76,8 +68,7 @@ async def run_data_processing_stage():
     
     try:
         context = load_context()
-        stage = DataProcessingStage()
-        result = await stage.execute(context)
+        result = await process_data(context)
         save_context(result)
         
         print("✓ Data processing stage completed successfully")
@@ -97,8 +88,7 @@ async def run_data_storage_stage():
     
     try:
         context = load_context()
-        stage = DataStorageStage()
-        result = await stage.execute(context)
+        result = await store_data(context)
         save_context(result)
         
         print("✓ Data storage stage completed successfully")
@@ -118,8 +108,7 @@ async def run_discord_update_stage():
     
     try:
         context = load_context()
-        stage = DiscordUpdateStage()
-        result = await stage.execute(context)
+        result = await update_discord(context)
         save_context(result)
         
         print("✓ Discord updates stage completed successfully")
