@@ -53,15 +53,15 @@ def _extract_usernames(contributors, pull_requests, issues, commits):
             all_usernames.add(contributor['login'])
     
     for pr in pull_requests:
-        if pr and pr.get('user', {}).get('login'):
+        if pr and pr.get('user') and pr['user'].get('login'):
             all_usernames.add(pr['user']['login'])
     
     for issue in issues:
-        if issue and issue.get('user', {}).get('login'):
+        if issue and issue.get('user') and issue['user'].get('login'):
             all_usernames.add(issue['user']['login'])
     
     for commit in commits:
-        if commit and commit.get('author', {}).get('login'):
+        if commit and commit.get('author') and commit['author'].get('login'):
             all_usernames.add(commit['author']['login'])
     
     return all_usernames
@@ -92,27 +92,30 @@ def _process_user_contributions(username, pull_requests, issues, commits, all_co
     
     # Process PRs
     for pr in pull_requests:
-        if pr and pr.get('user', {}).get('login') == username:
+        if pr and pr.get('user') and pr['user'].get('login') == username:
             user_data['pr_count'] += 1
             _update_activity_counts(pr.get('created_at', ''), user_data)
             
-            if 'repository' in pr:
-                repo_name = pr['repository'].get('name', 'unknown')
+            if pr.get('repository') and pr['repository'].get('name'):
+                repo_name = pr['repository']['name']
                 user_data['repositories'].add(repo_name)
     
     # Process issues
     for issue in issues:
-        if issue and issue.get('user', {}).get('login') == username:
+        if issue and issue.get('user') and issue['user'].get('login') == username:
             if not issue.get('pull_request'):  # Exclude PRs counted as issues
                 user_data['issues_count'] += 1
                 _update_activity_counts(issue.get('created_at', ''), user_data)
     
     # Process commits
     for commit in commits:
-        if commit and commit.get('author', {}).get('login') == username:
+        if commit and commit.get('author') and commit['author'].get('login') == username:
             user_data['commits_count'] += 1
-            commit_date = commit.get('commit', {}).get('author', {}).get('date', '')
-            _update_activity_counts(commit_date, user_data)
+            # Safe nested access for commit date
+            commit_obj = commit.get('commit')
+            if commit_obj and commit_obj.get('author'):
+                commit_date = commit_obj['author'].get('date', '')
+                _update_activity_counts(commit_date, user_data)
 
 def _update_activity_counts(date_str, user_data):
     """Update activity counters based on date."""
