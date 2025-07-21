@@ -30,15 +30,16 @@ def save_context(context: Dict[str, Any]) -> None:
 def load_context() -> Dict[str, Any]:
     """Load pipeline context from JSON file."""
     if not os.path.exists(CONTEXT_FILE):
+        print(f"No context file found at {CONTEXT_FILE}", flush=True)
         return {}
     
     try:
         with open(CONTEXT_FILE, 'r') as f:
             context = json.load(f)
-        print(f"✓ Context loaded from {CONTEXT_FILE}")
+        print(f"✓ Context loaded from {CONTEXT_FILE}", flush=True)
         return context
     except Exception as e:
-        print(f"Failed to load context: {e}")
+        print(f"Failed to load context: {e}", flush=True)
         return {}
 
 async def run_data_collection_stage():
@@ -102,20 +103,23 @@ async def run_data_storage_stage():
 
 async def run_discord_update_stage():
     """Run Stage 4: Discord Updates"""
-    print("="*60)
-    print("STAGE 4: DISCORD UPDATES")
-    print("="*60)
+    print("="*60, flush=True)
+    print("STAGE 4: DISCORD UPDATES", flush=True)
+    print("="*60, flush=True)
     
     try:
+        print("Loading pipeline context...", flush=True)
         context = load_context()
+        print("Calling Discord update function...", flush=True)
         result = await update_discord(context)
+        print("Saving updated context...", flush=True)
         save_context(result)
         
-        print("✓ Discord updates stage completed successfully")
+        print("✓ Discord updates stage completed successfully", flush=True)
         return True
         
     except Exception as e:
-        print(f"✗ Discord updates stage failed: {e}")
+        print(f"✗ Discord updates stage failed: {e}", flush=True)
         import traceback
         traceback.print_exc()
         return False
