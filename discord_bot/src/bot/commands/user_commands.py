@@ -8,8 +8,8 @@ import discord
 from discord import app_commands
 import asyncio
 import threading
-from ...utils.firestore import get_firestore_data, get_hall_of_fame_data, db
-from ...utils.role_utils import determine_role, get_next_role
+from ...core.services import get_document, set_document, query_collection
+from ...core.role_service import RoleService
 from ..auth import get_github_username_for_user, wait_for_username
 
 class UserCommands:
@@ -47,8 +47,7 @@ class UserCommands:
                 )
 
                 if github_username:
-                    doc_ref = db.collection('discord').document(discord_user_id)
-                    doc_ref.set({
+                    set_document('discord', discord_user_id, {
                         'github_id': github_username,
                         'pr_count': 0,
                         'issues_count': 0,
@@ -74,10 +73,11 @@ class UserCommands:
             try:
                 await interaction.response.defer(ephemeral=True)
 
-                doc_ref = db.collection('discord').document(str(interaction.user.id))
+                user_data = get_document('discord', str(interaction.user.id))
 
-                if doc_ref.get().exists:
-                    doc_ref.delete()
+                if user_data:
+                    # Delete document by setting it to empty (Firestore will remove it)
+                    set_document('discord', str(interaction.user.id), {})
                     await interaction.followup.send(
                         "Successfully unlinked your Discord account from your GitHub username.",
                         ephemeral=True
@@ -107,24 +107,24 @@ class UserCommands:
         async def getstats(interaction: discord.Interaction, type: str = "pr"):
             await interaction.response.defer()
             
-            _, contributions, user_mappings = get_firestore_data()
-            
             try:
                 stats_type = type.lower().strip()
                 if stats_type not in ["pr", "issue", "commit"]:
                     stats_type = "pr"
                 
                 user_id = str(interaction.user.id)
-                github_username = user_mappings.get(user_id)
                 
-                if not github_username:
+                # Get user's Discord data to find their GitHub username
+                discord_user_data = get_document('discord', user_id)
+                if not discord_user_data or not discord_user_data.get('github_id'):
                     await interaction.followup.send(
                         "Your Discord account is not linked to a GitHub username. Use `/link your_github_username` to link it.",
                         ephemeral=True
                     )
                     return
-                    
-                user_data = contributions.get(github_username)
+                
+                github_username = discord_user_data['github_id']
+                user_data = discord_user_data
                     
                 if not user_data:
                     await interaction.followup.send(
@@ -161,7 +161,7 @@ class UserCommands:
         async def halloffame(interaction: discord.Interaction, type: str = "pr", period: str = "all_time"):
             await interaction.response.defer()
             
-            hall_of_fame_data = get_hall_of_fame_data()
+            hall_of_fame_data = get_document('repo_stats', 'hall_of_fame')
             
             if not hall_of_fame_data:
                 await interaction.followup.send("Hall of fame data not available yet.", ephemeral=True)
@@ -180,11 +180,12 @@ class UserCommands:
     
     def _create_stats_embed(self, user_data, github_username, stats_type):
         """Create stats embed for user."""
-        pr_all_time = user_data.get("stats", {}).get("prs", {}).get("all_time", 0)
-        issues_all_time = user_data.get("stats", {}).get("issues", {}).get("all_time", 0)
-        commits_all_time = user_data.get("stats", {}).get("commits", {}).get("all_time", 0)
+        pr_all_time = user_data.get("pr_count", 0)
+        issues_all_time = user_data.get("issues_count", 0) 
+        commits_all_time = user_data.get("commits_count", 0)
         
-        pr_role, issue_role, commit_role = determine_role(pr_all_time, issues_all_time, commits_all_time)
+        role_service = RoleService()
+        pr_role, issue_role, commit_role = role_service.determine_roles(pr_all_time, issues_all_time, commits_all_time)
         
         type_names = {"pr": "Pull Requests", "issue": "Issues", "commit": "Commits"}
         
@@ -196,22 +197,19 @@ class UserCommands:
         if stats_type == "pr":
             current_role = pr_role
             all_time_count = pr_all_time
-            stats = user_data.get("stats", {}).get("prs", {})
         elif stats_type == "issue":
             current_role = issue_role
             all_time_count = issues_all_time
-            stats = user_data.get("stats", {}).get("issues", {})
         else:  # commit
             current_role = commit_role
             all_time_count = commits_all_time
-            stats = user_data.get("stats", {}).get("commits", {})
         
         embed.add_field(name="Current Role", value=current_role or "None", inline=True)
         embed.add_field(name="All Time", value=str(all_time_count), inline=True)
-        embed.add_field(name="This Month", value=str(stats.get("monthly", 0)), inline=True)
-        embed.add_field(name="This Week", value=str(stats.get("weekly", 0)), inline=True)
-        embed.add_field(name="Today", value=str(stats.get("daily", 0)), inline=True)
-        embed.add_field(name="Next Role", value=get_next_role(current_role, stats_type), inline=False)
+        embed.add_field(name="This Month", value=str(user_data.get("month_activity", 0)), inline=True)
+        embed.add_field(name="This Week", value=str(user_data.get("week_activity", 0)), inline=True)
+        embed.add_field(name="Today", value=str(user_data.get("today_activity", 0)), inline=True)
+        embed.add_field(name="Next Role", value=role_service.get_next_role(current_role, stats_type), inline=False)
         
         return embed
     
@@ -228,10 +226,10 @@ class UserCommands:
         trophies = ["🥇", "🥈", "🥉"]
         for i, contributor in enumerate(top_3[:3]):
             username = contributor.get('username', 'Unknown')
-            value = contributor.get('value', 0)
+            count = contributor.get('count', 0)  # Changed from 'value' to 'count' to match new structure
             embed.add_field(
                 name=f"{trophies[i]} {username}",
-                value=f"{value} {type_names[type].lower()}",
+                value=f"{count} {type_names[type].lower()}",
                 inline=False
             )
         

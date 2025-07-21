@@ -9,8 +9,6 @@ import sys
 import discord
 from discord.ext import commands
 from dotenv import load_dotenv
-import firebase_admin
-from firebase_admin import credentials, firestore
 
 from .commands import UserCommands, AdminCommands, AnalyticsCommands
 
@@ -20,7 +18,6 @@ class DiscordBot:
     def __init__(self):
         self.bot = None
         self._setup_environment()
-        self._setup_firebase()
         self._create_bot()
         self._register_commands()
     
@@ -38,19 +35,7 @@ class DiscordBot:
         if not self.token:
             raise ValueError("DISCORD_BOT_TOKEN environment variable is required")
     
-    def _setup_firebase(self):
-        """Initialize Firebase connection."""
-        if not firebase_admin._apps:
-            try:
-                cred = credentials.Certificate("config/credentials.json")
-                firebase_admin.initialize_app(cred)
-                print("Firebase initialized successfully")
-            except Exception as e:
-                print(f"Firebase initialization error: {e}")
-                raise
-        
-        self.db = firestore.client()
-        print("Firestore client ready")
+
     
     def _create_bot(self):
         """Create Discord bot instance."""

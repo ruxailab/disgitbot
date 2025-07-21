@@ -6,7 +6,7 @@ Handles analytics and visualization-related Discord commands.
 
 import discord
 from discord import app_commands
-from ...utils.firestore import get_analytics_data
+from ...core.services import get_document
 from ...utils.analytics import create_top_contributors_chart, create_activity_comparison_chart, create_activity_trend_chart
 
 class AnalyticsCommands:
@@ -28,7 +28,7 @@ class AnalyticsCommands:
             await interaction.response.defer()
             
             try:
-                analytics_data = get_analytics_data()
+                analytics_data = get_document('repo_stats', 'analytics')
                 
                 if not analytics_data:
                     await interaction.followup.send("No analytics data available for analysis.", ephemeral=True)
@@ -56,7 +56,7 @@ class AnalyticsCommands:
             await interaction.response.defer()
             
             try:
-                analytics_data = get_analytics_data()
+                analytics_data = get_document('repo_stats', 'analytics')
                 
                 if not analytics_data:
                     await interaction.followup.send("No analytics data available for analysis.", ephemeral=True)
@@ -84,7 +84,7 @@ class AnalyticsCommands:
             await interaction.response.defer()
             
             try:
-                analytics_data = get_analytics_data()
+                analytics_data = get_document('repo_stats', 'analytics')
                 
                 if not analytics_data:
                     await interaction.followup.send("No analytics data available for analysis.", ephemeral=True)
