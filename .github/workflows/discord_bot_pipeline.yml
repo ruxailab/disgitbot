@@ -16,20 +16,20 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Set up Python 3.13.2
+      - name: Set up Python 3.11.8
         uses: actions/setup-python@v4
         with:
-          python-version: '3.13.2'
+          python-version: '3.11.8'
 
       - name: Cache pip dependencies and built wheels
         uses: actions/cache@v3
         with:
           path: |
             ~/.cache/pip
-            ~/.local/lib/python3.13/site-packages
-          key: ${{ runner.os }}-pip-py313-${{ hashFiles('discord_bot/config/discord_bot_requirements.txt') }}
+            ~/.local/lib/python3.11/site-packages
+          key: ${{ runner.os }}-pip-py311-${{ hashFiles('discord_bot/config/discord_bot_requirements.txt') }}
           restore-keys: |
-            ${{ runner.os }}-pip-py313-
+            ${{ runner.os }}-pip-py311-
             ${{ runner.os }}-pip-
 
       - name: Cache system packages

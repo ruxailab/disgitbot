@@ -195,14 +195,18 @@ class GitHubService(IGitHubService):
         return {'items': []}
     
     def search_commits(self, owner: str, repo: str) -> Dict[str, Any]:
-        """Search for commits in a repository."""
-        commits_url = f"{self._github_config.api_url}/search/commits?q=repo:{owner}/{repo}"
-        response = self._make_request(commits_url, 'search')
+        """Get commits for a repository using the commits API."""
+        commits_url = f"{self._github_config.api_url}/repos/{owner}/{repo}/commits?per_page=100"
+        response = self._make_request(commits_url, 'core')
         
         if response and response.status_code == 200:
-            return response.json()
+            commits = response.json()
+            return {
+                'items': commits,
+                'total_count': len(commits)
+            }
         
-        return {'items': []}
+        return {'items': [], 'total_count': 0}
     
     def collect_complete_repository_data(self, owner: str, repo: str) -> Dict[str, Any]:
         """Collect all data for a single repository."""
