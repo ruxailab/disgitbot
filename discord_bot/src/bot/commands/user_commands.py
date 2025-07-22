@@ -118,12 +118,15 @@ class UserCommands:
                 discord_user_data = get_document('discord', user_id)
                 if not discord_user_data or not discord_user_data.get('github_id'):
                     await interaction.followup.send(
-                        "Your Discord account is not linked to a GitHub username. Use `/link your_github_username` to link it.",
+                        "Your Discord account is not linked to a GitHub username. Use `/link` to link it.",
                         ephemeral=True
                     )
                     return
                 
                 github_username = discord_user_data['github_id']
+                
+                # Use the Discord user data which should contain the full contribution stats
+                # The pipeline updates Discord documents with full contribution data
                 user_data = discord_user_data
                     
                 if not user_data:
@@ -139,6 +142,8 @@ class UserCommands:
                 
             except Exception as e:
                 print(f"Error in getstats command: {e}")
+                import traceback
+                traceback.print_exc()
                 await interaction.followup.send("Error retrieving your stats.", ephemeral=True)
         
         return getstats
@@ -180,39 +185,88 @@ class UserCommands:
     
     def _create_stats_embed(self, user_data, github_username, stats_type):
         """Create stats embed for user."""
-        pr_all_time = user_data.get("pr_count", 0)
-        issues_all_time = user_data.get("issues_count", 0) 
-        commits_all_time = user_data.get("commits_count", 0)
+        import datetime
         
         role_service = RoleService()
+        
+        # Get stats from the detailed structure if available
+        pr_all_time = user_data.get("stats", {}).get("prs", {}).get("all_time", user_data.get("pr_count", 0))
+        issues_all_time = user_data.get("stats", {}).get("issues", {}).get("all_time", user_data.get("issues_count", 0))
+        commits_all_time = user_data.get("stats", {}).get("commits", {}).get("all_time", user_data.get("commits_count", 0))
+        
         pr_role, issue_role, commit_role = role_service.determine_roles(pr_all_time, issues_all_time, commits_all_time)
         
-        type_names = {"pr": "Pull Requests", "issue": "Issues", "commit": "Commits"}
+        # Set up type-specific variables
+        title_prefix = "PR"
+        if stats_type == "pr":
+            count_field = "pr_count"
+            stats_field = "prs"
+            role = pr_role
+            title_prefix = "PR"
+        elif stats_type == "issue":
+            count_field = "issues_count"
+            stats_field = "issues"
+            role = issue_role if issue_role else "None"
+            title_prefix = "Issue"
+        elif stats_type == "commit":
+            count_field = "commits_count"
+            stats_field = "commits"
+            role = commit_role if commit_role else "None"
+            title_prefix = "Commit"
+ 
+        # Get enhanced stats
+        stats = user_data["stats"]
+        type_stats = stats[stats_field]
         
+        # Create enhanced embed
         embed = discord.Embed(
-            title=f"{type_names[stats_type]} Stats for {github_username}",
+            title=f"GitHub Contribution Metrics for {github_username}",
+            description=f"Stats tracked across all RUXAILAB repositories. Updated hourly. Last update: {stats.get('last_updated', datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC'))}",
             color=discord.Color.blue()
         )
         
-        if stats_type == "pr":
-            current_role = pr_role
-            all_time_count = pr_all_time
-        elif stats_type == "issue":
-            current_role = issue_role
-            all_time_count = issues_all_time
-        else:  # commit
-            current_role = commit_role
-            all_time_count = commits_all_time
+        # Create stats table with customized format
+        display_prefix = f"{title_prefix}s{' ' * (12 - len(title_prefix + 's'))}"
+        stats_table = f"```\n{display_prefix}   Count   Ranking\n"
+        stats_table += f"24h:           {type_stats.get('daily', 0):<8}#{user_data.get('rankings', {}).get(f'{stats_type}_daily', 0)}\n"
+        stats_table += f"7 days:        {type_stats.get('weekly', 0):<8}#{user_data.get('rankings', {}).get(f'{stats_type}_weekly', 0)}\n"
+        stats_table += f"30 days:       {type_stats.get('monthly', 0):<8}#{user_data.get('rankings', {}).get(f'{stats_type}_monthly', 0)}\n"
+        stats_table += f"Lifetime:      {type_stats.get('all_time', 0):<8}#{user_data.get('rankings', {}).get(stats_type, 0)}\n\n"
         
-        embed.add_field(name="Current Role", value=current_role or "None", inline=True)
-        embed.add_field(name="All Time", value=str(all_time_count), inline=True)
-        embed.add_field(name="This Month", value=str(user_data.get("month_activity", 0)), inline=True)
-        embed.add_field(name="This Week", value=str(user_data.get("week_activity", 0)), inline=True)
-        embed.add_field(name="Today", value=str(user_data.get("today_activity", 0)), inline=True)
-        embed.add_field(name="Next Role", value=role_service.get_next_role(current_role, stats_type), inline=False)
+        # Add averages and streaks with customized wording
+        stats_table += f"Daily Average ({stats.get('current_month', 'June')}): {type_stats.get('avg_per_day', 0)} {title_prefix}s\n\n"
+        stats_table += f"Active {title_prefix} Streak: {type_stats.get('current_streak', 0)} {title_prefix}s\n"
+        stats_table += f"Best {title_prefix} Streak: {type_stats.get('longest_streak', 0)} {title_prefix}s\n```"
         
-        return embed
-    
+        # Add level information based on role
+        embed.add_field(name="Statistics", value=stats_table, inline=False)
+        embed.add_field(name="Current level:", value=f"{role}", inline=True)
+        
+        # Determine next level
+        next_level = role_service.get_next_role(role, stats_type)
+        
+        # Remove @ if present in next_level
+        if next_level.startswith('@'):
+            next_level = next_level[1:]
+            
+        embed.add_field(name="Next level:", value=next_level, inline=True)
+        
+        # Add info about other stat types
+        other_types = []
+        if stats_type != "pr":
+            other_types.append(f"`/getstats type:pr` - View PR stats")
+        if stats_type != "issue":
+            other_types.append(f"`/getstats type:issue` - View Issue stats")
+        if stats_type != "commit":
+            other_types.append(f"`/getstats type:commit` - View Commit stats")
+            
+        embed.add_field(
+            name="Other Statistics:", 
+            value="\n".join(other_types),
+            inline=False
+        )
+        
+        return embed 
     def _create_halloffame_embed(self, top_3, type, period, last_updated):
         """Create hall of fame embed."""
         type_names = {"pr": "Pull Requests", "issue": "Issues", "commit": "Commits"}

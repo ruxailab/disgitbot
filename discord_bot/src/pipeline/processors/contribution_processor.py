@@ -83,7 +83,42 @@ def _initialize_user_if_needed(username, all_contributions):
             'longest_streak': 0,
             'average_daily': 0.0,
             'repositories': set(),
-            'profile': {}
+            'profile': {},
+            'pr_dates': [],
+            'issue_dates': [],
+            'commit_dates': [],
+            'stats': {
+                'current_month': current_month,
+                'last_updated': now.strftime('%Y-%m-%d %H:%M:%S UTC'),
+                'prs': {
+                    'daily': 0,
+                    'weekly': 0,
+                    'monthly': 0,
+                    'all_time': 0,
+                    'current_streak': 0,
+                    'longest_streak': 0,
+                    'avg_per_day': 0
+                },
+                'issues': {
+                    'daily': 0,
+                    'weekly': 0,
+                    'monthly': 0,
+                    'all_time': 0,
+                    'current_streak': 0,
+                    'longest_streak': 0,
+                    'avg_per_day': 0
+                },
+                'commits': {
+                    'daily': 0,
+                    'weekly': 0,
+                    'monthly': 0,
+                    'all_time': 0,
+                    'current_streak': 0,
+                    'longest_streak': 0,
+                    'avg_per_day': 0
+                }
+            },
+            'rankings': {}
         }
 
 def _process_user_contributions(username, pull_requests, issues, commits, all_contributions):
@@ -94,7 +129,15 @@ def _process_user_contributions(username, pull_requests, issues, commits, all_co
     for pr in pull_requests:
         if pr and pr.get('user') and pr['user'].get('login') == username:
             user_data['pr_count'] += 1
-            _update_activity_counts(pr.get('created_at', ''), user_data)
+            user_data['stats']['prs']['all_time'] += 1
+            created_at = pr.get('created_at', '')
+            _update_activity_counts(created_at, user_data)
+            _update_time_based_stats(created_at, user_data['stats']['prs'])
+            
+            # Store date for streak calculation
+            if created_at:
+                date_str = created_at.split('T')[0]
+                user_data['pr_dates'].append(date_str)
             
             if pr.get('repository') and pr['repository'].get('name'):
                 repo_name = pr['repository']['name']
@@ -105,17 +148,32 @@ def _process_user_contributions(username, pull_requests, issues, commits, all_co
         if issue and issue.get('user') and issue['user'].get('login') == username:
             if not issue.get('pull_request'):  # Exclude PRs counted as issues
                 user_data['issues_count'] += 1
-                _update_activity_counts(issue.get('created_at', ''), user_data)
+                user_data['stats']['issues']['all_time'] += 1
+                created_at = issue.get('created_at', '')
+                _update_activity_counts(created_at, user_data)
+                _update_time_based_stats(created_at, user_data['stats']['issues'])
+                
+                # Store date for streak calculation
+                if created_at:
+                    date_str = created_at.split('T')[0]
+                    user_data['issue_dates'].append(date_str)
     
     # Process commits
     for commit in commits:
         if commit and commit.get('author') and commit['author'].get('login') == username:
             user_data['commits_count'] += 1
+            user_data['stats']['commits']['all_time'] += 1
             # Safe nested access for commit date
             commit_obj = commit.get('commit')
             if commit_obj and commit_obj.get('author'):
                 commit_date = commit_obj['author'].get('date', '')
                 _update_activity_counts(commit_date, user_data)
+                _update_time_based_stats(commit_date, user_data['stats']['commits'])
+                
+                # Store date for streak calculation
+                if commit_date:
+                    date_str = commit_date.split('T')[0]
+                    user_data['commit_dates'].append(date_str)
 
 def _update_activity_counts(date_str, user_data):
     """Update activity counters based on date."""
@@ -149,34 +207,56 @@ def _update_activity_counts(date_str, user_data):
     except (ValueError, AttributeError):
         pass
 
+def _update_time_based_stats(date_str, stats_dict):
+    """Update time-based stats (daily, weekly, monthly) based on date."""
+    if not date_str:
+        return
+    
+    try:
+        activity_date = datetime.fromisoformat(date_str.replace('Z', '+00:00')).strftime('%Y-%m-%d')
+        
+        if activity_date == today_date:
+            stats_dict['daily'] += 1
+        
+        if activity_date >= week_ago_date:
+            stats_dict['weekly'] += 1
+            
+        if activity_date >= month_ago_date:
+            stats_dict['monthly'] += 1
+            
+    except (ValueError, AttributeError):
+        pass
+
 def calculate_rankings(contributions):
     """Calculate rankings for all contributors."""
     print("Calculating rankings for all contributors...")
     
-    # Sort contributors by total activity
-    sorted_contributors = sorted(
-        contributions.items(),
-        key=lambda x: x[1]['total_activity'],
-        reverse=True
-    )
+    if not contributions:
+        return contributions
     
-    for rank, (username, data) in enumerate(sorted_contributors, 1):
-        data['overall_rank'] = rank
+    # Define ranking categories
+    ranking_categories = {
+        'pr': lambda x: x[1]['stats']['prs']['all_time'],
+        'issue': lambda x: x[1]['stats']['issues']['all_time'],
+        'commit': lambda x: x[1]['stats']['commits']['all_time'],
+        'pr_daily': lambda x: x[1]['stats']['prs']['daily'],
+        'pr_weekly': lambda x: x[1]['stats']['prs']['weekly'],
+        'pr_monthly': lambda x: x[1]['stats']['prs']['monthly'],
+        'issue_daily': lambda x: x[1]['stats']['issues']['daily'],
+        'issue_weekly': lambda x: x[1]['stats']['issues']['weekly'],
+        'issue_monthly': lambda x: x[1]['stats']['issues']['monthly'],
+        'commit_daily': lambda x: x[1]['stats']['commits']['daily'],
+        'commit_weekly': lambda x: x[1]['stats']['commits']['weekly'],
+        'commit_monthly': lambda x: x[1]['stats']['commits']['monthly'],
+    }
     
-    # PR rankings
-    sorted_by_prs = sorted(contributions.items(), key=lambda x: x[1]['pr_count'], reverse=True)
-    for rank, (username, data) in enumerate(sorted_by_prs, 1):
-        data['pr_rank'] = rank
-    
-    # Issues rankings
-    sorted_by_issues = sorted(contributions.items(), key=lambda x: x[1]['issues_count'], reverse=True)
-    for rank, (username, data) in enumerate(sorted_by_issues, 1):
-        data['issues_rank'] = rank
-    
-    # Commits rankings
-    sorted_by_commits = sorted(contributions.items(), key=lambda x: x[1]['commits_count'], reverse=True)
-    for rank, (username, data) in enumerate(sorted_by_commits, 1):
-        data['commits_rank'] = rank
+    # Calculate rankings for each category
+    for rank_name, sort_key in ranking_categories.items():
+        sorted_contributors = sorted(contributions.items(), key=sort_key, reverse=True)
+        for rank, (username, data) in enumerate(sorted_contributors, 1):
+            if 'rankings' not in data:
+                data['rankings'] = {}
+            data['rankings'][rank_name] = rank
     
     return contributions
 
@@ -185,15 +265,24 @@ def calculate_streaks_and_averages(contributions):
     print("Calculating streaks and averages...")
     
     for username, data in contributions.items():
-        # Calculate average daily activity
-        if data['total_activity'] > 0:
-            # Simple approximation - total activity / 30 days
-            data['average_daily'] = round(data['total_activity'] / 30.0, 2)
+        # Calculate streaks for each contribution type
+        for contrib_type, date_key in [('prs', 'pr_dates'), ('issues', 'issue_dates'), ('commits', 'commit_dates')]:
+            dates = data.get(date_key, [])
+            if dates:
+                current_streak, longest_streak = _calculate_streak_from_dates(dates)
+                data['stats'][contrib_type]['current_streak'] = current_streak
+                data['stats'][contrib_type]['longest_streak'] = longest_streak
+            
+            # Calculate average per day for current month
+            monthly_count = data['stats'][contrib_type]['monthly']
+            days_this_month = min(now.day, 30)
+            data['stats'][contrib_type]['avg_per_day'] = round(monthly_count / max(days_this_month, 1), 1)
         
         # Convert repositories set to list for JSON serialization
-        data['repositories'] = list(data['repositories'])
+        if isinstance(data.get('repositories'), set):
+            data['repositories'] = list(data['repositories'])
         
-        # Simple streak calculation based on recent activity
+        # Legacy fields for backward compatibility
         if data['today_activity'] > 0 and data['yesterday_activity'] > 0:
             data['streak'] = 2
         elif data['today_activity'] > 0 or data['yesterday_activity'] > 0:
@@ -202,5 +291,54 @@ def calculate_streaks_and_averages(contributions):
             data['streak'] = 0
             
         data['longest_streak'] = max(data['streak'], 1) if data['total_activity'] > 0 else 0
+        data['average_daily'] = round(data['total_activity'] / 30.0, 2) if data['total_activity'] > 0 else 0
+        
+        # Clean up date arrays as they're no longer needed
+        for date_key in ['pr_dates', 'issue_dates', 'commit_dates']:
+            if date_key in data:
+                del data[date_key]
     
-    return contributions 
+    return contributions
+
+def _calculate_streak_from_dates(dates):
+    """Calculate current and longest streak from a list of dates."""
+    if not dates:
+        return 0, 0
+    
+    # Remove duplicates and sort dates (most recent first)
+    unique_dates = sorted(list(set(dates)), reverse=True)
+    
+    # Calculate current streak
+    current_streak = 0
+    if unique_dates:
+        last_date = datetime.strptime(unique_dates[0], '%Y-%m-%d')
+        current_streak = 1
+        
+        for i in range(1, len(unique_dates)):
+            date_obj = datetime.strptime(unique_dates[i], '%Y-%m-%d')
+            if (last_date - date_obj).days <= 1:  # Consecutive days
+                current_streak += 1
+                last_date = date_obj
+            else:
+                break
+    
+    # Calculate longest streak
+    longest_streak = 0
+    if unique_dates:
+        # Sort oldest first for proper streak calculation
+        unique_dates.sort()
+        
+        current_group = 1
+        longest_streak = 1
+        
+        for i in range(1, len(unique_dates)):
+            prev_date = datetime.strptime(unique_dates[i-1], '%Y-%m-%d')
+            curr_date = datetime.strptime(unique_dates[i], '%Y-%m-%d')
+            
+            if (curr_date - prev_date).days <= 1:  # Consecutive days
+                current_group += 1
+                longest_streak = max(longest_streak, current_group)
+            else:
+                current_group = 1
+    
+    return current_streak, longest_streak 
