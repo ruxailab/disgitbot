@@ -18,22 +18,11 @@ def run_discord_bot_async():
     print("Starting Discord bot...")
     
     try:
-        # Import the existing Discord bot with all commands
-        print("Importing existing Discord bot setup...")
-        import src.bot.init_discord_bot as discord_bot_module
-        
-        # The init_discord_bot module will handle all the Discord bot setup
-        # including commands like /getstats, /halloffame, /link, etc.
-        print("Discord bot setup imported successfully")
-        
-        # Get the bot instance and run it
-        print("Starting Discord bot connection...")
-        
-        # Ensure TOKEN is validated (deployment pipeline guarantees this)
-        token = discord_bot_module.TOKEN
-        assert token is not None, "TOKEN should be validated by deployment pipeline"
-        
-        discord_bot_module.bot.run(token)
+        # Import the modular Discord bot
+        print("Starting modular Discord bot...")
+        from src.bot.init_discord_bot import main as bot_main
+        bot_main()
+        print("Discord bot started successfully")
         
     except Exception as e:
         print(f"Error in Discord bot setup: {e}")

@@ -1,0 +1,207 @@
+name: Discord Bot Data Pipeline
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # Run daily at midnight UTC
+  workflow_dispatch: {}  # Allow manual trigger
+  push:
+    branches:
+      - post_visualization_refactor
+
+jobs:
+  discord-bot-pipeline:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+          cache-dependency-path: 'discord_bot/config/discord_bot_requirements.txt'
+
+      - name: Cache system dependencies
+        uses: actions/cache@v4
+        id: system-deps
+        with:
+          path: /var/cache/apt/archives
+          key: system-deps-${{ runner.os }}-${{ hashFiles('.github/workflows/discord_bot_pipeline.yml') }}
+
+      - name: Install system dependencies
+        if: steps.system-deps.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libffi-dev libnacl-dev python3-dev build-essential
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip wheel setuptools
+          pip install -r discord_bot/config/discord_bot_requirements.txt
+
+      - name: Set up Google Credentials
+        run: echo "${{ secrets.DEV_GOOGLE_CREDENTIALS_JSON }}" | base64 --decode > discord_bot/config/credentials.json
+
+      - name: Collect GitHub Data
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          REPO_OWNER: ${{ secrets.REPO_OWNER }}
+          PYTHONUNBUFFERED: 1
+        run: |
+          cd discord_bot
+          python -u -c "
+          import sys, json
+          sys.path.insert(0, 'src')
+          from core.github_service import GitHubService
+          print('Collecting GitHub data...')
+          github_service = GitHubService()
+          raw_data = github_service.collect_organization_data()
+          print(f'Collected data for {len(raw_data.get(\"repositories\", {}))} repositories')
+          print('Saving raw data...')
+          with open('raw_data.json', 'w') as f:
+            json.dump(raw_data, f)
+          print('Raw data saved to raw_data.json')
+          "
+
+      - name: Process Contributions & Analytics
+        env:
+          PYTHONUNBUFFERED: 1
+        run: |
+          cd discord_bot
+          python -u -c "
+          import sys, json
+          sys.path.insert(0, 'src')
+          from pipeline.processors import contribution_functions, analytics_functions, metrics_functions
+          
+          print('Loading raw data...')
+          with open('raw_data.json', 'r') as f:
+            raw_data = json.load(f)
+          
+          print('Processing contributions...')
+          contributions = contribution_functions.process_raw_data(raw_data)
+          contributions = contribution_functions.calculate_rankings(contributions)
+          contributions = contribution_functions.calculate_streaks_and_averages(contributions)
+          
+          print('Creating analytics...')
+          hall_of_fame = analytics_functions.create_hall_of_fame_data(contributions)
+          analytics_data = analytics_functions.create_analytics_data(contributions)
+          
+          print('Calculating metrics...')
+          repo_metrics = metrics_functions.create_repo_metrics(raw_data, contributions)
+          
+          print('Processing repository labels...')
+          processed_labels = metrics_functions.process_repository_labels(raw_data)
+          
+          print(f'Processed {len(contributions)} contributors')
+          
+          print('Saving processed data...')
+          processed_data = {
+            'contributions': contributions,
+            'hall_of_fame': hall_of_fame,
+            'analytics_data': analytics_data,
+            'repo_metrics': repo_metrics,
+            'processed_labels': processed_labels
+          }
+          with open('processed_data.json', 'w') as f:
+            json.dump(processed_data, f)
+          print('Processed data saved to processed_data.json')
+          "
+
+      - name: Store Data in Firestore
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: discord_bot/config/credentials.json
+          PYTHONUNBUFFERED: 1
+        run: |
+          cd discord_bot
+          python -u -c "
+          import sys, json
+          sys.path.insert(0, 'src')
+          from core.services import set_document, query_collection, update_document
+          
+          print('Loading processed data...')
+          with open('processed_data.json', 'r') as f:
+            data = json.load(f)
+          
+          contributions = data['contributions']
+          hall_of_fame = data['hall_of_fame']
+          analytics_data = data['analytics_data']
+          repo_metrics = data['repo_metrics']
+          processed_labels = data['processed_labels']
+          
+          print('Storing data in Firestore...')
+          set_document('repo_stats', 'metrics', repo_metrics)
+          set_document('repo_stats', 'hall_of_fame', hall_of_fame)
+          set_document('repo_stats', 'analytics', analytics_data)
+          
+          print('Storing repository labels...')
+          labels_stored = 0
+          for repo_name, label_data in processed_labels.items():
+            doc_id = repo_name.replace('/', '_')
+            if set_document('repository_labels', doc_id, label_data):
+              labels_stored += 1
+              print(f\"Stored {label_data['count']} labels for {repo_name}\")
+          
+          print(f'Stored labels for {labels_stored} repositories')
+          
+          user_mappings = query_collection('discord')
+          stored_count = 0
+          
+          for username, user_data in contributions.items():
+            discord_id = None
+            for uid, data in user_mappings.items():
+              if data.get('github_id') == username:
+                discord_id = uid
+                break
+            if discord_id:
+              if update_document('discord', discord_id, user_data):
+                stored_count += 1
+          
+          print(f'Stored data for {stored_count} users')
+          "
+
+      - name: Update Discord Roles & Channels
+        env:
+          DISCORD_BOT_TOKEN: ${{ secrets.DEV_DISCORD_BOT_TOKEN }}
+          GOOGLE_APPLICATION_CREDENTIALS: discord_bot/config/credentials.json
+          PYTHONUNBUFFERED: 1
+        run: |
+          cd discord_bot
+          python -u -c "
+          import sys, json
+          sys.path.insert(0, 'src')
+          from core.services import query_collection, DiscordBotService
+          from core.role_service import RoleService
+          
+          print('Loading processed data...')
+          with open('processed_data.json', 'r') as f:
+            data = json.load(f)
+          
+          contributions = data['contributions']
+          repo_metrics = data['repo_metrics']
+          
+          print('Initializing Discord services...')
+          role_service = RoleService()
+          discord_service = DiscordBotService(role_service)
+          
+          print('Getting user mappings...')
+          user_mappings_data = query_collection('discord')
+          user_mappings = {}
+          for discord_id, data in user_mappings_data.items():
+            github_id = data.get('github_id')
+            if github_id:
+              user_mappings[discord_id] = github_id
+          
+          print(f'Found {len(user_mappings)} user mappings')
+          
+          print('Updating Discord roles and channels...')
+          import asyncio
+          success = asyncio.run(discord_service.update_roles_and_channels(user_mappings, contributions, repo_metrics))
+          print(f'Discord updates completed: {success}')
+          "
+
+      - name: Pipeline Summary
+        if: always()
+        run: |
+          echo 'Discord Bot Pipeline completed!'
+          echo 'All steps executed successfully.'

@@ -3,11 +3,19 @@
 Reviewer Assigner for automatically assigning reviewers to pull requests.
 """
 
-import json
 import random
 import logging
+import sys
+import os
+import time
 from typing import List, Dict, Any, Optional
-from pathlib import Path
+
+# Import Discord bot core services
+discord_bot_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'discord_bot', 'src')
+if discord_bot_path not in sys.path:
+    sys.path.insert(0, discord_bot_path)
+
+from core.services import get_document, set_document
 
 logger = logging.getLogger(__name__)
 
@@ -15,26 +23,24 @@ class ReviewerAssigner:
     """Automatically assigns reviewers to pull requests using random selection."""
     
     def __init__(self, config_path: Optional[str] = None):
-        """Initialize the reviewer assigner with configuration."""
-        self.config_path = config_path if config_path is not None else "data/reviewers_config.json"
+        """Initialize the reviewer assigner with Firestore configuration."""
         self.reviewers = self._load_reviewers()
         
     def _load_reviewers(self) -> List[str]:
-        """Load reviewer pool from configuration."""
+        """Load reviewer pool from Firestore configuration."""
         try:
-            config_file = Path(self.config_path)
-            if not config_file.exists():
-                logger.warning(f"Config file {self.config_path} not found, using default reviewers")
-                return ["marcgc21", "xemyst", "KarinePistili", "hvini", "sergiobeltranguerrero", "leoruas", "JulioManoel"]
+            reviewer_data = get_document('pr_config', 'reviewers')
+            if reviewer_data and 'reviewers' in reviewer_data:
+                reviewers = reviewer_data['reviewers']
+                logger.info(f"Loaded {len(reviewers)} reviewers from Firestore")
+                return reviewers
             
-            with open(config_file, 'r') as f:
-                config = json.load(f)
-                
-            return config.get('reviewers', [])
-            
+            logger.warning("No reviewer configuration found in Firestore")
+            return []
+              
         except Exception as e:
-            logger.error(f"Failed to load reviewers config: {e}")
-            return ["marcgc21", "xemyst", "KarinePistili", "hvini", "sergiobeltranguerrero", "leoruas", "JulioManoel"]
+            logger.error(f"Failed to load reviewers from Firestore: {e}")
+            return []
     
     def assign_reviewers(self, pr_data: Dict[str, Any], repo: Optional[str] = None) -> Dict[str, Any]:
         """
@@ -96,11 +102,17 @@ class ReviewerAssigner:
             logger.info(f"Removed reviewer: {username}")
     
     def save_config(self):
-        """Save the current reviewer configuration."""
+        """Save the current reviewer configuration to Firestore."""
         try:
-            config = {"reviewers": self.reviewers}
-            with open(self.config_path, 'w') as f:
-                json.dump(config, f, indent=2)
-            logger.info(f"Saved reviewer config to {self.config_path}")
+            reviewer_data = {
+                'reviewers': self.reviewers,
+                'count': len(self.reviewers),
+                'last_updated': time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime())
+            }
+            success = set_document('pr_config', 'reviewers', reviewer_data)
+            if success:
+                logger.info(f"Saved {len(self.reviewers)} reviewers to Firestore")
+            else:
+                logger.error("Failed to save reviewer config to Firestore")
         except Exception as e:
             logger.error(f"Failed to save config: {e}") 

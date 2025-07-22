@@ -119,6 +119,7 @@ Go to your GitHub repository → Settings → Secrets and variables → Actions 
 - `DISCORD_BOT_TOKEN`
 - `GH_TOKEN` 
 - `GOOGLE_CREDENTIALS_JSON`
+- `REPO_OWNER`
 
 ---
 
@@ -151,6 +152,7 @@ Go to your GitHub repository → Settings → Secrets and variables → Actions 
      - [x] `Use Slash Commands`
      - [x] `Use Embedded Activities`
      - [x] `Connect`
+     - [x] `Attach Files`
 5. **Invite Bot to Your Server:**
    - Copy the generated URL from the OAuth2 page
    - Paste it in your browser and invite the bot to your Discord server
@@ -281,10 +283,11 @@ Go to your GitHub repository → Settings → Secrets and variables → Actions 
    - Copy the "Client ID" → **Add to `.env`:** `GITHUB_CLIENT_ID=your_client_id`
    - Click "Generate a new client secret" → Copy it → **Add to `.env`:** `GITHUB_CLIENT_SECRET=your_secret`
 
-### Step 6: Get REPO_OWNER (.env)
+### Step 6: Get REPO_OWNER (.env) + REPO_OWNER (GitHub Secret)
 
 **What this configures:** 
 - `.env` file: `REPO_OWNER=your_org_name`
+- GitHub Secret: `REPO_OWNER`
 
 **What this does:** Tells the bot which GitHub organization's repositories to monitor for contributions.
 
@@ -293,6 +296,7 @@ Go to your GitHub repository → Settings → Secrets and variables → Actions 
    - The organization name is the part after `/orgs/` (example: `ruxailab`)
 2. **Set in Configuration:**
    - **Add to `.env`:** `REPO_OWNER=your_org_name` (example: `REPO_OWNER=ruxailab`)
+   - **Add to GitHub Secrets:** Create secret named `REPO_OWNER` with the same value
    - **Important:** Use ONLY the organization name, NOT the full URL
 
 ---
@@ -328,6 +332,9 @@ The deployment script will:
    - `/getstats` - View your GitHub contribution stats
    - `/halloffame` - See top contributors
    - `/setup_voice_stats` - Create voice channels showing repo stats
+   - `/show-top-contributors` - Show top contributors by PR count
+   - `/show-activity-comparison` - Show contributor activity comparison
+   - `/show-activity-trends` - Show recent activity trends
 
 3. **Test Role Updates:**
    ```bash
@@ -698,7 +705,6 @@ github_blueprint = make_github_blueprint(
     redirect_url=f"{base_url}/auth/callback"  # ← GitHub will redirect here
 )
 ```
-
 ### Key Networking Concepts Demonstrated
 
 1. **Single Process, Multiple Services**: `main.py` Lines 64-94 show how one container runs both Discord bot (background thread) and Flask (main thread)
