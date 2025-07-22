@@ -1,6 +1,3 @@
-❗NOTE: FOR THE MOST UP TO DATE CHANGES, SEE THIS BRANCH, MAIN IS OUTDATED, WILL MERGE SOON https://github.com/ruxailab/disgitbot/tree/post_visualization_refactor❗
-
-
 GSOC 2025 project, 
 
 project idea: 'Integration of GitHub Actions with Discord Role Management (90h)',
