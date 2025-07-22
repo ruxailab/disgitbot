@@ -6,7 +6,7 @@ on:
   workflow_dispatch: {}  # Allow manual trigger
   push:
     branches:
-      - post_visualization_refactor
+      - main
 
 jobs:
   discord-bot-pipeline:
@@ -41,7 +41,7 @@ jobs:
           pip install -r discord_bot/config/discord_bot_requirements.txt
 
       - name: Set up Google Credentials
-        run: echo "${{ secrets.DEV_GOOGLE_CREDENTIALS_JSON }}" | base64 --decode > discord_bot/config/credentials.json
+        run: echo "${{ secrets.GOOGLE_CREDENTIALS_JSON }}" | base64 --decode > discord_bot/config/credentials.json
 
       - name: Collect GitHub Data
         env:
@@ -162,7 +162,7 @@ jobs:
 
       - name: Update Discord Roles & Channels
         env:
-          DISCORD_BOT_TOKEN: ${{ secrets.DEV_DISCORD_BOT_TOKEN }}
+          DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
           GOOGLE_APPLICATION_CREDENTIALS: discord_bot/config/credentials.json
           PYTHONUNBUFFERED: 1
         run: |
