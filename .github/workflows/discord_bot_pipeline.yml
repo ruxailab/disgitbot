@@ -45,7 +45,7 @@ jobs:
 
       - name: Collect GitHub Data
         env:
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.DEV_GH_TOKEN }}
           REPO_OWNER: ${{ secrets.REPO_OWNER }}
           PYTHONUNBUFFERED: 1
         run: |
