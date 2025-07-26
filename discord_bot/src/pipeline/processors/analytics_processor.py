@@ -13,57 +13,34 @@ def create_hall_of_fame_data(all_contributions):
     if not all_contributions:
         return {}
     
+    time_periods = ['all_time', 'monthly', 'weekly', 'daily']
+    leaderboard_size = 10
     contributors = list(all_contributions.keys())
     
-    # Sort by PR count for hall of fame
-    top_prs = sorted(
-        contributors,
-        key=lambda x: all_contributions[x].get('pr_count', 0),
-        reverse=True
-    )[:10]
-    
-    # Sort by issues
-    top_issues = sorted(
-        contributors,
-        key=lambda x: all_contributions[x].get('issues_count', 0),
-        reverse=True
-    )[:10]
-    
-    # Sort by commits
-    top_commits = sorted(
-        contributors,
-        key=lambda x: all_contributions[x].get('commits_count', 0),
-        reverse=True
-    )[:10]
+    def create_leaderboard_for_period(contrib_type, period):
+        """Create a leaderboard for a specific contribution type and time period."""
+        sorted_contributors = sorted(
+            contributors,
+            key=lambda x: all_contributions[x]['stats'][contrib_type][period],
+            reverse=True
+        )[:leaderboard_size]
+        
+        return [
+            {
+                'username': username,
+                'count': all_contributions[username]['stats'][contrib_type][period]
+            }
+            for username in sorted_contributors
+        ]
     
     return {
         'last_updated': time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime()),
-        'pr': {
-            'all_time': [
-                {
-                    'username': username,
-                    'count': all_contributions[username].get('pr_count', 0)
-                }
-                for username in top_prs
-            ]
-        },
-        'issues': {
-            'all_time': [
-                {
-                    'username': username,
-                    'count': all_contributions[username].get('issues_count', 0)
-                }
-                for username in top_issues
-            ]
-        },
-        'commits': {
-            'all_time': [
-                {
-                    'username': username,
-                    'count': all_contributions[username].get('commits_count', 0)
-                }
-                for username in top_commits
-            ]
+        **{
+            contrib_type: {
+                period: create_leaderboard_for_period(contrib_type, period)
+                for period in time_periods
+            }
+            for contrib_type in ['pr', 'issue', 'commit']
         }
     }
 

@@ -90,7 +90,7 @@ def _initialize_user_if_needed(username, all_contributions):
             'stats': {
                 'current_month': current_month,
                 'last_updated': now.strftime('%Y-%m-%d %H:%M:%S UTC'),
-                'prs': {
+                'pr': {
                     'daily': 0,
                     'weekly': 0,
                     'monthly': 0,
@@ -99,7 +99,7 @@ def _initialize_user_if_needed(username, all_contributions):
                     'longest_streak': 0,
                     'avg_per_day': 0
                 },
-                'issues': {
+                'issue': {
                     'daily': 0,
                     'weekly': 0,
                     'monthly': 0,
@@ -108,7 +108,7 @@ def _initialize_user_if_needed(username, all_contributions):
                     'longest_streak': 0,
                     'avg_per_day': 0
                 },
-                'commits': {
+                'commit': {
                     'daily': 0,
                     'weekly': 0,
                     'monthly': 0,
@@ -129,10 +129,10 @@ def _process_user_contributions(username, pull_requests, issues, commits, all_co
     for pr in pull_requests:
         if pr and pr.get('user') and pr['user'].get('login') == username:
             user_data['pr_count'] += 1
-            user_data['stats']['prs']['all_time'] += 1
+            user_data['stats']['pr']['all_time'] += 1
             created_at = pr.get('created_at', '')
             _update_activity_counts(created_at, user_data)
-            _update_time_based_stats(created_at, user_data['stats']['prs'])
+            _update_time_based_stats(created_at, user_data['stats']['pr'])
             
             # Store date for streak calculation
             if created_at:
@@ -148,10 +148,10 @@ def _process_user_contributions(username, pull_requests, issues, commits, all_co
         if issue and issue.get('user') and issue['user'].get('login') == username:
             if not issue.get('pull_request'):  # Exclude PRs counted as issues
                 user_data['issues_count'] += 1
-                user_data['stats']['issues']['all_time'] += 1
+                user_data['stats']['issue']['all_time'] += 1
                 created_at = issue.get('created_at', '')
                 _update_activity_counts(created_at, user_data)
-                _update_time_based_stats(created_at, user_data['stats']['issues'])
+                _update_time_based_stats(created_at, user_data['stats']['issue'])
                 
                 # Store date for streak calculation
                 if created_at:
@@ -162,13 +162,13 @@ def _process_user_contributions(username, pull_requests, issues, commits, all_co
     for commit in commits:
         if commit and commit.get('author') and commit['author'].get('login') == username:
             user_data['commits_count'] += 1
-            user_data['stats']['commits']['all_time'] += 1
+            user_data['stats']['commit']['all_time'] += 1
             # Safe nested access for commit date
             commit_obj = commit.get('commit')
             if commit_obj and commit_obj.get('author'):
                 commit_date = commit_obj['author'].get('date', '')
                 _update_activity_counts(commit_date, user_data)
-                _update_time_based_stats(commit_date, user_data['stats']['commits'])
+                _update_time_based_stats(commit_date, user_data['stats']['commit'])
                 
                 # Store date for streak calculation
                 if commit_date:
@@ -236,18 +236,18 @@ def calculate_rankings(contributions):
     
     # Define ranking categories
     ranking_categories = {
-        'pr': lambda x: x[1]['stats']['prs']['all_time'],
-        'issue': lambda x: x[1]['stats']['issues']['all_time'],
-        'commit': lambda x: x[1]['stats']['commits']['all_time'],
-        'pr_daily': lambda x: x[1]['stats']['prs']['daily'],
-        'pr_weekly': lambda x: x[1]['stats']['prs']['weekly'],
-        'pr_monthly': lambda x: x[1]['stats']['prs']['monthly'],
-        'issue_daily': lambda x: x[1]['stats']['issues']['daily'],
-        'issue_weekly': lambda x: x[1]['stats']['issues']['weekly'],
-        'issue_monthly': lambda x: x[1]['stats']['issues']['monthly'],
-        'commit_daily': lambda x: x[1]['stats']['commits']['daily'],
-        'commit_weekly': lambda x: x[1]['stats']['commits']['weekly'],
-        'commit_monthly': lambda x: x[1]['stats']['commits']['monthly'],
+        'pr': lambda x: x[1]['stats']['pr']['all_time'],
+        'issue': lambda x: x[1]['stats']['issue']['all_time'],
+        'commit': lambda x: x[1]['stats']['commit']['all_time'],
+        'pr_daily': lambda x: x[1]['stats']['pr']['daily'],
+        'pr_weekly': lambda x: x[1]['stats']['pr']['weekly'],
+        'pr_monthly': lambda x: x[1]['stats']['pr']['monthly'],
+        'issue_daily': lambda x: x[1]['stats']['issue']['daily'],
+        'issue_weekly': lambda x: x[1]['stats']['issue']['weekly'],
+        'issue_monthly': lambda x: x[1]['stats']['issue']['monthly'],
+        'commit_daily': lambda x: x[1]['stats']['commit']['daily'],
+        'commit_weekly': lambda x: x[1]['stats']['commit']['weekly'],
+        'commit_monthly': lambda x: x[1]['stats']['commit']['monthly'],
     }
     
     # Calculate rankings for each category
@@ -266,7 +266,7 @@ def calculate_streaks_and_averages(contributions):
     
     for username, data in contributions.items():
         # Calculate streaks for each contribution type
-        for contrib_type, date_key in [('prs', 'pr_dates'), ('issues', 'issue_dates'), ('commits', 'commit_dates')]:
+        for contrib_type, date_key in [('pr', 'pr_dates'), ('issue', 'issue_dates'), ('commit', 'commit_dates')]:
             dates = data.get(date_key, [])
             if dates:
                 current_streak, longest_streak = _calculate_streak_from_dates(dates)
