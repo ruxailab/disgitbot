@@ -6,7 +6,6 @@ Functions for processing contributor data to generate reviewer pools.
 
 import time
 from typing import Dict, Any, List
-from ..processors.contribution_processor import TIME_PERIODS
 
 def generate_reviewer_pool(all_contributions: Dict[str, Any], max_reviewers: int = 7) -> Dict[str, Any]:
     """Generate reviewer pool from top PR contributors."""
