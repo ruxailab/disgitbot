@@ -10,6 +10,7 @@ import random
 from typing import List, Dict, Any, Optional
 import google.generativeai as genai
 from config import GOOGLE_API_KEY, GEMINI_MODEL
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -244,41 +245,27 @@ class AIPRLabeler:
         if len(files_changed) > 10:
             files_summary += f" (and {len(files_changed) - 10} more files)"
         
-        return f"""
-You are an expert at classifying GitHub Pull Requests. Analyze this PR and select the most appropriate labels.
-
-**PR INFORMATION:**
-Title: {title}
-Description: {description}
-
-**CODE CHANGES:**
-Files changed: {files_summary}
-Lines added: {metrics.get('lines_added', 0)}
-Lines deleted: {metrics.get('lines_deleted', 0)}
-Functions added: {metrics.get('functions_added', 0)}
-Risk level: {metrics.get('risk_level', 'UNKNOWN')}
-
-**CODE DIFF (first 2000 chars):**
-{diff[:2000]}
-
-**AVAILABLE LABELS:**
-{', '.join(available_labels)}
-
-**INSTRUCTIONS:**
-1. Analyze the PR title, description, and code changes
-2. Select 1-5 most relevant labels from the available labels list
-3. Assign confidence scores (0.0-1.0) for each selected label
-4. Focus on the main purpose and impact of the PR
-
-**OUTPUT FORMAT:**
-Return your response as a JSON-like format:
-```
-LABEL: label_name | CONFIDENCE: 0.85 | REASON: brief explanation
-LABEL: another_label | CONFIDENCE: 0.70 | REASON: brief explanation
-```
-
-Only select labels that are highly relevant. Be selective and accurate.
-"""
+        # Load prompt template from file
+        prompt_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'prompts', 'label_classification.txt')
+        try:
+            with open(prompt_file, 'r', encoding='utf-8') as f:
+                prompt_template = f.read()
+        except FileNotFoundError:
+            logger.error(f"Prompt file not found: {prompt_file}")
+            raise Exception("AI prompt template file is missing")
+        
+        # Format the template with actual data
+        return prompt_template.format(
+            title=title,
+            description=description,
+            files_summary=files_summary,
+            lines_added=metrics.get('lines_added', 0),
+            lines_deleted=metrics.get('lines_deleted', 0),
+            functions_added=metrics.get('functions_added', 0),
+            risk_level=metrics.get('risk_level', 'UNKNOWN'),
+            diff=diff[:2000],
+            available_labels=', '.join(available_labels)
+        )
     
     def _parse_response(self, response_text: str, available_labels: List[str]) -> List[Dict[str, Any]]:
         """Parse the AI response into structured label predictions"""

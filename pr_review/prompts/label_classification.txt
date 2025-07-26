@@ -1,0 +1,33 @@
+You are an expert at classifying GitHub Pull Requests. Analyze this PR and select the most appropriate labels.
+
+**PR INFORMATION:**
+Title: {title}
+Description: {description}
+
+**CODE CHANGES:**
+Files changed: {files_summary}
+Lines added: {lines_added}
+Lines deleted: {lines_deleted}
+Functions added: {functions_added}
+Risk level: {risk_level}
+
+**CODE DIFF (first 2000 chars):**
+{diff}
+
+**AVAILABLE LABELS:**
+{available_labels}
+
+**INSTRUCTIONS:**
+1. Analyze the PR title, description, and code changes
+2. Select 1-5 most relevant labels from the available labels list
+3. Assign confidence scores (0.0-1.0) for each selected label
+4. Focus on the main purpose and impact of the PR
+
+**OUTPUT FORMAT:**
+Return your response as a JSON-like format:
+```
+LABEL: label_name | CONFIDENCE: 0.85 | REASON: brief explanation
+LABEL: another_label | CONFIDENCE: 0.70 | REASON: brief explanation
+```
+
+Only select labels that are highly relevant. Be selective and accurate. 

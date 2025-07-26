@@ -7,5 +7,6 @@ Simple functions for transforming raw GitHub data into structured analytics.
 import pipeline.processors.contribution_processor as contribution_functions
 import pipeline.processors.analytics_processor as analytics_functions  
 import pipeline.processors.metrics_processor as metrics_functions
+import pipeline.processors.reviewer_processor as reviewer_functions
 
-__all__ = ['contribution_functions', 'analytics_functions', 'metrics_functions'] 
+__all__ = ['contribution_functions', 'analytics_functions', 'metrics_functions', 'reviewer_functions'] 

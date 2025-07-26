@@ -1,0 +1,63 @@
+"""
+Reviewer Processing Functions
+
+Functions for processing contributor data to generate reviewer pools.
+"""
+
+import time
+from typing import Dict, Any, List
+from ..processors.contribution_processor import TIME_PERIODS
+
+def generate_reviewer_pool(all_contributions: Dict[str, Any], max_reviewers: int = 7) -> Dict[str, Any]:
+    """Generate reviewer pool from top PR contributors."""
+    print("Generating reviewer pool from top contributors...")
+    
+    if not all_contributions:
+        return {}
+    
+    # Get contributors sorted by PR count (all-time)
+    top_contributors = sorted(
+        all_contributions.items(),
+        key=lambda x: x[1].get('stats', {}).get('pr', {}).get('all_time', x[1].get('pr_count', 0)),
+        reverse=True
+    )[:max_reviewers]
+    
+    # Create reviewer list
+    reviewers = []
+    for contributor, data in top_contributors:
+        pr_count = data.get('stats', {}).get('pr', {}).get('all_time', data.get('pr_count', 0))
+        if pr_count > 0:  # Only include contributors with at least 1 PR
+            reviewers.append(contributor)
+    
+    return {
+        'reviewers': reviewers,
+        'count': len(reviewers),
+        'selection_criteria': 'top_pr_contributors',
+        'last_updated': time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime()),
+        'generated_from_total': len(all_contributions)
+    }
+
+def get_contributor_summary(all_contributions: Dict[str, Any]) -> Dict[str, Any]:
+    """Get summary of all contributors for reviewer selection context."""
+    if not all_contributions:
+        return {}
+    
+    contributors_by_prs = []
+    for username, data in all_contributions.items():
+        pr_count = data.get('stats', {}).get('pr', {}).get('all_time', data.get('pr_count', 0))
+        if pr_count > 0:
+            contributors_by_prs.append({
+                'username': username,
+                'pr_count': pr_count,
+                'issues_count': data.get('stats', {}).get('issue', {}).get('all_time', data.get('issues_count', 0)),
+                'commits_count': data.get('stats', {}).get('commit', {}).get('all_time', data.get('commits_count', 0))
+            })
+    
+    # Sort by PR count
+    contributors_by_prs.sort(key=lambda x: x['pr_count'], reverse=True)
+    
+    return {
+        'top_contributors': contributors_by_prs[:15],
+        'total_contributors': len(contributors_by_prs),
+        'criteria': 'sorted_by_pr_count'
+    } 

@@ -6,6 +6,7 @@ Handles administrative Discord commands like permissions and setup.
 
 import discord
 from discord import app_commands
+from ...core.services import get_document, set_document
 
 class AdminCommands:
     """Handles administrative Discord commands."""
@@ -17,6 +18,9 @@ class AdminCommands:
         """Register all admin commands with the bot."""
         self.bot.tree.add_command(self._check_permissions_command())
         self.bot.tree.add_command(self._setup_voice_stats_command())
+        self.bot.tree.add_command(self._add_reviewer_command())
+        self.bot.tree.add_command(self._remove_reviewer_command())
+        self.bot.tree.add_command(self._list_reviewers_command())
     
     def _check_permissions_command(self):
         """Create the check_permissions command."""
@@ -70,4 +74,150 @@ class AdminCommands:
                 import traceback
                 traceback.print_exc()
         
-        return setup_voice_stats 
+        return setup_voice_stats
+    
+    def _add_reviewer_command(self):
+        """Create the add_reviewer command."""
+        @app_commands.command(name="add_reviewer", description="Add a GitHub username to the PR reviewer pool")
+        @app_commands.describe(username="GitHub username to add as reviewer")
+        async def add_reviewer(interaction: discord.Interaction, username: str):
+            await interaction.response.defer()
+            
+            try:
+                # Get current reviewer configuration
+                reviewer_data = get_document('pr_config', 'reviewers')
+                if not reviewer_data:
+                    reviewer_data = {'reviewers': [], 'count': 0, 'selection_criteria': 'manual_additions'}
+                
+                current_reviewers = reviewer_data.get('reviewers', [])
+                
+                # Check if reviewer already exists
+                if username in current_reviewers:
+                    await interaction.followup.send(f"GitHub user `{username}` is already in the reviewer pool.")
+                    return
+                
+                # Add the reviewer
+                current_reviewers.append(username)
+                reviewer_data['reviewers'] = current_reviewers
+                reviewer_data['count'] = len(current_reviewers)
+                reviewer_data['last_updated'] = __import__('time').strftime('%Y-%m-%d %H:%M:%S UTC', __import__('time').gmtime())
+                
+                # Save to Firestore
+                success = set_document('pr_config', 'reviewers', reviewer_data)
+                
+                if success:
+                    await interaction.followup.send(f"Successfully added `{username}` to the PR reviewer pool.\nTotal reviewers: {len(current_reviewers)}")
+                else:
+                    await interaction.followup.send("Failed to add reviewer to the database.")
+                    
+            except Exception as e:
+                await interaction.followup.send(f"Error adding reviewer: {str(e)}")
+                print(f"Error in add_reviewer: {e}")
+                import traceback
+                traceback.print_exc()
+        
+        return add_reviewer
+    
+    def _remove_reviewer_command(self):
+        """Create the remove_reviewer command."""
+        @app_commands.command(name="remove_reviewer", description="Remove a GitHub username from the PR reviewer pool")
+        @app_commands.describe(username="GitHub username to remove from reviewers")
+        async def remove_reviewer(interaction: discord.Interaction, username: str):
+            await interaction.response.defer()
+            
+            try:
+                # Get current reviewer configuration
+                reviewer_data = get_document('pr_config', 'reviewers')
+                if not reviewer_data or not reviewer_data.get('reviewers'):
+                    await interaction.followup.send("No reviewers found in the database.")
+                    return
+                
+                current_reviewers = reviewer_data.get('reviewers', [])
+                
+                # Check if reviewer exists
+                if username not in current_reviewers:
+                    await interaction.followup.send(f"GitHub user `{username}` is not in the reviewer pool.")
+                    return
+                
+                # Remove the reviewer
+                current_reviewers.remove(username)
+                reviewer_data['reviewers'] = current_reviewers
+                reviewer_data['count'] = len(current_reviewers)
+                reviewer_data['last_updated'] = __import__('time').strftime('%Y-%m-%d %H:%M:%S UTC', __import__('time').gmtime())
+                
+                # Save to Firestore
+                success = set_document('pr_config', 'reviewers', reviewer_data)
+                
+                if success:
+                    await interaction.followup.send(f"Successfully removed `{username}` from the PR reviewer pool.\nTotal reviewers: {len(current_reviewers)}")
+                else:
+                    await interaction.followup.send("Failed to remove reviewer from the database.")
+                    
+            except Exception as e:
+                await interaction.followup.send(f"Error removing reviewer: {str(e)}")
+                print(f"Error in remove_reviewer: {e}")
+                import traceback
+                traceback.print_exc()
+        
+        return remove_reviewer
+    
+    def _list_reviewers_command(self):
+        """Create the list_reviewers command."""
+        @app_commands.command(name="list_reviewers", description="Show current PR reviewer pool and top contributors")
+        async def list_reviewers(interaction: discord.Interaction):
+            await interaction.response.defer()
+            
+            try:
+                # Get reviewer data
+                reviewer_data = get_document('pr_config', 'reviewers')
+                contributor_data = get_document('repo_stats', 'contributor_summary')
+                
+                embed = discord.Embed(
+                    title="PR Reviewer Pool Status",
+                    color=discord.Color.blue()
+                )
+                
+                # Show current reviewers
+                if reviewer_data and reviewer_data.get('reviewers'):
+                    reviewers = reviewer_data['reviewers']
+                    reviewers_text = '\n'.join([f"• {reviewer}" for reviewer in reviewers])
+                    embed.add_field(
+                        name=f"Current Reviewers ({len(reviewers)})",
+                        value=reviewers_text,
+                        inline=False
+                    )
+                    
+                    embed.add_field(
+                        name="Pool Info",
+                        value=f"Last Updated: {reviewer_data.get('last_updated', 'Unknown')}\nSelection: {reviewer_data.get('selection_criteria', 'Unknown')}",
+                        inline=False
+                    )
+                else:
+                    embed.add_field(
+                        name="Current Reviewers",
+                        value="No reviewers configured",
+                        inline=False
+                    )
+                
+                # Show top contributors (potential reviewers)
+                if contributor_data and contributor_data.get('top_contributors'):
+                    top_contributors = contributor_data['top_contributors'][:7]
+                    contrib_text = '\n'.join([
+                        f"• {c['username']} ({c['pr_count']} PRs)"
+                        for c in top_contributors
+                    ])
+                    embed.add_field(
+                        name="Top Contributors (Auto-Selected Pool)",
+                        value=contrib_text,
+                        inline=False
+                    )
+                
+                await interaction.followup.send(embed=embed)
+                
+            except Exception as e:
+                await interaction.followup.send(f"Error retrieving reviewer information: {str(e)}")
+                print(f"Error in list_reviewers: {e}")
+                import traceback
+                traceback.print_exc()
+        
+        return list_reviewers 

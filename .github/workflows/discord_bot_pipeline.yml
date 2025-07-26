@@ -72,7 +72,7 @@ jobs:
           python -u -c "
           import sys, json
           sys.path.insert(0, 'src')
-          from pipeline.processors import contribution_functions, analytics_functions, metrics_functions
+          from pipeline.processors import contribution_functions, analytics_functions, metrics_functions, reviewer_functions
           
           print('Loading raw data...')
           with open('raw_data.json', 'r') as f:
@@ -93,7 +93,12 @@ jobs:
           print('Processing repository labels...')
           processed_labels = metrics_functions.process_repository_labels(raw_data)
           
+          print('Generating reviewer pool...')
+          reviewer_pool = reviewer_functions.generate_reviewer_pool(contributions)
+          contributor_summary = reviewer_functions.get_contributor_summary(contributions)
+          
           print(f'Processed {len(contributions)} contributors')
+          print(f'Generated reviewer pool with {reviewer_pool.get(\"count\", 0)} reviewers')
           
           print('Saving processed data...')
           processed_data = {
@@ -101,7 +106,9 @@ jobs:
             'hall_of_fame': hall_of_fame,
             'analytics_data': analytics_data,
             'repo_metrics': repo_metrics,
-            'processed_labels': processed_labels
+            'processed_labels': processed_labels,
+            'reviewer_pool': reviewer_pool,
+            'contributor_summary': contributor_summary
           }
           with open('processed_data.json', 'w') as f:
             json.dump(processed_data, f)
@@ -128,11 +135,18 @@ jobs:
           analytics_data = data['analytics_data']
           repo_metrics = data['repo_metrics']
           processed_labels = data['processed_labels']
+          reviewer_pool = data['reviewer_pool']
+          contributor_summary = data['contributor_summary']
           
           print('Storing data in Firestore...')
           set_document('repo_stats', 'metrics', repo_metrics)
           set_document('repo_stats', 'hall_of_fame', hall_of_fame)
           set_document('repo_stats', 'analytics', analytics_data)
+          
+          print('Storing reviewer pool...')
+          set_document('pr_config', 'reviewers', reviewer_pool)
+          set_document('repo_stats', 'contributor_summary', contributor_summary)
+          print(f'Stored reviewer pool with {reviewer_pool.get(\"count\", 0)} reviewers')
           
           print('Storing repository labels...')
           labels_stored = 0
