@@ -5,25 +5,6 @@ Simple configuration functions for environment variables and paths.
 """
 
 import os
-from dotenv import load_dotenv
-
-def load_env():
-    """Load environment variables from .env file."""
-    env_paths = [
-        'discord_bot/config/.env',
-        'config/.env', 
-        '.env'
-    ]
-    
-    for path in env_paths:
-        if os.path.exists(path):
-            load_dotenv(path)
-            return
-    
-    print("WARNING: No .env file found")
-
-# Load env on import
-load_env()
 
 def get_firebase_credentials_path() -> str:
     """Get the path to Firebase credentials with fallback logic."""
