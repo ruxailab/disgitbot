@@ -14,29 +14,29 @@ class RoleConfiguration:
     def __init__(self):
         # PR Role Thresholds
         self.pr_thresholds = {
-            "🌸 1+ PR": 1,
-            "🌺 6+ PR": 6,
-            "🌻 16+ PR": 16,
-            "🌷 31+ PR": 31,
-            "🌹 51+ PR": 51
+            "🌸 1+ PRs": 1,
+            "🌺 6+ PRs": 6,
+            "🌻 16+ PRs": 16,
+            "🌷 31+ PRs": 31,
+            "🌹 51+ PRs": 51
         }
         
         # Issue Role Thresholds  
         self.issue_thresholds = {
-            "🍃 1+ Issue": 1,
-            "🌿 6+ Issue": 6,
-            "🌱 16+ Issue": 16,
-            "🌾 31+ Issue": 31,
-            "🍀 51+ Issue": 51
+            "🍃 1+ GitHub Issues Reported": 1,
+            "🌿 6+ GitHub Issues Reported": 6,
+            "🌱 16+ GitHub Issues Reported": 16,
+            "🌾 31+ GitHub Issues Reported": 31,
+            "🍀 51+ GitHub Issues Reported": 51
         }
         
         # Commit Role Thresholds
         self.commit_thresholds = {
-            "☁️ 1+ Commit": 1,
-            "🌊 51+ Commit": 51,
-            "🌈 101+ Commit": 101,
-            "🌙 251+ Commit": 251,
-            "⭐ 501+ Commit": 501
+            "☁️ 1+ Commits": 1,
+            "🌊 51+ Commits": 51,
+            "🌈 101+ Commits": 101,
+            "🌙 251+ Commits": 251,
+            "⭐ 501+ Commits": 501
         }
         
         # Medal roles for top 3 contributors
@@ -49,35 +49,43 @@ class RoleConfiguration:
             "Contributor (6-15 Issues)", "Analyst (16-30 Issues)", "Expert (31-50 Issues)", 
             "Master (51+ Issues)", "Beginner (1-50 Commits)", "Contributor (51-100 Commits)", 
             "Analyst (101-250 Commits)", "Expert (251-500 Commits)", "Master (501+ Commits)",
-            # Also clean up the old minimal names
+            # Clean up the old minimal names
             "1+ PR", "6+ PR", "16+ PR", "31+ PR", "51+ PR",
             "1+ Issue", "6+ Issue", "16+ Issue", "31+ Issue", "51+ Issue", 
+            "1+ Issue Reporter", "6+ Issue Reporter", "16+ Issue Reporter", "31+ Issue Reporter", "51+ Issue Reporter",
+            "1+ Bug Hunter", "6+ Bug Hunter", "16+ Bug Hunter", "31+ Bug Hunter", "51+ Bug Hunter",
             "1+ Commit", "51+ Commit", "101+ Commit", "251+ Commit", "501+ Commit",
-            "PR Champion", "PR Runner-up", "PR Bronze"
+            "PR Champion", "PR Runner-up", "PR Bronze",
+            # Clean up previous emoji versions
+            "🌸 1+ PR", "🌺 6+ PR", "🌻 16+ PR", "🌷 31+ PR", "🌹 51+ PR",
+            "🍃 1+ Issue", "🌿 6+ Issue", "🌱 16+ Issue", "🌾 31+ Issue", "🍀 51+ Issue",
+            "🍃 1+ Issue Reporter", "🌿 6+ Issue Reporter", "🌱 16+ Issue Reporter", "🌾 31+ Issue Reporter", "🍀 51+ Issue Reporter",
+            "🍃 1+ Bug Hunter", "🌿 6+ Bug Hunter", "🌱 16+ Bug Hunter", "🌾 31+ Bug Hunter", "🍀 51+ Bug Hunter",
+            "☁️ 1+ Commit", "🌊 51+ Commit", "🌈 101+ Commit", "🌙 251+ Commit", "⭐ 501+ Commit"
         }
         
         # Role Colors (RGB tuples) - Aesthetic pastels
         self.role_colors = {
             # PR roles - Pink/Rose pastels
-            "🌸 1+ PR": (255, 182, 193),        # Light pink
-            "🌺 6+ PR": (255, 160, 180),        # Soft rose
-            "🌻 16+ PR": (255, 140, 167),       # Medium rose
-            "🌷 31+ PR": (255, 120, 154),       # Deep rose
-            "🌹 51+ PR": (255, 100, 141),       # Rich rose
+            "🌸 1+ PRs": (255, 182, 193),        # Light pink
+            "🌺 6+ PRs": (255, 160, 180),        # Soft rose
+            "🌻 16+ PRs": (255, 140, 167),       # Medium rose
+            "🌷 31+ PRs": (255, 120, 154),       # Deep rose
+            "🌹 51+ PRs": (255, 100, 141),       # Rich rose
             
             # Issue roles - Green pastels
-            "🍃 1+ Issue": (189, 252, 201),     # Soft mint
-            "🌿 6+ Issue": (169, 252, 186),     # Light mint
-            "🌱 16+ Issue": (149, 252, 171),    # Medium mint
-            "🌾 31+ Issue": (129, 252, 156),    # Deep mint
-            "🍀 51+ Issue": (109, 252, 141),    # Rich mint
+            "🍃 1+ GitHub Issues Reported": (189, 252, 201),     # Soft mint
+            "🌿 6+ GitHub Issues Reported": (169, 252, 186),     # Light mint
+            "🌱 16+ GitHub Issues Reported": (149, 252, 171),    # Medium mint
+            "🌾 31+ GitHub Issues Reported": (129, 252, 156),    # Deep mint
+            "🍀 51+ GitHub Issues Reported": (109, 252, 141),    # Rich mint
             
             # Commit roles - Blue/Purple pastels
-            "☁️ 1+ Commit": (230, 230, 250),    # Lavender
-            "🌊 51+ Commit": (173, 216, 230),   # Light blue
-            "🌈 101+ Commit": (186, 186, 255),  # Periwinkle
-            "🌙 251+ Commit": (221, 160, 221),  # Plum
-            "⭐ 501+ Commit": (200, 140, 255),  # Soft purple
+            "☁️ 1+ Commits": (230, 230, 250),    # Lavender
+            "🌊 51+ Commits": (173, 216, 230),   # Light blue
+            "🌈 101+ Commits": (186, 186, 255),  # Periwinkle
+            "🌙 251+ Commits": (221, 160, 221),  # Plum
+            "⭐ 501+ Commits": (200, 140, 255),  # Soft purple
             
             # Medal roles - Shimmery pastels
             "✨ PR Champion": (255, 215, 180),   # Champagne
