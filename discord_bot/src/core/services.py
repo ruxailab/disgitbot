@@ -140,83 +140,71 @@ class DiscordBotService:
         
         hall_of_fame_data = self._role_service.get_hall_of_fame_data()
         medal_assignments = self._role_service.get_medal_assignments(hall_of_fame_data or {})
-        print(f"Medal assignments: {medal_assignments}")
         
-        roles = {}
+        obsolete_roles = self._role_service.get_obsolete_role_names()
+        current_roles = set(self._role_service.get_all_role_names())
         existing_roles = {role.name: role for role in guild.roles}
         
-        all_role_names = self._role_service.get_all_role_names()
-        
-        # Ensure the required roles exist or create them
-        for role_name in all_role_names:
+        # Remove obsolete roles from server
+        for role_name in obsolete_roles:
             if role_name in existing_roles:
-                print(f"Role {role_name} already exists, skipping creation.")
+                try:
+                    await existing_roles[role_name].delete()
+                    print(f"Deleted obsolete role: {role_name}")
+                except Exception as e:
+                    print(f"Error deleting role {role_name}: {e}")
+        
+        # Create missing current roles
+        roles = {}
+        for role_name in current_roles:
+            if role_name in existing_roles:
                 roles[role_name] = existing_roles[role_name]
             else:
                 try:
-                    print(f"Creating role: {role_name}")
                     role_color = self._role_service.get_role_color(role_name)
-                    if role_color:
-                        roles[role_name] = await guild.create_role(
-                            name=role_name, 
-                            color=discord.Color.from_rgb(*role_color)
-                        )
-                    else:
-                        roles[role_name] = await guild.create_role(name=role_name)
-                except discord.Forbidden:
-                    print(f"Insufficient permissions to create role: {role_name}")
-                    continue
+                    roles[role_name] = await guild.create_role(
+                        name=role_name, 
+                        color=discord.Color.from_rgb(*role_color) if role_color else discord.Color.default()
+                    )
+                    print(f"Created role: {role_name}")
                 except Exception as e:
                     print(f"Error creating role {role_name}: {e}")
-                    continue
         
-        # Update roles for each member
+        # Update users
         updated_count = 0
         for member in guild.members:
             github_username = user_mappings.get(str(member.id))
-            if not github_username:
-                continue
-            user_data = contributions.get(github_username)
-            if not user_data:
+            if not github_username or github_username not in contributions:
                 continue
             
-            # Remove all roles from the member except @everyone
-            roles_to_remove = [role for role in member.roles if role.name != "@everyone"]
-            try:
-                if roles_to_remove:
-                    await member.remove_roles(*roles_to_remove)
-                    print(f"Removed all roles from {member.name}")
-            except Exception as e:
-                print(f"Error removing roles from {member.name}: {e}")
-            
-            # Get contribution counts
+            user_data = contributions[github_username]
             pr_count = user_data.get("pr_count", 0)
             issues_count = user_data.get("issues_count", 0)
             commits_count = user_data.get("commits_count", 0)
             
-            # Use role service to determine roles
-            pr_role, issue_role, commit_role = self._role_service.determine_roles(
-                pr_count, issues_count, commits_count
-            )
-            print(pr_role, issue_role, commit_role)
-            new_role_names = [pr_role, issue_role, commit_role]
-            
-            # Add medal role if user is in top 3 all-time PRs
+            # Get correct roles for user
+            pr_role, issue_role, commit_role = self._role_service.determine_roles(pr_count, issues_count, commits_count)
+            correct_roles = {pr_role, issue_role, commit_role}
             if github_username in medal_assignments:
-                medal_role = medal_assignments[github_username]
-                new_role_names.append(medal_role)
-                print(f"Adding medal role {medal_role} to {member.name}")
+                correct_roles.add(medal_assignments[github_username])
+            correct_roles.discard(None)
             
-            # Add roles to the member
-            for role_name in new_role_names:
-                if role_name and role_name in roles:
-                    try:
-                        await member.add_roles(roles[role_name])
-                        print(f"Added role {role_name} to {member.name}")
-                    except Exception as e:
-                        print(f"Error adding role {role_name} to {member.name}: {e}")
+            # Remove obsolete roles and roles user outgrew
+            user_bot_roles = [role for role in member.roles if role.name in (obsolete_roles | current_roles)]
+            roles_to_remove = [role for role in user_bot_roles if role.name not in correct_roles]
             
-            updated_count += 1
+            if roles_to_remove:
+                await member.remove_roles(*roles_to_remove)
+                print(f"Removed {[r.name for r in roles_to_remove]} from {member.name}")
+            
+            # Add missing roles
+            for role_name in correct_roles:
+                if role_name in roles and roles[role_name] not in member.roles:
+                    await member.add_roles(roles[role_name])
+                    print(f"Added {role_name} to {member.name}")
+            
+            if roles_to_remove or any(role_name in roles and roles[role_name] not in member.roles for role_name in correct_roles):
+                updated_count += 1
         
         return updated_count
     

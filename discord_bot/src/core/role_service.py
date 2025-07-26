@@ -14,39 +14,75 @@ class RoleConfiguration:
     def __init__(self):
         # PR Role Thresholds
         self.pr_thresholds = {
-            "Beginner (1-5 PRs)": 1,
-            "Contributor (6-15 PRs)": 6,
-            "Analyst (16-30 PRs)": 16,
-            "Expert (31-50 PRs)": 31,
-            "Master (51+ PRs)": 51
+            "🌸 1+ PR": 1,
+            "🌺 6+ PR": 6,
+            "🌻 16+ PR": 16,
+            "🌷 31+ PR": 31,
+            "🌹 51+ PR": 51
         }
         
         # Issue Role Thresholds  
         self.issue_thresholds = {
-            "Beginner (1-5 Issues)": 1,
-            "Contributor (6-15 Issues)": 6,
-            "Analyst (16-30 Issues)": 16,
-            "Expert (31-50 Issues)": 31,
-            "Master (51+ Issues)": 51
+            "🍃 1+ Issue": 1,
+            "🌿 6+ Issue": 6,
+            "🌱 16+ Issue": 16,
+            "🌾 31+ Issue": 31,
+            "🍀 51+ Issue": 51
         }
         
         # Commit Role Thresholds
         self.commit_thresholds = {
-            "Beginner (1-50 Commits)": 1,
-            "Contributor (51-100 Commits)": 51,
-            "Analyst (101-250 Commits)": 101,
-            "Expert (251-500 Commits)": 251,
-            "Master (501+ Commits)": 501
+            "☁️ 1+ Commit": 1,
+            "🌊 51+ Commit": 51,
+            "🌈 101+ Commit": 101,
+            "🌙 251+ Commit": 251,
+            "⭐ 501+ Commit": 501
         }
         
         # Medal roles for top 3 contributors
-        self.medal_roles = ["PR Champion", "PR Runner-up", "PR Bronze"]
+        self.medal_roles = ["✨ PR Champion", "💫 PR Runner-up", "🔮 PR Bronze"]
         
-        # Role Colors (RGB tuples)
+        # Obsolete role names to clean up
+        self.obsolete_roles = {
+            "Beginner (1-5 PRs)", "Contributor (6-15 PRs)", "Analyst (16-30 PRs)", 
+            "Expert (31-50 PRs)", "Master (51+ PRs)", "Beginner (1-5 Issues)", 
+            "Contributor (6-15 Issues)", "Analyst (16-30 Issues)", "Expert (31-50 Issues)", 
+            "Master (51+ Issues)", "Beginner (1-50 Commits)", "Contributor (51-100 Commits)", 
+            "Analyst (101-250 Commits)", "Expert (251-500 Commits)", "Master (501+ Commits)",
+            # Also clean up the old minimal names
+            "1+ PR", "6+ PR", "16+ PR", "31+ PR", "51+ PR",
+            "1+ Issue", "6+ Issue", "16+ Issue", "31+ Issue", "51+ Issue", 
+            "1+ Commit", "51+ Commit", "101+ Commit", "251+ Commit", "501+ Commit",
+            "PR Champion", "PR Runner-up", "PR Bronze"
+        }
+        
+        # Role Colors (RGB tuples) - Aesthetic pastels
         self.role_colors = {
-            "PR Champion": (255, 215, 0),      # Gold
-            "PR Runner-up": (192, 192, 192),   # Silver
-            "PR Bronze": (205, 127, 50)        # Bronze
+            # PR roles - Pink/Rose pastels
+            "🌸 1+ PR": (255, 182, 193),        # Light pink
+            "🌺 6+ PR": (255, 160, 180),        # Soft rose
+            "🌻 16+ PR": (255, 140, 167),       # Medium rose
+            "🌷 31+ PR": (255, 120, 154),       # Deep rose
+            "🌹 51+ PR": (255, 100, 141),       # Rich rose
+            
+            # Issue roles - Green pastels
+            "🍃 1+ Issue": (189, 252, 201),     # Soft mint
+            "🌿 6+ Issue": (169, 252, 186),     # Light mint
+            "🌱 16+ Issue": (149, 252, 171),    # Medium mint
+            "🌾 31+ Issue": (129, 252, 156),    # Deep mint
+            "🍀 51+ Issue": (109, 252, 141),    # Rich mint
+            
+            # Commit roles - Blue/Purple pastels
+            "☁️ 1+ Commit": (230, 230, 250),    # Lavender
+            "🌊 51+ Commit": (173, 216, 230),   # Light blue
+            "🌈 101+ Commit": (186, 186, 255),  # Periwinkle
+            "🌙 251+ Commit": (221, 160, 221),  # Plum
+            "⭐ 501+ Commit": (200, 140, 255),  # Soft purple
+            
+            # Medal roles - Shimmery pastels
+            "✨ PR Champion": (255, 215, 180),   # Champagne
+            "💫 PR Runner-up": (220, 220, 220), # Pearl
+            "🔮 PR Bronze": (205, 180, 150)     # Rose gold
         }
 
 class RoleService:
@@ -95,6 +131,10 @@ class RoleService:
         all_roles.extend(self.config.commit_thresholds.keys())
         all_roles.extend(self.config.medal_roles)
         return list(set(all_roles))  # Remove duplicates
+    
+    def get_obsolete_role_names(self) -> set:
+        """Get obsolete role names that should be cleaned up."""
+        return self.config.obsolete_roles
     
     def get_role_color(self, role_name: str) -> Optional[Tuple[int, int, int]]:
         """Get RGB color for a specific role."""
