@@ -63,6 +63,25 @@ def create_analytics_data(all_contributions):
         if c.get('week_activity', 0) > 0
     ])
     
+    # Convert tuples to dictionaries for Firestore compatibility
+    top_prs = sorted(
+        all_contributions.items(),
+        key=lambda x: x[1].get('pr_count', 0),
+        reverse=True
+    )[:5]
+    
+    top_issues = sorted(
+        all_contributions.items(),
+        key=lambda x: x[1].get('issues_count', 0),
+        reverse=True
+    )[:5]
+    
+    top_commits = sorted(
+        all_contributions.items(),
+        key=lambda x: x[1].get('commits_count', 0),
+        reverse=True
+    )[:5]
+    
     return {
         'summary': {
             'total_contributors': total_contributors,
@@ -71,23 +90,30 @@ def create_analytics_data(all_contributions):
             'total_issues': total_issues,
             'total_commits': total_commits
         },
-        'top_contributors': {
-            'by_prs': sorted(
-                all_contributions.items(),
-                key=lambda x: x[1].get('pr_count', 0),
-                reverse=True
-            )[:5],
-            'by_issues': sorted(
-                all_contributions.items(),
-                key=lambda x: x[1].get('issues_count', 0),
-                reverse=True
-            )[:5],
-            'by_commits': sorted(
-                all_contributions.items(),
-                key=lambda x: x[1].get('commits_count', 0),
-                reverse=True
-            )[:5]
-        },
+        'top_contributors_prs': [
+            {
+                'username': username,
+                'pr_count': data.get('pr_count', 0),
+                'total_activity': data.get('total_activity', 0)
+            }
+            for username, data in top_prs
+        ],
+        'top_contributors_issues': [
+            {
+                'username': username,
+                'issues_count': data.get('issues_count', 0),
+                'total_activity': data.get('total_activity', 0)
+            }
+            for username, data in top_issues
+        ],
+        'top_contributors_commits': [
+            {
+                'username': username,
+                'commits_count': data.get('commits_count', 0),
+                'total_activity': data.get('total_activity', 0)
+            }
+            for username, data in top_commits
+        ],
         'activity_trends': {
             'today_total': sum(c.get('today_activity', 0) for c in all_contributions.values()),
             'week_total': sum(c.get('week_activity', 0) for c in all_contributions.values()),
