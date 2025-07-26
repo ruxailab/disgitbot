@@ -101,7 +101,7 @@ class UserCommands:
         @app_commands.describe(type="Type of stats to display")
         @app_commands.choices(type=[
             app_commands.Choice(name="Pull Requests", value="pr"),
-            app_commands.Choice(name="Issues", value="issue"),
+            app_commands.Choice(name="GitHub Issues Reported", value="issue"),
             app_commands.Choice(name="Commits", value="commit")
         ])
         async def getstats(interaction: discord.Interaction, type: str = "pr"):
@@ -154,7 +154,7 @@ class UserCommands:
         @app_commands.describe(type="Contribution type", period="Time period")
         @app_commands.choices(type=[
             app_commands.Choice(name="Pull Requests", value="pr"),
-            app_commands.Choice(name="Issues", value="issue"),
+            app_commands.Choice(name="GitHub Issues Reported", value="issue"),
             app_commands.Choice(name="Commits", value="commit")
         ])
         @app_commands.choices(period=[
@@ -207,7 +207,7 @@ class UserCommands:
             count_field = "issues_count"
             stats_field = "issues"
             role = issue_role if issue_role else "None"
-            title_prefix = "Issue"
+            title_prefix = "GitHub Issue Reported"
         elif stats_type == "commit":
             count_field = "commits_count"
             stats_field = "commits"
@@ -221,7 +221,7 @@ class UserCommands:
         # Create enhanced embed
         embed = discord.Embed(
             title=f"GitHub Contribution Metrics for {github_username}",
-            description=f"Stats tracked across all RUXAILAB repositories. Updated hourly. Last update: {stats.get('last_updated', datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC'))}",
+            description=f"Stats tracked across all RUXAILAB repositories. Updated daily. Last update: {stats.get('last_updated', datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC'))}",
             color=discord.Color.blue()
         )
         
@@ -256,7 +256,7 @@ class UserCommands:
         if stats_type != "pr":
             other_types.append(f"`/getstats type:pr` - View PR stats")
         if stats_type != "issue":
-            other_types.append(f"`/getstats type:issue` - View Issue stats")
+            other_types.append(f"`/getstats type:issue` - View GitHub Issues Reported stats")
         if stats_type != "commit":
             other_types.append(f"`/getstats type:commit` - View Commit stats")
             
@@ -269,7 +269,7 @@ class UserCommands:
         return embed 
     def _create_halloffame_embed(self, top_3, type, period, last_updated):
         """Create hall of fame embed."""
-        type_names = {"pr": "Pull Requests", "issue": "Issues", "commit": "Commits"}
+        type_names = {"pr": "Pull Requests", "issue": "GitHub Issues Reported", "commit": "Commits"}
         period_names = {"all_time": "All Time", "monthly": "Monthly", "weekly": "Weekly", "daily": "Daily"}
         
         embed = discord.Embed(
