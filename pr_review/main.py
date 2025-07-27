@@ -9,9 +9,6 @@ import logging
 from typing import Dict, Any, List
 import json
 
-# Add the current directory to Python path for imports
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-
 from config import GITHUB_TOKEN, GOOGLE_API_KEY, REPO_OWNER
 from utils.github_client import GitHubClient
 from utils.metrics_calculator import MetricsCalculator

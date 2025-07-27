@@ -5,17 +5,9 @@ Reviewer Assigner for automatically assigning reviewers to pull requests.
 
 import random
 import logging
-import sys
-import os
 import time
 from typing import List, Dict, Any, Optional
-
-# Import Discord bot core services
-discord_bot_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'discord_bot', 'src')
-if discord_bot_path not in sys.path:
-    sys.path.insert(0, discord_bot_path)
-
-from core.database import get_document, set_document
+from shared.firestore import get_document, set_document
 
 logger = logging.getLogger(__name__)
 

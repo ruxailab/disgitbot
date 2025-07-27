@@ -119,12 +119,12 @@ jobs:
         env:
           GOOGLE_APPLICATION_CREDENTIALS: discord_bot/config/credentials.json
           PYTHONUNBUFFERED: 1
+          PYTHONPATH: ${{ github.workspace }}
         run: |
           cd discord_bot
           python -u -c "
-          import sys, json
-          sys.path.insert(0, 'src')
-          from core.database import set_document, query_collection, update_document
+          from shared.firestore import set_document, query_collection, update_document
+          import json
           
           print('Loading processed data...')
           with open('processed_data.json', 'r') as f:
@@ -179,14 +179,15 @@ jobs:
           DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
           GOOGLE_APPLICATION_CREDENTIALS: discord_bot/config/credentials.json
           PYTHONUNBUFFERED: 1
+          PYTHONPATH: ${{ github.workspace }}
         run: |
           cd discord_bot
           python -u -c "
-          import sys, json
-          sys.path.insert(0, 'src')
-          from core.database import query_collection
-          from core.services import DiscordBotService
-          from core.role_service import RoleService
+          from shared.firestore import query_collection  # Uses PYTHONPATH (no path setup needed)
+          import sys, json                               # Standard library imports
+          sys.path.insert(0, 'src')                     # Setup for local modules
+          from core.services import DiscordBotService    # Uses src/ path
+          from core.role_service import RoleService      # Uses src/ path
           
           print('Loading processed data...')
           with open('processed_data.json', 'r') as f:

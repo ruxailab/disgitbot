@@ -20,6 +20,12 @@ RUN pip install --no-cache-dir --root-user-action=ignore -r discord_bot_requirem
 # Create config directory and empty credentials file (will be overwritten by volume mount)
 RUN mkdir -p /app/config && echo "{}" > /app/config/credentials.json
 
+# Copy shared package first
+COPY ../shared ./shared
+
+# Set PYTHONPATH to include shared packages (needed for from shared.firestore import ...)
+ENV PYTHONPATH=/app:$PYTHONPATH
+
 # Copy all bot files
 COPY . .
 

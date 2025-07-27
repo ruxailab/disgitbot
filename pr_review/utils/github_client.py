@@ -229,13 +229,7 @@ class GitHubClient:
             List of label dictionaries with name, color, description
         """
         try:
-            import sys
-            import os
-            discord_bot_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'discord_bot', 'src')
-            if discord_bot_path not in sys.path:
-                sys.path.insert(0, discord_bot_path)
-            
-            from core.database import get_document
+            from shared.firestore import get_document
             
             doc_id = repo.replace('/', '_')
             label_data = get_document('repository_labels', doc_id)

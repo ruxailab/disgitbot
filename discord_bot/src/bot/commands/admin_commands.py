@@ -6,7 +6,7 @@ Handles administrative Discord commands like permissions and setup.
 
 import discord
 from discord import app_commands
-from ...core.database import get_document, set_document
+from shared.firestore import get_document, set_document
 
 class AdminCommands:
     """Handles administrative Discord commands."""

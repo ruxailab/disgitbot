@@ -4,14 +4,12 @@ Core Services
 Discord bot functionality.
 """
 
-import os
 import discord
 from discord.ext import commands
 from typing import Dict, Any, Optional, List
 import time
-
 from .config import get_discord_token
-from .database import get_document, set_document, update_document, query_collection
+from shared.firestore import get_document, set_document, update_document, query_collection
 
 class DiscordBotService:
     """Discord bot implementation for role and channel management."""

@@ -150,7 +150,7 @@ class RoleService:
     
     def get_hall_of_fame_data(self) -> Optional[Dict[str, Any]]:
         """Get hall of fame data from storage."""
-        from .database import get_document
+        from shared.firestore import get_document
         return get_document('repo_stats', 'hall_of_fame')
     
     def get_next_role(self, current_role: str, stats_type: str) -> str:
