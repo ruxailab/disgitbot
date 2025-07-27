@@ -45,6 +45,8 @@ on:
         required: true
       GOOGLE_API_KEY:
         required: true
+      GOOGLE_CREDENTIALS_JSON:
+        required: true
 
 jobs:
   # Process PR with AI automation
