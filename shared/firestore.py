@@ -10,7 +10,7 @@ def _get_firestore_client():
     global _db
     if _db is None:
         if not firebase_admin._apps:
-            cred_path = os.path.join(os.getcwd(), 'discord_bot', 'config', 'credentials.json')
+            cred_path = os.path.join(os.getcwd(), 'config', 'credentials.json')
             if not os.path.exists(cred_path):
                 raise FileNotFoundError(f"Firebase credentials file not found: {cred_path}")
             
