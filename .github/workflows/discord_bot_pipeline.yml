@@ -48,6 +48,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.DEV_GH_TOKEN }}
           REPO_OWNER: ${{ secrets.REPO_OWNER }}
           PYTHONUNBUFFERED: 1
+          PYTHONPATH: ${{ github.workspace }}
         run: |
           cd discord_bot
           python -u -c "
@@ -67,6 +68,7 @@ jobs:
       - name: Process Contributions & Analytics
         env:
           PYTHONUNBUFFERED: 1
+          PYTHONPATH: ${{ github.workspace }}
         run: |
           cd discord_bot
           python -u -c "
