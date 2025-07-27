@@ -145,9 +145,7 @@ Cyclomatic complexity +{complexity_added} · Functions +{functions_added} · Ris
 
 """
         
-        # Risk assessment (only if medium/high risk)
-        if metrics.get('risk_factors') and risk_level in ['MEDIUM', 'HIGH']:
-            comment += f"**Risk**: {metrics['risk_factors'][0]}\n\n"
+        # Risk assessment removed - already covered in metrics summary
         
         # Labels (clean format)
         if labels:
