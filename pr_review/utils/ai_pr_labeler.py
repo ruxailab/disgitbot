@@ -195,16 +195,9 @@ class AIPRLabeler:
             
         except Exception as e:
             logger.error(f"Failed to fetch repository labels: {e}")
-            return self._get_default_labels()
+            raise
     
-    def _get_default_labels(self) -> List[str]:
-        """Return default RUXAILAB labels as fallback"""
-        return [
-            "accessibility", "user-testing", "eye-tracking", "vr-ar", 
-            "research", "figma-integration", "documentation", "feature", 
-            "bug", "enhancement", "testing", "ui/ux", "backend", 
-            "security", "performance", "dependencies", "ci/cd"
-        ]
+
     
     def _make_ai_request(self, prompt: str) -> Any:
         """Make a single AI request without retry logic"""

@@ -127,47 +127,49 @@ class PRReviewSystem:
             }
     
     def _build_comprehensive_comment(self, metrics: Dict, labels: List[Dict], reviewers: Dict, ai_review: Dict) -> str:
-        """Build a focused comment with metrics and automation info"""
+        """Build a clean, Apple-inspired comment with essential information"""
         
-        comment = "# Automated PR Analysis\n\n"
+        # Get essential metrics
+        functions_added = metrics.get('functions_added', 0)
+        lines_added = metrics.get('lines_added', 0)
+        files_changed = metrics.get('files_changed', 0)
+        complexity_added = metrics.get('cyclomatic_complexity_added', 0)
+        risk_level = metrics.get('risk_level', 'UNKNOWN')
         
-        # Add metrics section
-        comment += "## Code Metrics\n"
-        comment += f"In this PR introducing {metrics.get('functions_added', 0)} more functions:\n\n"
-        comment += f"- Cyclomatic complexity will increase by: {metrics.get('cyclomatic_complexity_added', 0)}\n"
-        comment += f"- Line number will increase by: {metrics.get('lines_added', 0)}\n"
-        comment += f"- Files changed: {metrics.get('files_changed', 0)}\n"
-        comment += f"- Risk Level: {metrics.get('risk_level', 'UNKNOWN')}\n\n"
+        # Build clean, minimal comment
+        comment = f"""## Code Metrics
+
+**{lines_added}** lines added across **{files_changed}** {'file' if files_changed == 1 else 'files'}
+
+Complexity **+{complexity_added}** · Functions **+{functions_added}** · Risk **{risk_level}**
+
+"""
         
-        # Risk factors (if any)
-        if metrics.get('risk_factors'):
-            comment += "**Risk Factors:**\n"
-            for factor in metrics['risk_factors']:
-                comment += f"- {factor}\n"
-            comment += "\n"
+        # Risk assessment (only if medium/high risk)
+        if metrics.get('risk_factors') and risk_level in ['MEDIUM', 'HIGH']:
+            risk_emoji = "🟡" if risk_level == "MEDIUM" else "🔴"
+            comment += f"{risk_emoji} **{metrics['risk_factors'][0]}**\n\n"
         
-        # Add labels section
-        comment += "## Auto-Applied Labels\n"
-        
-        # AI-predicted labels
+        # Labels (clean, badge-like format)
         if labels:
+            label_badges = []
             for label in labels:
-                confidence_percent = int(label["confidence"] * 100)
-                comment += f"- {label['name']} ({confidence_percent}% confidence)\n"
-            comment += "\n"
+                confidence = int(label["confidence"] * 100)
+                if confidence >= 80:
+                    label_badges.append(f"`{label['name']}`")
+                elif confidence >= 60:
+                    label_badges.append(f"`{label['name']}*`")
+            
+            if label_badges:
+                comment += f"**Labels** {' '.join(label_badges)}\n\n"
         
-        # Add reviewers section
-        comment += "## Auto-Assigned Reviewers\n"
-        
-        # Reviewer assignments
+        # Reviewers (simple, clean format)
         if reviewers.get('reviewers'):
-            for reviewer in reviewers['reviewers']:
-                comment += f"- @{reviewer['username']} "
-                comment += f"({reviewer.get('expertise', 'General')} expertise)\n"
-            comment += "\n"
+            reviewer_list = ' '.join([f"@{r['username']}" for r in reviewers['reviewers']])
+            comment += f"**Reviewers** {reviewer_list}\n\n"
         
-        comment += "---\n"
-        comment += f"*Automated analysis by {REPO_OWNER.upper()} PR System*"
+        # Minimal footer
+        comment += f"<sub>Automated analysis · {REPO_OWNER}</sub>"
         
         return comment
     

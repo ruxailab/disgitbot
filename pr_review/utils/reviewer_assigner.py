@@ -21,17 +21,20 @@ class ReviewerAssigner:
     def _load_reviewers(self) -> List[str]:
         """Load reviewer pool from Firestore configuration."""
         try:
+            logger.info("REVIEWER DEBUG: Attempting to load reviewers from pr_config/reviewers")
             reviewer_data = get_document('pr_config', 'reviewers')
+            
             if reviewer_data and 'reviewers' in reviewer_data:
                 reviewers = reviewer_data['reviewers']
-                logger.info(f"Loaded {len(reviewers)} reviewers from Firestore")
+                logger.info(f"REVIEWER DEBUG: Successfully loaded {len(reviewers)} reviewers: {reviewers}")
                 return reviewers
             
-            logger.warning("No reviewer configuration found in Firestore")
+            logger.error("REVIEWER DEBUG: No reviewer configuration found in Firestore")
+            logger.error(f"REVIEWER DEBUG: Retrieved data: {reviewer_data}")
             return []
               
         except Exception as e:
-            logger.error(f"Failed to load reviewers from Firestore: {e}")
+            logger.error(f"REVIEWER DEBUG: Failed to load reviewers from Firestore: {e}")
             return []
     
     def assign_reviewers(self, pr_data: Dict[str, Any], repo: Optional[str] = None) -> Dict[str, Any]:

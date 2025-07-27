@@ -77,7 +77,7 @@ discord_bot/src/
 - **Depend on abstractions, not concretions**
 - Services depend on `IStorageService` interface
 - Pipeline stages inject dependencies via constructor
-- Easy to mock for testing
+- Clear interface boundaries
 
 ### Interface Segregation ✅
 - **Small, focused interfaces**
@@ -115,7 +115,7 @@ user_commands.register_commands()
 ## Benefits Achieved
 
 ### 🧪 **Testability**
-- **Dependency injection** enables easy mocking
+- **Dependency injection** enables clean testing
 - **Small, focused methods** are simple to test
 - **Interface-based design** allows test doubles
 
@@ -180,7 +180,7 @@ container.register_singleton(IStorageService, PostgreSQLService)
 ## Testing Strategy
 
 ### Unit Testing
-- **Mock dependencies** using interfaces
+- **Test dependencies** using interfaces
 - **Test individual components** in isolation
 - **Verify behavior** not implementation
 

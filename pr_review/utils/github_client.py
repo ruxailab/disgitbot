@@ -234,35 +234,18 @@ class GitHubClient:
             doc_id = repo.replace('/', '_')
             label_data = get_document('repository_labels', doc_id)
             
-            if label_data and 'labels' in label_data:
-                labels = label_data['labels']
-                self.logger.info(f"Retrieved {len(labels)} labels for {repo} from stored data")
-                return labels
-            else:
-                self.logger.warning(f"No stored labels found for {repo}, using fallback API call")
-                # Fallback to direct API call if no stored data
-                return self._get_labels_from_api(repo)
+            if not label_data or 'labels' not in label_data:
+                raise ValueError(f"No label configuration found for repository {repo}")
+                
+            labels = label_data['labels']
+            self.logger.info(f"Retrieved {len(labels)} labels for {repo} from stored data")
+            return labels
                 
         except Exception as e:
             self.logger.error(f"Error getting stored labels for {repo}: {e}")
-            # Fallback to direct API call
-            return self._get_labels_from_api(repo)
+            raise
     
-    def _get_labels_from_api(self, repo: str) -> List[Dict[str, Any]]:
-        """Fallback method to get labels directly from GitHub API."""
-        try:
-            endpoint = f"repos/{repo}/labels"
-            response = self._make_request(endpoint)
-            
-            if response.get('status_code') == 200:
-                return response.get('data', [])
-            
-            self.logger.warning(f"Failed to get labels for {repo} via API")
-            return []
-            
-        except Exception as e:
-            self.logger.error(f"Error getting labels from API for {repo}: {e}")
-            return []
+
     
     def add_labels_to_pull_request(self, repo: str, pr_number: int, labels: List[str]) -> Dict[str, Any]:
         """

@@ -55,7 +55,7 @@ class MetricsCalculator:
             
         except Exception as e:
             logger.error(f"Error calculating metrics: {e}")
-            return self._get_fallback_metrics(files)
+            raise
     
     def _calculate_basic_metrics(self, files: List[Dict]) -> Dict[str, Any]:
         """Calculate basic metrics from GitHub API data"""
@@ -252,18 +252,4 @@ class MetricsCalculator:
             'risk_score': risk_score,
             'risk_factors': risk_factors,
         }
-    
-    def _get_fallback_metrics(self, files: List[Dict]) -> Dict[str, Any]:
-        """Fallback metrics if calculation fails"""
-        return {
-            'lines_added': sum(file.get('additions', 0) for file in files),
-            'lines_deleted': sum(file.get('deletions', 0) for file in files),
-            'files_changed': len(files),
-            'total_changes': sum(file.get('additions', 0) + file.get('deletions', 0) for file in files),
-            'cyclomatic_complexity_added': 0,
-            'functions_added': 0,
-            'classes_added': 0,
-            'risk_level': 'UNKNOWN',
-            'risk_factors': ['Metrics calculation failed'],
-            'error': 'Failed to calculate detailed metrics'
-        } 
+ 
