@@ -124,7 +124,7 @@ jobs:
           python -u -c "
           import sys, json
           sys.path.insert(0, 'src')
-          from core.services import set_document, query_collection, update_document
+          from core.database import set_document, query_collection, update_document
           
           print('Loading processed data...')
           with open('processed_data.json', 'r') as f:
@@ -184,7 +184,8 @@ jobs:
           python -u -c "
           import sys, json
           sys.path.insert(0, 'src')
-          from core.services import query_collection, DiscordBotService
+          from core.database import query_collection
+          from core.services import DiscordBotService
           from core.role_service import RoleService
           
           print('Loading processed data...')

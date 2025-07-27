@@ -6,7 +6,7 @@ Handles analytics and visualization-related Discord commands.
 
 import discord
 from discord import app_commands
-from ...core.services import get_document
+from ...core.database import get_document
 from ...utils.analytics import create_top_contributors_chart, create_activity_comparison_chart, create_activity_trend_chart
 
 class AnalyticsCommands:

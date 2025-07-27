@@ -15,7 +15,7 @@ discord_bot_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
 if discord_bot_path not in sys.path:
     sys.path.insert(0, discord_bot_path)
 
-from core.services import get_document, set_document
+from core.database import get_document, set_document
 
 logger = logging.getLogger(__name__)
 

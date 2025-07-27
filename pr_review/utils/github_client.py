@@ -235,7 +235,7 @@ class GitHubClient:
             if discord_bot_path not in sys.path:
                 sys.path.insert(0, discord_bot_path)
             
-            from core.services import get_document
+            from core.database import get_document
             
             doc_id = repo.replace('/', '_')
             label_data = get_document('repository_labels', doc_id)
