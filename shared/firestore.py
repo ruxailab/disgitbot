@@ -10,36 +10,14 @@ def _get_firestore_client():
     global _db
     if _db is None:
         if not firebase_admin._apps:
-            config_path = _get_firebase_credentials_path()
-            cred = credentials.Certificate(config_path)
+            cred_path = 'discord_bot/config/credentials.json'
+            if not os.path.exists(cred_path):
+                raise FileNotFoundError(f"Firebase credentials file not found: {cred_path}")
+            
+            cred = credentials.Certificate(cred_path)
             firebase_admin.initialize_app(cred)
         _db = firestore.client()
     return _db
-
-def _get_firebase_credentials_path() -> str:
-    """Get the path to Firebase credentials with fallback logic."""
-    env_path = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
-    if env_path and os.path.exists(env_path):
-        print(f"DEBUG: Using environment path: {env_path}")
-        return env_path
-    
-    fallback_paths = [
-        'discord_bot/config/credentials.json',
-        'config/credentials.json',
-        os.path.join(os.getcwd(), 'discord_bot', 'config', 'credentials.json'),
-        os.path.join(os.getcwd(), 'config', 'credentials.json')
-    ]
-    
-    for path in fallback_paths:
-        abs_path = os.path.abspath(path)
-        if os.path.exists(abs_path):
-            print(f"DEBUG: Using fallback path: {abs_path}")
-            return abs_path
-    
-    raise FileNotFoundError(
-        f"Firebase credentials not found. Tried:\n" + 
-        "\n".join(f"  - {os.path.abspath(path)}" for path in fallback_paths)
-    )
 
 def get_document(collection: str, document_id: str) -> Optional[Dict[str, Any]]:
     """Get a document from Firestore."""
