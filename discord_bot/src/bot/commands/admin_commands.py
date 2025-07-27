@@ -87,26 +87,30 @@ class AdminCommands:
                 # Get current reviewer configuration
                 reviewer_data = get_document('pr_config', 'reviewers')
                 if not reviewer_data:
-                    reviewer_data = {'reviewers': [], 'count': 0, 'selection_criteria': 'manual_additions'}
+                    reviewer_data = {'reviewers': [], 'manual_reviewers': [], 'top_contributor_reviewers': [], 'count': 0}
                 
-                current_reviewers = reviewer_data.get('reviewers', [])
+                manual_reviewers = reviewer_data.get('manual_reviewers', [])
+                all_reviewers = reviewer_data.get('reviewers', [])
                 
                 # Check if reviewer already exists
-                if username in current_reviewers:
+                if username in all_reviewers:
                     await interaction.followup.send(f"GitHub user `{username}` is already in the reviewer pool.")
                     return
                 
-                # Add the reviewer
-                current_reviewers.append(username)
-                reviewer_data['reviewers'] = current_reviewers
-                reviewer_data['count'] = len(current_reviewers)
+                # Add to manual reviewers pool
+                manual_reviewers.append(username)
+                all_reviewers.append(username)
+                
+                reviewer_data['manual_reviewers'] = manual_reviewers
+                reviewer_data['reviewers'] = all_reviewers
+                reviewer_data['count'] = len(all_reviewers)
                 reviewer_data['last_updated'] = __import__('time').strftime('%Y-%m-%d %H:%M:%S UTC', __import__('time').gmtime())
                 
                 # Save to Firestore
                 success = set_document('pr_config', 'reviewers', reviewer_data)
                 
                 if success:
-                    await interaction.followup.send(f"Successfully added `{username}` to the PR reviewer pool.\nTotal reviewers: {len(current_reviewers)}")
+                    await interaction.followup.send(f"Successfully added `{username}` to the manual reviewer pool.\nTotal reviewers: {len(all_reviewers)}")
                 else:
                     await interaction.followup.send("Failed to add reviewer to the database.")
                     
@@ -132,26 +136,36 @@ class AdminCommands:
                     await interaction.followup.send("No reviewers found in the database.")
                     return
                 
-                current_reviewers = reviewer_data.get('reviewers', [])
+                manual_reviewers = reviewer_data.get('manual_reviewers', [])
+                top_contributor_reviewers = reviewer_data.get('top_contributor_reviewers', [])
                 
-                # Check if reviewer exists
-                if username not in current_reviewers:
+                # Check if reviewer exists and determine which pool
+                if username not in reviewer_data.get('reviewers', []):
                     await interaction.followup.send(f"GitHub user `{username}` is not in the reviewer pool.")
                     return
                 
-                # Remove the reviewer
-                current_reviewers.remove(username)
-                reviewer_data['reviewers'] = current_reviewers
-                reviewer_data['count'] = len(current_reviewers)
-                reviewer_data['last_updated'] = __import__('time').strftime('%Y-%m-%d %H:%M:%S UTC', __import__('time').gmtime())
-                
-                # Save to Firestore
-                success = set_document('pr_config', 'reviewers', reviewer_data)
-                
-                if success:
-                    await interaction.followup.send(f"Successfully removed `{username}` from the PR reviewer pool.\nTotal reviewers: {len(current_reviewers)}")
+                # Only allow removal from manual pool (top contributors are auto-managed)
+                if username in manual_reviewers:
+                    manual_reviewers.remove(username)
+                    all_reviewers = list(set(top_contributor_reviewers + manual_reviewers))
+                    
+                    reviewer_data['manual_reviewers'] = manual_reviewers
+                    reviewer_data['reviewers'] = all_reviewers
+                    reviewer_data['count'] = len(all_reviewers)
+                    reviewer_data['last_updated'] = __import__('time').strftime('%Y-%m-%d %H:%M:%S UTC', __import__('time').gmtime())
+                    
+                    # Save to Firestore
+                    success = set_document('pr_config', 'reviewers', reviewer_data)
+                    
+                    if success:
+                        await interaction.followup.send(f"Successfully removed `{username}` from the manual reviewer pool.\nTotal reviewers: {len(all_reviewers)}")
+                    else:
+                        await interaction.followup.send("Failed to remove reviewer from the database.")
+                        
+                elif username in top_contributor_reviewers:
+                    await interaction.followup.send(f"`{username}` is a top contributor reviewer and cannot be manually removed. They will be updated automatically by the system.")
                 else:
-                    await interaction.followup.send("Failed to remove reviewer from the database.")
+                    await interaction.followup.send(f"Unable to determine reviewer pool for `{username}`.")
                     
             except Exception as e:
                 await interaction.followup.send(f"Error removing reviewer: {str(e)}")
@@ -177,19 +191,32 @@ class AdminCommands:
                     color=discord.Color.blue()
                 )
                 
-                # Show current reviewers
+                # Show current reviewers by pool
                 if reviewer_data and reviewer_data.get('reviewers'):
-                    reviewers = reviewer_data['reviewers']
-                    reviewers_text = '\n'.join([f"• {reviewer}" for reviewer in reviewers])
-                    embed.add_field(
-                        name=f"Current Reviewers ({len(reviewers)})",
-                        value=reviewers_text,
-                        inline=False
-                    )
+                    # Top contributor reviewers
+                    top_contributors = reviewer_data.get('top_contributor_reviewers', [])
+                    if top_contributors:
+                        top_text = '\n'.join([f"• {reviewer}" for reviewer in top_contributors])
+                        embed.add_field(
+                            name=f"Top Contributor Reviewers ({len(top_contributors)})",
+                            value=top_text,
+                            inline=True
+                        )
                     
+                    # Manual reviewers
+                    manual_reviewers = reviewer_data.get('manual_reviewers', [])
+                    if manual_reviewers:
+                        manual_text = '\n'.join([f"• {reviewer}" for reviewer in manual_reviewers])
+                        embed.add_field(
+                            name=f"Manual Reviewers ({len(manual_reviewers)})",
+                            value=manual_text,
+                            inline=True
+                        )
+                    
+                    total_reviewers = reviewer_data['reviewers']
                     embed.add_field(
                         name="Pool Info",
-                        value=f"Last Updated: {reviewer_data.get('last_updated', 'Unknown')}\nSelection: {reviewer_data.get('selection_criteria', 'Unknown')}",
+                        value=f"Total Reviewers: {len(total_reviewers)}\nLast Updated: {reviewer_data.get('last_updated', 'Unknown')}",
                         inline=False
                     )
                 else:

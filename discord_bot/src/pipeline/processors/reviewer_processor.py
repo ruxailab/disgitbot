@@ -8,11 +8,16 @@ import time
 from typing import Dict, Any, List
 
 def generate_reviewer_pool(all_contributions: Dict[str, Any], max_reviewers: int = 7) -> Dict[str, Any]:
-    """Generate reviewer pool from top PR contributors."""
+    """Generate reviewer pool with separate top contributor and manual pools."""
     print("Generating reviewer pool from top contributors...")
     
     if not all_contributions:
         return {}
+    
+    # Get existing reviewer configuration to preserve manual reviewers
+    from shared.firestore import get_document
+    existing_config = get_document('pr_config', 'reviewers') or {}
+    manual_reviewers = existing_config.get('manual_reviewers', [])
     
     # Get contributors sorted by PR count (all-time)
     top_contributors = sorted(
@@ -21,17 +26,22 @@ def generate_reviewer_pool(all_contributions: Dict[str, Any], max_reviewers: int
         reverse=True
     )[:max_reviewers]
     
-    # Create reviewer list
-    reviewers = []
+    # Create top contributor reviewer list
+    top_contributor_reviewers = []
     for contributor, data in top_contributors:
         pr_count = data.get('stats', {}).get('pr', {}).get('all_time', data.get('pr_count', 0))
         if pr_count > 0:  # Only include contributors with at least 1 PR
-            reviewers.append(contributor)
+            top_contributor_reviewers.append(contributor)
+    
+    # Combine both pools for total reviewer list
+    all_reviewers = list(set(top_contributor_reviewers + manual_reviewers))
     
     return {
-        'reviewers': reviewers,
-        'count': len(reviewers),
-        'selection_criteria': 'top_pr_contributors',
+        'reviewers': all_reviewers,
+        'top_contributor_reviewers': top_contributor_reviewers,
+        'manual_reviewers': manual_reviewers,
+        'count': len(all_reviewers),
+        'selection_criteria': 'top_pr_contributors_plus_manual',
         'last_updated': time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime()),
         'generated_from_total': len(all_contributions)
     }

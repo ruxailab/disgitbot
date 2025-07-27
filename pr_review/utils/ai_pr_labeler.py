@@ -157,7 +157,9 @@ class AIPRLabeler:
             List of predicted labels with confidence scores
         """
         try:
-            available_labels = self._get_repository_labels(repo) if repo else self._get_default_labels()
+            if not repo:
+                raise ValueError("Repository name is required for label prediction")
+            available_labels = self._get_repository_labels(repo)
             
             prompt = self._build_classification_prompt(pr_data, available_labels)
             response = self.retry_handler.execute_with_retry(self._make_ai_request, prompt)
@@ -190,8 +192,7 @@ class AIPRLabeler:
                 logger.info(f"Using {len(label_names)} stored labels for repository {repo}")
                 return label_names
             
-            logger.warning(f"No stored labels found for {repo}, using defaults")
-            return self._get_default_labels()
+            raise ValueError(f"No labels found for repository {repo}. Run Discord bot pipeline to populate labels.")
             
         except Exception as e:
             logger.error(f"Failed to fetch repository labels: {e}")
