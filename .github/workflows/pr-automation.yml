@@ -77,7 +77,7 @@ jobs:
         
     - name: Run PR automation
       env:
-        GITHUB_TOKEN: ${{ secrets.GH_TOKEN || github.token }}
+        GITHUB_TOKEN: ${{ secrets.DEV_GH_TOKEN }}
         GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
       run: |
         cd ${{ github.event_name == 'workflow_call' && 'pr-automation/' || '' }}pr_review
