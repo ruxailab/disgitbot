@@ -5,15 +5,25 @@ from firebase_admin import credentials, firestore
 
 _db = None
 
+def _get_credentials_path() -> str:
+    """Get the path to Firebase credentials file."""
+    current_dir = os.getcwd()
+    
+    # If we're in pr_review/, go up one level to repository root
+    repo_root = os.path.dirname(current_dir) if os.path.basename(current_dir) == 'pr_review' else current_dir
+    cred_path = os.path.join(repo_root, 'discord_bot', 'config', 'credentials.json')
+    
+    if not os.path.exists(cred_path):
+        raise FileNotFoundError(f"Firebase credentials file not found: {cred_path}")
+    
+    return cred_path
+
 def _get_firestore_client():
     """Get Firestore client, initializing if needed."""
     global _db
     if _db is None:
         if not firebase_admin._apps:
-            cred_path = os.path.join(os.getcwd(), 'config', 'credentials.json')
-            if not os.path.exists(cred_path):
-                raise FileNotFoundError(f"Firebase credentials file not found: {cred_path}")
-            
+            cred_path = _get_credentials_path()
             cred = credentials.Certificate(cred_path)
             firebase_admin.initialize_app(cred)
         _db = firestore.client()

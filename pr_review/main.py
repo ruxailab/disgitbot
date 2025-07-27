@@ -127,49 +127,46 @@ class PRReviewSystem:
             }
     
     def _build_comprehensive_comment(self, metrics: Dict, labels: List[Dict], reviewers: Dict, ai_review: Dict) -> str:
-        """Build a clean, Apple-inspired comment with essential information"""
+        """Build a clean, minimal comment with essential information"""
         
         # Get essential metrics
-        functions_added = metrics.get('functions_added', 0)
         lines_added = metrics.get('lines_added', 0)
         files_changed = metrics.get('files_changed', 0)
         complexity_added = metrics.get('cyclomatic_complexity_added', 0)
+        functions_added = metrics.get('functions_added', 0)
         risk_level = metrics.get('risk_level', 'UNKNOWN')
         
         # Build clean, minimal comment
         comment = f"""## Code Metrics
 
-**{lines_added}** lines added across **{files_changed}** {'file' if files_changed == 1 else 'files'}
+{lines_added} lines added across {files_changed} {'file' if files_changed == 1 else 'files'}
 
-Complexity **+{complexity_added}** · Functions **+{functions_added}** · Risk **{risk_level}**
+Cyclomatic complexity +{complexity_added} · Functions +{functions_added} · Risk {risk_level}
 
 """
         
-        # Risk assessment (only if medium/high risk)
-        if metrics.get('risk_factors') and risk_level in ['MEDIUM', 'HIGH']:
-            risk_emoji = "🟡" if risk_level == "MEDIUM" else "🔴"
-            comment += f"{risk_emoji} **{metrics['risk_factors'][0]}**\n\n"
+        # Risk assessment removed - already covered in metrics summary
         
-        # Labels (clean, badge-like format)
+        # Labels (clean format)
         if labels:
-            label_badges = []
+            label_names = []
             for label in labels:
                 confidence = int(label["confidence"] * 100)
                 if confidence >= 80:
-                    label_badges.append(f"`{label['name']}`")
+                    label_names.append(label['name'])
                 elif confidence >= 60:
-                    label_badges.append(f"`{label['name']}*`")
+                    label_names.append(f"{label['name']}*")
             
-            if label_badges:
-                comment += f"**Labels** {' '.join(label_badges)}\n\n"
+            if label_names:
+                comment += f"**Labels**: {', '.join(label_names)}\n\n"
         
-        # Reviewers (simple, clean format)
+        # Reviewers (clean format)
         if reviewers.get('reviewers'):
-            reviewer_list = ' '.join([f"@{r['username']}" for r in reviewers['reviewers']])
-            comment += f"**Reviewers** {reviewer_list}\n\n"
+            reviewer_names = [r['username'] for r in reviewers['reviewers']]
+            comment += f"**Reviewers**: {', '.join(reviewer_names)}\n\n"
         
         # Minimal footer
-        comment += f"<sub>Automated analysis · {REPO_OWNER}</sub>"
+        comment += f"Automated analysis · {REPO_OWNER}"
         
         return comment
     
