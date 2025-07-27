@@ -41,7 +41,7 @@ on:
         default: 'process_pr'
         description: 'Action to perform'
     secrets:
-      GH_TOKEN:
+      DEV_GH_TOKEN:
         required: true
       GOOGLE_API_KEY:
         required: true
@@ -63,7 +63,7 @@ jobs:
         # If called from another repo, checkout this master repo
         repository: ${{ github.event_name == 'workflow_call' && 'ruxailab/disgitbot' || github.repository }}
         path: ${{ github.event_name == 'workflow_call' && 'pr-automation' || '.' }}
-        token: ${{ secrets.GH_TOKEN || github.token }}
+        token: ${{ secrets.DEV_GH_TOKEN || github.token }}
       
     - name: Set up Python
       uses: actions/setup-python@v4
