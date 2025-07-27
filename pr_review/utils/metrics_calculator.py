@@ -102,9 +102,9 @@ class MetricsCalculator:
                     
                     for result in complexity_results:
                         total_complexity += result.complexity
-                        if result.type == 'function':
+                        if hasattr(result, 'is_method') and not result.is_method:
                             total_functions += 1
-                        elif result.type == 'class':
+                        elif result.__class__.__name__.endswith('Class'):
                             total_classes += 1
                 
                 # For other languages, use simple pattern matching

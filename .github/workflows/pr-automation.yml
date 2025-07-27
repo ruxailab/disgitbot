@@ -70,6 +70,9 @@ jobs:
       with:
         python-version: '3.9'
         
+    - name: Set up Google Credentials
+      run: echo "${{ secrets.GOOGLE_CREDENTIALS_JSON }}" | base64 --decode > discord_bot/config/credentials.json
+        
     - name: Install dependencies
       run: |
         cd ${{ github.event_name == 'workflow_call' && 'pr-automation/' || '' }}pr_review
@@ -79,6 +82,7 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.DEV_GH_TOKEN }}
         GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+        GOOGLE_APPLICATION_CREDENTIALS: discord_bot/config/credentials.json
         PYTHONPATH: ${{ github.workspace }}
       run: |
         cd ${{ github.event_name == 'workflow_call' && 'pr-automation/' || '' }}pr_review
