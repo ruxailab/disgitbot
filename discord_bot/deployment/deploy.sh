@@ -655,14 +655,27 @@ main() {
     print_step "Preparing Dockerfile for Cloud Build..."
     cp "$SCRIPT_DIR/Dockerfile" "$ROOT_DIR/Dockerfile"
     
+    # Copy shared directory into build context so Docker can access it
+    print_step "Copying shared directory into build context..."
+    if [ -d "$(dirname "$ROOT_DIR")/shared" ]; then
+        cp -r "$(dirname "$ROOT_DIR")/shared" "$ROOT_DIR/shared"
+        print_success "Shared directory copied successfully"
+    else
+        print_warning "Shared directory not found - skipping shared copy"
+    fi
+    
     # Use Cloud Build to build and push the image
     gcloud builds submit \
       --tag gcr.io/$PROJECT_ID/$SERVICE_NAME:latest \
       --project="$PROJECT_ID" \
       "$ROOT_DIR"
     
-    # Clean up temporary Dockerfile
+    # Clean up temporary files
     rm -f "$ROOT_DIR/Dockerfile"
+    if [ -d "$ROOT_DIR/shared" ]; then
+        rm -rf "$ROOT_DIR/shared"
+        print_step "Cleaned up temporary shared directory"
+    fi
     print_success "Build completed and temporary files cleaned up!"
     
     # Clean up existing service configuration if exists

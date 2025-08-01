@@ -6,17 +6,46 @@ from firebase_admin import credentials, firestore
 _db = None
 
 def _get_credentials_path() -> str:
-    """Get the path to Firebase credentials file."""
+    """Get the path to Firebase credentials file.
+    
+    This shared package gets copied around different environments:
+    - GitHub workflows: runs from repo root with discord_bot/ subdirectory
+    - Docker container: copied to /app/shared/ with credentials at /app/config/
+    - PR review: runs from pr_review/ subdirectory
+    
+    We try multiple paths to handle all these scenarios.
+    """
     current_dir = os.getcwd()
     
-    # If we're in pr_review/, go up one level to repository root
-    repo_root = os.path.dirname(current_dir) if os.path.basename(current_dir) == 'pr_review' else current_dir
-    cred_path = os.path.join(repo_root, 'discord_bot', 'config', 'credentials.json')
+    # List of possible credential paths to try (in order of preference)
+    possible_paths = [
+        # Docker container path (when shared is copied to /app/shared/)
+        '/app/config/credentials.json',
+        
+        # GitHub workflow path (from discord_bot/ directory)
+        os.path.join(current_dir, 'config', 'credentials.json'),
+        
+        # GitHub workflow path (from repo root)
+        os.path.join(current_dir, 'discord_bot', 'config', 'credentials.json'),
+        
+        # PR review path (from pr_review/ directory)
+        os.path.join(os.path.dirname(current_dir), 'discord_bot', 'config', 'credentials.json'),
+        
+        # Fallback: relative to this file's location
+        os.path.join(os.path.dirname(os.path.dirname(__file__)), 'discord_bot', 'config', 'credentials.json'),
+    ]
     
-    if not os.path.exists(cred_path):
-        raise FileNotFoundError(f"Firebase credentials file not found: {cred_path}")
+    for cred_path in possible_paths:
+        if os.path.exists(cred_path):
+            print(f"Found Firebase credentials at: {cred_path}")
+            return cred_path
     
-    return cred_path
+    # If none found, show all attempted paths for debugging
+    attempted_paths = '\n'.join(f"  - {path}" for path in possible_paths)
+    raise FileNotFoundError(
+        f"Firebase credentials file not found. Tried these paths:\n{attempted_paths}\n"
+        f"Current working directory: {current_dir}"
+    )
 
 def _get_firestore_client():
     """Get Firestore client, initializing if needed."""
