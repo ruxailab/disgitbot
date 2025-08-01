@@ -190,9 +190,9 @@ class UserCommands:
         role_service = RoleService()
         
         # Get stats from the detailed structure if available
-        pr_all_time = user_data.get("stats", {}).get("prs", {}).get("all_time", user_data.get("pr_count", 0))
-        issues_all_time = user_data.get("stats", {}).get("issues", {}).get("all_time", user_data.get("issues_count", 0))
-        commits_all_time = user_data.get("stats", {}).get("commits", {}).get("all_time", user_data.get("commits_count", 0))
+        pr_all_time = user_data.get("stats", {}).get("pr", {}).get("all_time", user_data.get("pr_count", 0))
+        issues_all_time = user_data.get("stats", {}).get("issue", {}).get("all_time", user_data.get("issues_count", 0))
+        commits_all_time = user_data.get("stats", {}).get("commit", {}).get("all_time", user_data.get("commits_count", 0))
         
         pr_role, issue_role, commit_role = role_service.determine_roles(pr_all_time, issues_all_time, commits_all_time)
         
@@ -200,17 +200,17 @@ class UserCommands:
         title_prefix = "PR"
         if stats_type == "pr":
             count_field = "pr_count"
-            stats_field = "prs"
+            stats_field = "pr"
             role = pr_role
             title_prefix = "PR"
         elif stats_type == "issue":
             count_field = "issues_count"
-            stats_field = "issues"
+            stats_field = "issue"
             role = issue_role if issue_role else "None"
             title_prefix = "GitHub Issue Reported"
         elif stats_type == "commit":
             count_field = "commits_count"
-            stats_field = "commits"
+            stats_field = "commit"
             role = commit_role if commit_role else "None"
             title_prefix = "Commit"
  
