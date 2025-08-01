@@ -1,0 +1,16 @@
+name: Keep Discord Bot Alive
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'  # Every 5 minutes
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Cloud Run Service
+        run: |
+          curl -s "${{ secrets.CLOUD_RUN_URL }}/health" > /dev/null || echo "Failed to ping bot"
+        env:
+          CLOUD_RUN_URL: ${{ secrets.CLOUD_RUN_URL }}

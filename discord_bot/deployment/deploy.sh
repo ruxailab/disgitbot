@@ -685,7 +685,7 @@ main() {
       --port=8080 \
       --memory=$MEMORY \
       --cpu=$CPU \
-      --min-instances=1 \
+      --min-instances=0 \
       --max-instances=1 \
       --concurrency=80 \
       --timeout=300s \

@@ -120,6 +120,7 @@ Go to your GitHub repository → Settings → Secrets and variables → Actions 
 - `GH_TOKEN` 
 - `GOOGLE_CREDENTIALS_JSON`
 - `REPO_OWNER`
+- `CLOUD_RUN_URL`
 
 ---
 
@@ -257,6 +258,7 @@ Go to your GitHub repository → Settings → Secrets and variables → Actions 
    - **REMEMBER YOUR PROJECT ID** - you'll need it for the final deployment
    - **Add to `.env`:** `OAUTH_BASE_URL=YOUR_CLOUD_RUN_URL`
    - **Example:** `OAUTH_BASE_URL=https://discord-bot-abcd1234-uc.a.run.app`
+   - **Add to GitHub Secrets:** Create secret named `CLOUD_RUN_URL` with the same URL
 
 ### Step 5: Get GITHUB_CLIENT_ID (.env) + GITHUB_CLIENT_SECRET (.env)
 
