@@ -8,9 +8,30 @@ on:
 jobs:
   ping:
     runs-on: ubuntu-latest
+    timeout-minutes: 2
     steps:
+      - name: Check if CLOUD_RUN_URL is set
+        run: |
+          if [ -z "${{ secrets.CLOUD_RUN_URL }}" ]; then
+            echo "CLOUD_RUN_URL secret is not set"
+            exit 1
+          else
+            echo "CLOUD_RUN_URL is configured"
+          fi
+
       - name: Ping Cloud Run Service
         run: |
-          curl -s "${{ secrets.CLOUD_RUN_URL }}" > /dev/null || echo "Failed to ping bot"
+          echo " Pinging bot at: ${{ secrets.CLOUD_RUN_URL }}"
+          response=$(curl -s -w "%{http_code}" --max-time 30 "${{ secrets.CLOUD_RUN_URL }}" 2>/dev/null)
+          http_code="${response: -3}"
+          body="${response%???}"
+          
+          if [ "$http_code" -eq 200 ] || [ "$http_code" -eq 000 ]; then
+            echo "Bot is alive (HTTP: $http_code)"
+          else
+            echo "Bot ping failed (HTTP: $http_code)"
+            echo "Response body: $body"
+            exit 1
+          fi
         env:
           CLOUD_RUN_URL: ${{ secrets.CLOUD_RUN_URL }}
