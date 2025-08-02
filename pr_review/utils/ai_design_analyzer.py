@@ -5,19 +5,16 @@ Analyzes code changes against SOLID principles and design patterns
 """
 
 import logging
-import json
 from typing import Dict, Any, List
-import google.generativeai as genai
-from config import GOOGLE_API_KEY
+from .base_ai_analyzer import BaseAIAnalyzer
 
 logger = logging.getLogger(__name__)
 
-class AIDesignAnalyzer:
+class AIDesignAnalyzer(BaseAIAnalyzer):
     """AI-powered design principles analyzer using Gemini"""
     
     def __init__(self):
-        genai.configure(api_key=GOOGLE_API_KEY)
-        self.model = genai.GenerativeModel('gemini-1.5-flash')
+        super().__init__('gemini-1.5-flash')
         
         self.analysis_prompt = """
 You are a strict, professional code architecture reviewer. Analyze the provided code changes for design principle violations.
@@ -91,23 +88,20 @@ CODE TO ANALYZE:
             AI analysis results with identified issues and suggestions
         """
         try:
-            added_code_by_file = self._extract_added_code_from_diff(diff)
+            added_code_by_file = self.extract_added_code_from_diff(diff)
             
             if not added_code_by_file:
                 return self._empty_analysis()
             
-            # Prepare code context for AI analysis
             code_context = self._prepare_code_context(added_code_by_file, files)
             
             if not code_context.strip():
                 return self._empty_analysis()
             
-            # Get AI analysis
             full_prompt = self.analysis_prompt + code_context
-            response = self.model.generate_content(full_prompt)
+            response_text = self.make_ai_request(full_prompt)
             
-            # Parse AI response
-            return self._parse_ai_response(response.text)
+            return self._parse_ai_response(response_text)
             
         except Exception as e:
             logger.error(f"Error in AI design analysis: {e}")
@@ -118,7 +112,7 @@ CODE TO ANALYZE:
         context_parts = []
         
         for filename, code_lines in added_code_by_file.items():
-            if not self._is_analyzable_file(filename):
+            if not self.is_analyzable_file(filename):
                 continue
                 
             code_content = '\n'.join(code_lines)
@@ -140,63 +134,23 @@ FILE: {filename} (+{additions} lines)
     
     def _parse_ai_response(self, response_text: str) -> Dict[str, Any]:
         """Parse AI response and extract JSON"""
-        try:
-            # Find JSON in response
-            start_idx = response_text.find('{')
-            end_idx = response_text.rfind('}') + 1
-            
-            if start_idx == -1 or end_idx == 0:
-                logger.warning("No JSON found in AI response")
-                return self._empty_analysis()
-            
-            json_str = response_text[start_idx:end_idx]
-            result = json.loads(json_str)
-            
-            # Validate required fields
-            required_fields = ['design_issues_found', 'design_score', 'issues']
-            if not all(field in result for field in required_fields):
-                logger.warning("AI response missing required fields")
-                return self._empty_analysis()
-            
-            # Add derived metrics for consistency with existing system
-            issues = result.get('issues', [])
-            result['high_severity_issues'] = sum(1 for issue in issues if issue.get('severity') == 'HIGH')
-            result['medium_severity_issues'] = sum(1 for issue in issues if issue.get('severity') == 'MEDIUM')
-            result['low_severity_issues'] = sum(1 for issue in issues if issue.get('severity') == 'LOW')
-            
-            return result
-            
-        except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse AI response as JSON: {e}")
-            return self._empty_analysis()
-        except Exception as e:
-            logger.error(f"Error parsing AI response: {e}")
-            return self._empty_analysis()
-    
-    def _extract_added_code_from_diff(self, diff: str) -> Dict[str, List[str]]:
-        """Extract only the added code lines from git diff"""
-        added_code = {}
-        current_file = None
+        result = self.parse_json_response(response_text, self._empty_analysis())
         
-        for line in diff.split('\n'):
-            if line.startswith('+++'):
-                if len(line) > 6:
-                    current_file = line[6:].strip()
-                    if current_file.startswith('b/'):
-                        current_file = current_file[2:]
-                    added_code[current_file] = []
-                continue
-            
-            if current_file and line.startswith('+') and not line.startswith('+++'):
-                code_line = line[1:]
-                added_code[current_file].append(code_line)
+        # Validate required fields
+        required_fields = ['design_issues_found', 'design_score', 'issues']
+        if not all(field in result for field in required_fields):
+            logger.warning("AI response missing required fields")
+            return self._empty_analysis()
         
-        return added_code
+        # Add derived metrics for consistency with existing system
+        issues = result.get('issues', [])
+        result['high_severity_issues'] = sum(1 for issue in issues if issue.get('severity') == 'HIGH')
+        result['medium_severity_issues'] = sum(1 for issue in issues if issue.get('severity') == 'MEDIUM')
+        result['low_severity_issues'] = sum(1 for issue in issues if issue.get('severity') == 'LOW')
+        
+        return result
     
-    def _is_analyzable_file(self, filename: str) -> bool:
-        """Check if file should be analyzed for design principles"""
-        analyzable_extensions = {'.py', '.js', '.jsx', '.ts', '.tsx', '.java', '.c', '.cpp', '.cs'}
-        return any(filename.lower().endswith(ext) for ext in analyzable_extensions)
+
     
     def _empty_analysis(self) -> Dict[str, Any]:
         """Return empty analysis result"""

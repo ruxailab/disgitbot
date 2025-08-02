@@ -14,6 +14,7 @@ from utils.github_client import GitHubClient
 from utils.metrics_calculator import MetricsCalculator
 from utils.ai_pr_labeler import AIPRLabeler
 from utils.reviewer_assigner import ReviewerAssigner
+from utils.design_formatter import format_design_analysis, format_metrics_summary
 
 
 # Configure logging
@@ -215,10 +216,18 @@ def main():
     # Process the PR
     results = system.process_pull_request(repo, pr_number, experience_level)
     
-    # Print results
-    print("\n" + "="*50)
-    print("PR PROCESSING RESULTS")
-    print("="*50)
+    # Print results in clean format
+    print("\n" + "="*60)
+    print("PR ANALYSIS RESULTS")
+    print("="*60)
+    
+    # Format metrics summary
+    if 'metrics' in results:
+        print(format_metrics_summary(results['metrics']))
+        print(format_design_analysis(results['metrics']))
+    
+    # Print raw JSON for debugging (optional)
+    print("\nDetailed Results:")
     print(json.dumps(results, indent=2))
 
 if __name__ == "__main__":
