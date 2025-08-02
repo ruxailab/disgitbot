@@ -128,22 +128,17 @@ class PRReviewSystem:
             }
     
     def _build_comprehensive_comment(self, metrics: Dict, labels: List[Dict], reviewers: Dict, ai_review: Dict) -> str:
-        """Build comprehensive PR comment with formatted metrics and design analysis"""
+        """Build clean, well-organized PR comment"""
         
-        # Use the formatted output functions
-        metrics_summary = format_metrics_summary(metrics)
-        design_analysis = format_design_analysis(metrics)
+        comment_parts = []
         
-        # Build clean comment using markdown formatting
-        comment = "## Code Metrics\n"
-        comment += metrics_summary.replace('**', '**').strip() + "\n\n"
+        # Metrics section - condensed into 2 lines
+        comment_parts.append("## Metrics")
+        comment_parts.append(format_metrics_summary(metrics))
         
-        # Add design analysis if there are issues
-        if metrics.get('design_issues_found', 0) > 0:
-            comment += "## Design Analysis\n"
-            comment += design_analysis.replace('**', '**').strip() + "\n\n"
+        # Labels and Reviewers section - parallel structure
+        assignment_parts = []
         
-        # Labels (clean format)
         if labels:
             label_names = []
             for label in labels:
@@ -152,19 +147,26 @@ class PRReviewSystem:
                     label_names.append(label['name'])
                 elif confidence >= 60:
                     label_names.append(f"{label['name']}*")
-            
             if label_names:
-                comment += f"**Labels**: {', '.join(label_names)}\n\n"
+                assignment_parts.append(f"**Labels**: {', '.join(label_names)}")
         
-        # Reviewers (clean format)
         if reviewers.get('reviewers'):
             reviewer_names = [r['username'] for r in reviewers['reviewers']]
-            comment += f"**Reviewers**: {', '.join(reviewer_names)}\n\n"
+            assignment_parts.append(f"**Reviewers**: {', '.join(reviewer_names)}")
         
-        # Minimal footer
-        comment += f"Automated analysis · {REPO_OWNER}"
+        if assignment_parts:
+            comment_parts.append("\n## Labels & Reviewers")
+            comment_parts.extend(assignment_parts)
         
-        return comment
+        # Design analysis at the end (harder to read stuff)
+        if metrics.get('design_issues_found', 0) > 0:
+            comment_parts.append("\n## Design")
+            comment_parts.append(format_design_analysis(metrics))
+        
+        # Footer
+        comment_parts.append(f"\nAutomated analysis · {REPO_OWNER}")
+        
+        return '\n'.join(comment_parts)
     
 
 
