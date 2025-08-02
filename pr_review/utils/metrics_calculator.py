@@ -11,6 +11,7 @@ from typing import Dict, Any, List
 from datetime import datetime
 from radon.complexity import cc_visit
 from radon.raw import analyze
+from .ai_design_analyzer import AIDesignAnalyzer
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +21,7 @@ class MetricsCalculator:
     def __init__(self):
         """Initialize the metrics calculator"""
         self.supported_extensions = {'.py', '.js', '.jsx', '.ts', '.tsx', '.java', '.c', '.cpp', '.h'}
+        self.design_analyzer = AIDesignAnalyzer()
     
     def calculate_pr_metrics(self, diff: str, files: List[Dict]) -> Dict[str, Any]:
         """
@@ -33,19 +35,17 @@ class MetricsCalculator:
             Dictionary containing calculated metrics
         """
         try:
-            # Basic metrics from GitHub API
             basic_metrics = self._calculate_basic_metrics(files)
-            
-            # Complexity metrics using radon
             complexity_metrics = self._calculate_complexity_with_radon(diff, files)
+            coupling_metrics = self._calculate_coupling_metrics(diff, files)
+            design_analysis = self.design_analyzer.analyze_design_principles(diff, files)
+            risk_metrics = self._calculate_risk_assessment(basic_metrics, complexity_metrics, coupling_metrics, design_analysis)
             
-            # Risk assessment
-            risk_metrics = self._calculate_risk_assessment(basic_metrics, complexity_metrics)
-            
-            # Combine all metrics
             all_metrics = {
                 **basic_metrics,
                 **complexity_metrics,
+                **coupling_metrics,
+                **design_analysis,
                 **risk_metrics,
                 'calculation_timestamp': datetime.now().isoformat()
             }
@@ -77,7 +77,6 @@ class MetricsCalculator:
         if not diff:
             return complexity_metrics
         
-        # Extract added code from diff
         added_code_by_file = self._extract_added_code_from_diff(diff)
         
         total_complexity = 0
@@ -88,16 +87,13 @@ class MetricsCalculator:
             if not self._is_supported_file(filename):
                 continue
             
-            # Join code lines
             code_content = '\n'.join(code_lines)
             
             if not code_content.strip():
                 continue
             
             try:
-                # Use radon to calculate complexity
                 if filename.endswith('.py'):
-                    # For Python files, use radon's complexity analysis
                     complexity_results = cc_visit(code_content)
                     
                     for result in complexity_results:
@@ -107,7 +103,6 @@ class MetricsCalculator:
                         elif result.__class__.__name__.endswith('Class'):
                             total_classes += 1
                 
-                # For other languages, use simple pattern matching
                 else:
                     total_functions += self._count_functions_simple(code_content, filename)
                     total_classes += self._count_classes_simple(code_content, filename)
@@ -204,7 +199,69 @@ class MetricsCalculator:
         
         return complexity
     
-    def _calculate_risk_assessment(self, basic: Dict, complexity: Dict) -> Dict[str, Any]:
+    def _calculate_coupling_metrics(self, diff: str, files: List[Dict]) -> Dict[str, Any]:
+        """Calculate Fan-In and Fan-Out coupling metrics"""
+        coupling_metrics = {
+            'fan_out': 0,
+            'fan_in': 0,
+            'coupling_factor': 0.0,
+            'imports_added': 0,
+            'exports_added': 0
+        }
+        
+        if not diff:
+            return coupling_metrics
+        
+        # Extract added lines from diff
+        added_lines = []
+        for line in diff.split('\n'):
+            if line.startswith('+') and not line.startswith('+++'):
+                added_lines.append(line[1:].strip())
+        
+        # Calculate Fan-Out (dependencies this module has on others)
+        fan_out_patterns = [
+            r'^\s*import\s+',           # Python imports
+            r'^\s*from\s+\w+\s+import', # Python from imports
+            r'^\s*#include\s+',         # C/C++ includes
+            r'^\s*require\s*\(',        # JavaScript require
+            r'^\s*import\s+.*\s+from',  # ES6 imports
+            r'^\s*using\s+',            # C# using
+            r'^\s*package\s+',          # Java package
+        ]
+        
+        # Calculate Fan-In (how many times this module is referenced)
+        fan_in_patterns = [
+            r'export\s+',               # JavaScript/TypeScript exports
+            r'module\.exports\s*=',     # Node.js exports
+            r'public\s+class\s+',       # Java public classes
+            r'public\s+interface\s+',   # Java public interfaces
+            r'def\s+\w+\s*\(',         # Python function definitions
+            r'class\s+\w+\s*[:\(]',    # Python class definitions
+        ]
+        
+        for line in added_lines:
+            # Count Fan-Out (outgoing dependencies)
+            for pattern in fan_out_patterns:
+                if re.search(pattern, line, re.IGNORECASE):
+                    coupling_metrics['fan_out'] += 1
+                    coupling_metrics['imports_added'] += 1
+                    break
+            
+            # Count Fan-In indicators (potential incoming dependencies)
+            for pattern in fan_in_patterns:
+                if re.search(pattern, line, re.IGNORECASE):
+                    coupling_metrics['fan_in'] += 1
+                    coupling_metrics['exports_added'] += 1
+                    break
+        
+        # Calculate coupling factor (Fan-Out / (Fan-In + Fan-Out))
+        total_coupling = coupling_metrics['fan_in'] + coupling_metrics['fan_out']
+        if total_coupling > 0:
+            coupling_metrics['coupling_factor'] = coupling_metrics['fan_out'] / total_coupling
+        
+        return coupling_metrics
+    
+    def _calculate_risk_assessment(self, basic: Dict, complexity: Dict, coupling: Dict, design: Dict) -> Dict[str, Any]:
         """Calculate risk level based on metrics"""
         risk_score = 0
         risk_factors = []
@@ -238,6 +295,41 @@ class MetricsCalculator:
         elif functions_added > 5:
             risk_score += 1
             risk_factors.append(f'Several functions added ({functions_added})')
+        
+        # Coupling-based risk
+        fan_out = coupling.get('fan_out', 0)
+        coupling_factor = coupling.get('coupling_factor', 0.0)
+        
+        if fan_out > 15:
+            risk_score += 3
+            risk_factors.append(f'High coupling - many dependencies ({fan_out})')
+        elif fan_out > 8:
+            risk_score += 2
+            risk_factors.append(f'Medium coupling ({fan_out} dependencies)')
+        elif fan_out > 4:
+            risk_score += 1
+            risk_factors.append(f'Some coupling ({fan_out} dependencies)')
+        
+        if coupling_factor > 0.8:
+            risk_score += 2
+            risk_factors.append(f'High outgoing coupling factor ({coupling_factor:.2f})')
+        elif coupling_factor > 0.6:
+            risk_score += 1
+            risk_factors.append(f'Medium outgoing coupling factor ({coupling_factor:.2f})')
+        
+        # Design-based risk
+        design_issues = design.get('design_issues_found', 0)
+        high_severity = design.get('high_severity_issues', 0)
+        
+        if high_severity > 0:
+            risk_score += 3
+            risk_factors.append(f'High severity design issues ({high_severity})')
+        elif design_issues > 3:
+            risk_score += 2
+            risk_factors.append(f'Multiple design issues ({design_issues})')
+        elif design_issues > 0:
+            risk_score += 1
+            risk_factors.append(f'Design issues detected ({design_issues})')
         
         # Determine risk level
         if risk_score >= 6:

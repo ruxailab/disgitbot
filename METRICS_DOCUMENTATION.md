@@ -13,6 +13,8 @@ This document provides comprehensive information about the metrics system implem
 - Files changed
 - Functions added
 - Cyclomatic complexity increase
+- Fan-In and Fan-Out coupling metrics
+- Design principles analysis
 - Risk level assessment
 - Risk factors identification
 
@@ -43,6 +45,22 @@ if cyclomatic_complexity > 50:
 # Risk levels: LOW (0-2), MEDIUM (3-5), HIGH (6+)
 ```
 
+**Design Principles Analysis:**
+- **SOLID Principles Compliance**: Checks for Single Responsibility, Open/Closed, Interface Segregation, Dependency Inversion violations
+- **God Classes Detection**: Identifies classes that are too large or have too many responsibilities
+- **Long Functions**: Flags functions that exceed recommended length limits
+- **Parameter Count**: Detects functions with excessive parameters
+- **Tight Coupling**: Identifies direct instantiation and dependency issues
+- **Magic Values**: Detects hardcoded numbers and strings that should be constants
+- **Design Score**: Overall assessment (EXCELLENT, GOOD, FAIR, POOR)
+
+**Fan-In and Fan-Out Metrics:**
+- **Fan-Out**: Number of dependencies this module has on other modules
+- **Fan-In**: Number of modules that depend on this module
+- **Coupling Factor**: Fan-Out / (Fan-In + Fan-Out) - measures dependency direction
+- **Imports Added**: Count of new import/include statements
+- **Exports Added**: Count of new export/public declarations
+
 **Output Example:**
 ```json
 {
@@ -51,8 +69,30 @@ if cyclomatic_complexity > 50:
   "files_changed": 8,
   "functions_added": 3,
   "cyclomatic_complexity_added": 15,
+  "fan_out": 8,
+  "fan_in": 3,
+  "coupling_factor": 0.73,
+  "imports_added": 8,
+  "exports_added": 3,
+  "design_issues_found": 2,
+  "design_score": "GOOD",
+  "high_severity_issues": 0,
+  "medium_severity_issues": 2,
+  "low_severity_issues": 0,
+  "issues": [
+    {
+      "principle": "Single Responsibility Principle",
+      "description": "Function 'process_data' is too long (65 lines)",
+      "code_snippet": "def process_data(self, data):\n    # Complex processing logic...",
+      "suggestions": [
+        "Break process_data into smaller, focused functions",
+        "Extract complex logic into separate helper methods"
+      ],
+      "severity": "MEDIUM"
+    }
+  ],
   "risk_level": "MEDIUM",
-  "risk_factors": ["Large addition (>200 lines)"]
+  "risk_factors": ["Large addition (>200 lines)", "Medium coupling (8 dependencies)", "Design issues detected (2)"]
 }
 ```
 

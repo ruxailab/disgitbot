@@ -42,11 +42,7 @@ def create_oauth_app():
     def index():
         return jsonify({
             "service": "Discord Bot with OAuth",
-            "status": "running",
-            "endpoints": {
-                "start_auth": "/auth/start/<discord_user_id>",
-                "callback": "/auth/callback"
-            }
+            "status": "Ready"
         })
     
     @app.route("/auth/start/<discord_user_id>")
