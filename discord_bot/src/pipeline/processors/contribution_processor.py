@@ -293,10 +293,8 @@ def calculate_streaks_and_averages(contributions):
         data['longest_streak'] = max(data['streak'], 1) if data['total_activity'] > 0 else 0
         data['average_daily'] = round(data['total_activity'] / 30.0, 2) if data['total_activity'] > 0 else 0
         
-        # Clean up date arrays as they're no longer needed
-        for date_key in ['pr_dates', 'issue_dates', 'commit_dates']:
-            if date_key in data:
-                del data[date_key]
+        # Keep date arrays for analytics processing
+        # Note: Date arrays will be cleaned up after analytics processing
     
     return contributions
 

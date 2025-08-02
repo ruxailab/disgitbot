@@ -144,5 +144,50 @@ def create_analytics_data(all_contributions):
                 reverse=True
             )[:10]
         ],
+        'time_series': _create_time_series_data(all_contributions),
         'last_updated': time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime())
-    } 
+    }
+
+def _create_time_series_data(all_contributions):
+    """Create daily time series data for the last 30 days."""
+    from datetime import datetime, timedelta
+    
+    if not all_contributions:
+        return {}
+    
+    # Generate last 30 days
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=29)  # 30 days total
+    
+    time_series = {}
+    current_date = start_date
+    
+    while current_date <= end_date:
+        date_str = current_date.strftime('%Y-%m-%d')
+        time_series[date_str] = {
+            'prs': 0,
+            'issues': 0,
+            'commits': 0,
+            'total': 0
+        }
+        current_date += timedelta(days=1)
+    
+    # Aggregate daily data from all contributors
+    for contrib_data in all_contributions.values():
+        monthly_data = contrib_data.get('monthly_data', {})
+        
+        # Extract daily data from pr_dates, issue_dates, commit_dates if available
+        for contrib_type, date_key in [('prs', 'pr_dates'), ('issues', 'issue_dates'), ('commits', 'commit_dates')]:
+            dates = contrib_data.get(date_key, [])
+            for date_str in dates:
+                try:
+                    activity_date = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                    date_key = activity_date.strftime('%Y-%m-%d')
+                    
+                    if date_key in time_series:
+                        time_series[date_key][contrib_type] += 1
+                        time_series[date_key]['total'] += 1
+                except (ValueError, AttributeError):
+                    continue
+    
+    return time_series 

@@ -176,6 +176,77 @@ class ActivityTrendChart(ChartGenerator):
         ax.grid(True, alpha=0.3)
         plt.tight_layout()
 
+class TimeSeriesChart(ChartGenerator):
+    """Generates time series charts with configurable metrics and date ranges."""
+    
+    def create(self, analytics_data, metrics=['prs', 'issues', 'commits'], days=30, title="Time Series"):
+        """Create a time series chart for specified metrics and date range."""
+        if not analytics_data or 'time_series' not in analytics_data:
+            return None
+        
+        time_series = analytics_data['time_series']
+        if not time_series:
+            return None
+        
+        dates, data_series = self._extract_time_series_data(time_series, metrics, days)
+        
+        if not dates or not any(sum(series) for series in data_series.values()):
+            return None
+        
+        fig, ax = plt.subplots(figsize=self.figure_size)
+        
+        colors = {'prs': 'skyblue', 'issues': 'lightcoral', 'commits': 'lightgreen', 'total': 'steelblue'}
+        markers = {'prs': 'o', 'issues': 's', 'commits': '^', 'total': 'D'}
+        
+        for metric in metrics:
+            if metric in data_series:
+                ax.plot(dates, data_series[metric], 
+                       marker=markers.get(metric, 'o'), 
+                       label=metric.title(), 
+                       linewidth=2, 
+                       markersize=6,
+                       color=colors.get(metric, 'steelblue'),
+                       alpha=0.8)
+        
+        self._configure_time_series_chart(ax, title, days)
+        
+        return self._create_buffer(fig)
+    
+    def _extract_time_series_data(self, time_series, metrics, days):
+        """Extract time series data for specified metrics and date range."""
+        from datetime import datetime, timedelta
+        
+        # Sort dates and take last N days
+        sorted_dates = sorted(time_series.keys())[-days:]
+        
+        dates = []
+        data_series = {metric: [] for metric in metrics}
+        
+        for date_str in sorted_dates:
+            dates.append(datetime.strptime(date_str, '%Y-%m-%d'))
+            day_data = time_series[date_str]
+            
+            for metric in metrics:
+                data_series[metric].append(day_data.get(metric, 0))
+        
+        return dates, data_series
+    
+    def _configure_time_series_chart(self, ax, title, days):
+        """Configure time series chart appearance."""
+        ax.set_xlabel('Date')
+        ax.set_ylabel('Daily Contributions')
+        ax.set_title(f"{title} (Last {days} Days)")
+        ax.legend()
+        ax.grid(True, alpha=0.3)
+        
+        # Format x-axis dates
+        import matplotlib.dates as mdates
+        ax.xaxis.set_major_formatter(mdates.DateFormatter('%m/%d'))
+        ax.xaxis.set_major_locator(mdates.DayLocator(interval=max(1, days//10)))
+        plt.setp(ax.xaxis.get_majorticklabels(), rotation=45, ha='right')
+        
+        plt.tight_layout()
+
 # Factory functions for backward compatibility
 def create_top_contributors_chart(analytics_data, metric='prs', title="Top Contributors"):
     """Create top contributors chart."""
@@ -190,4 +261,9 @@ def create_activity_comparison_chart(analytics_data, title="Activity Comparison"
 def create_activity_trend_chart(analytics_data, title="Activity Trends"):
     """Create activity trend chart."""
     generator = ActivityTrendChart()
-    return generator.create(analytics_data, title) 
+    return generator.create(analytics_data, title)
+
+def create_time_series_chart(analytics_data, metrics=['prs', 'issues', 'commits'], days=30, title="Time Series"):
+    """Create time series chart."""
+    generator = TimeSeriesChart()
+    return generator.create(analytics_data, metrics, days, title) 

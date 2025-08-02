@@ -6,7 +6,7 @@ Handles analytics and visualization-related Discord commands.
 
 import discord
 from discord import app_commands
-from ...utils.analytics import create_top_contributors_chart, create_activity_comparison_chart, create_activity_trend_chart
+from ...utils.analytics import create_top_contributors_chart, create_activity_comparison_chart, create_activity_trend_chart, create_time_series_chart
 from shared.firestore import get_document
 
 class AnalyticsCommands:
@@ -20,6 +20,7 @@ class AnalyticsCommands:
         self.bot.tree.add_command(self._show_top_contributors_command())
         self.bot.tree.add_command(self._show_activity_comparison_command())
         self.bot.tree.add_command(self._show_activity_trends_command())
+        self.bot.tree.add_command(self._show_time_series_command())
     
     def _show_top_contributors_command(self):
         """Create the show-top-contributors command."""
@@ -103,4 +104,54 @@ class AnalyticsCommands:
                 print(f"Error in show-activity-trends command: {e}")
                 await interaction.followup.send("Error generating activity trends chart.", ephemeral=True)
         
-        return show_activity_trends 
+        return show_activity_trends
+    
+    def _show_time_series_command(self):
+        """Create the show-time-series command."""
+        @app_commands.command(name="show-time-series", description="Show time series chart with customizable metrics and date range")
+        @app_commands.describe(
+            metrics="Comma-separated metrics to display (prs,issues,commits,total)",
+            days="Number of days to show (7-90, default: 30)"
+        )
+        async def show_time_series(interaction: discord.Interaction, metrics: str = "prs,issues,commits", days: int = 30):
+            await interaction.response.defer()
+            
+            try:
+                # Validate inputs
+                if days < 7 or days > 90:
+                    await interaction.followup.send("Days must be between 7 and 90.", ephemeral=True)
+                    return
+                
+                valid_metrics = ['prs', 'issues', 'commits', 'total']
+                selected_metrics = [m.strip().lower() for m in metrics.split(',')]
+                selected_metrics = [m for m in selected_metrics if m in valid_metrics]
+                
+                if not selected_metrics:
+                    await interaction.followup.send("Invalid metrics. Use: prs, issues, commits, total", ephemeral=True)
+                    return
+                
+                analytics_data = get_document('repo_stats', 'analytics')
+                
+                if not analytics_data:
+                    await interaction.followup.send("No analytics data available for analysis.", ephemeral=True)
+                    return
+                
+                chart_buffer = create_time_series_chart(
+                    analytics_data, 
+                    metrics=selected_metrics, 
+                    days=days,
+                    title=f"Activity Time Series - {', '.join(m.title() for m in selected_metrics)}"
+                )
+                
+                if not chart_buffer:
+                    await interaction.followup.send("No data available to generate chart.", ephemeral=True)
+                    return
+                
+                file = discord.File(chart_buffer, filename="time_series.png")
+                await interaction.followup.send(f"Time series chart for last {days} days:", file=file)
+                
+            except Exception as e:
+                print(f"Error in show-time-series command: {e}")
+                await interaction.followup.send("Error generating time series chart.", ephemeral=True)
+        
+        return show_time_series 
