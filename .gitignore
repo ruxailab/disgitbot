@@ -82,3 +82,6 @@ create_test_pr.sh
 # pr_review/data/reviewers_config.json
 
 pre_prompt.txt
+reset.sh
+force-sync.sh
+create_test_pr.sh
