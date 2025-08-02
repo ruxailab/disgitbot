@@ -166,33 +166,7 @@ class PRReviewSystem:
         
         return comment
     
-    def update_repository_labels_cache(self, repo: str) -> Dict[str, Any]:
-        """
-        Update the repository labels cache for a specific repo
-        
-        Args:
-            repo: Repository name in format "owner/repo"
-            
-        Returns:
-            Cache update results
-        """
-        try:
-            logger.info(f"Updating labels cache for {repo}")
-            labels = self.ai_labeler.update_repository_labels_cache(repo)
-            
-            return {
-                'repository': repo,
-                'labels_count': len(labels),
-                'status': 'success'
-            }
-            
-        except Exception as e:
-            logger.error(f"Failed to update labels cache for {repo}: {e}")
-            return {
-                'repository': repo,
-                'status': 'error',
-                'error': str(e)
-            }
+
 
 def main():
     """Main entry point for testing"""
