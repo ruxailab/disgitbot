@@ -128,25 +128,20 @@ class PRReviewSystem:
             }
     
     def _build_comprehensive_comment(self, metrics: Dict, labels: List[Dict], reviewers: Dict, ai_review: Dict) -> str:
-        """Build a clean, minimal comment with essential information"""
+        """Build comprehensive PR comment with formatted metrics and design analysis"""
         
-        # Get essential metrics
-        lines_added = metrics.get('lines_added', 0)
-        files_changed = metrics.get('files_changed', 0)
-        complexity_added = metrics.get('cyclomatic_complexity_added', 0)
-        functions_added = metrics.get('functions_added', 0)
-        risk_level = metrics.get('risk_level', 'UNKNOWN')
+        # Use the formatted output functions
+        metrics_summary = format_metrics_summary(metrics)
+        design_analysis = format_design_analysis(metrics)
         
-        # Build clean, minimal comment
-        comment = f"""## Code Metrics
-
-{lines_added} lines added across {files_changed} {'file' if files_changed == 1 else 'files'}
-
-Cyclomatic complexity +{complexity_added} · Functions +{functions_added} · Risk {risk_level}
-
-"""
+        # Build clean comment using markdown formatting
+        comment = "## Code Metrics\n"
+        comment += metrics_summary.replace('**', '**').strip() + "\n\n"
         
-        # Risk assessment removed - already covered in metrics summary
+        # Add design analysis if there are issues
+        if metrics.get('design_issues_found', 0) > 0:
+            comment += "## Design Analysis\n"
+            comment += design_analysis.replace('**', '**').strip() + "\n\n"
         
         # Labels (clean format)
         if labels:

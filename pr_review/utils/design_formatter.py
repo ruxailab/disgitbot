@@ -71,10 +71,21 @@ def format_metrics_summary(metrics: Dict[str, Any]) -> str:
     complexity_added = metrics.get('cyclomatic_complexity_added', 0)
     risk_level = metrics.get('risk_level', 'UNKNOWN')
     
+    # Fan-In/Fan-Out coupling metrics
+    fan_out = metrics.get('fan_out', 0)
+    fan_in = metrics.get('fan_in', 0)
+    coupling_factor = metrics.get('coupling_factor', 0.0)
+    imports_added = metrics.get('imports_added', 0)
+    exports_added = metrics.get('exports_added', 0)
+    
     output = f"""
 **Code Metrics**
    {lines_added} lines added • {functions_added} functions • Complexity +{complexity_added}
    Risk: **{risk_level}**
+
+**Coupling Analysis**
+   Fan-Out: {fan_out} • Fan-In: {fan_in} • Coupling Factor: {coupling_factor:.2f}
+   Imports: {imports_added} • Exports: {exports_added}
 """
     
     return output
