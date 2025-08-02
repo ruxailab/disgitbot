@@ -2,36 +2,50 @@ name: Keep Discord Bot Alive
 
 on:
   schedule:
-    - cron: '*/5 * * * *'  # Every 5 minutes
+    - cron: '0 */6 * * *'  # Every 6 hours at minute 0
   workflow_dispatch:
 
 jobs:
-  ping:
+  persistent-ping:
     runs-on: ubuntu-latest
-    timeout-minutes: 2
+    timeout-minutes: 360  # 6 hours maximum
     steps:
-      - name: Check if CLOUD_RUN_URL is set
+      - name: Validate CLOUD_RUN_URL
         run: |
           if [ -z "${{ secrets.CLOUD_RUN_URL }}" ]; then
             echo "CLOUD_RUN_URL secret is not set"
             exit 1
-          else
-            echo "CLOUD_RUN_URL is configured"
           fi
+          echo "CLOUD_RUN_URL is configured"
 
-      - name: Ping Cloud Run Service
-        run: |
-          echo " Pinging bot at: ${{ secrets.CLOUD_RUN_URL }}"
-          response=$(curl -s -w "%{http_code}" --max-time 30 "${{ secrets.CLOUD_RUN_URL }}" 2>/dev/null)
-          http_code="${response: -3}"
-          body="${response%???}"
-          
-          if [ "$http_code" -eq 200 ] || [ "$http_code" -eq 000 ]; then
-            echo "Bot is alive (HTTP: $http_code)"
-          else
-            echo "Bot ping failed (HTTP: $http_code)"
-            echo "Response body: $body"
-            exit 1
-          fi
+      - name: Persistent Ping Loop
         env:
           CLOUD_RUN_URL: ${{ secrets.CLOUD_RUN_URL }}
+        run: |
+          echo "Starting persistent ping loop for 6 hours"
+          echo "Will ping every 5 minutes (72 total pings)"
+          echo "Start time: $(date)"
+          
+          for iteration in {1..72}; do
+            echo "=== Ping $iteration/72 at $(date) ==="
+            
+            response=$(curl -s -w "%{http_code}" --max-time 30 "$CLOUD_RUN_URL" 2>/dev/null)
+            http_code="${response: -3}"
+            body="${response%???}"
+            
+            if [ "$http_code" -eq 200 ] || [ "$http_code" -eq 000 ]; then
+              echo "Bot is alive (HTTP: $http_code)"
+            else
+              echo "Bot ping failed (HTTP: $http_code)"
+              echo "Response body: $body"
+              echo "Continuing despite failure..."
+            fi
+            
+            if [ $iteration -lt 72 ]; then
+              echo "Sleeping for 5 minutes..."
+              sleep 300
+            fi
+          done
+          
+          echo "=== Ping loop completed at $(date) ==="
+          echo "Total pings sent: 72"
