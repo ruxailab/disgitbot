@@ -115,9 +115,34 @@ def create_analytics_data(all_contributions):
             for username, data in top_commits
         ],
         'activity_trends': {
-            'today_total': sum(c.get('today_activity', 0) for c in all_contributions.values()),
-            'week_total': sum(c.get('week_activity', 0) for c in all_contributions.values()),
-            'month_total': sum(c.get('month_activity', 0) for c in all_contributions.values())
+            'daily': {
+                'prs': sum(c.get('stats', {}).get('pr', {}).get('daily', 0) for c in all_contributions.values()),
+                'issues': sum(c.get('stats', {}).get('issue', {}).get('daily', 0) for c in all_contributions.values()),
+                'commits': sum(c.get('stats', {}).get('commit', {}).get('daily', 0) for c in all_contributions.values())
+            },
+            'weekly': {
+                'prs': sum(c.get('stats', {}).get('pr', {}).get('weekly', 0) for c in all_contributions.values()),
+                'issues': sum(c.get('stats', {}).get('issue', {}).get('weekly', 0) for c in all_contributions.values()),
+                'commits': sum(c.get('stats', {}).get('commit', {}).get('weekly', 0) for c in all_contributions.values())
+            },
+            'monthly': {
+                'prs': sum(c.get('stats', {}).get('pr', {}).get('monthly', 0) for c in all_contributions.values()),
+                'issues': sum(c.get('stats', {}).get('issue', {}).get('monthly', 0) for c in all_contributions.values()),
+                'commits': sum(c.get('stats', {}).get('commit', {}).get('monthly', 0) for c in all_contributions.values())
+            }
         },
+        'activity_comparison': [
+            {
+                'username': username,
+                'pr_count': data.get('pr_count', 0),
+                'issues_count': data.get('issues_count', 0),
+                'commits_count': data.get('commits_count', 0)
+            }
+            for username, data in sorted(
+                all_contributions.items(),
+                key=lambda x: x[1].get('total_activity', 0),
+                reverse=True
+            )[:10]
+        ],
         'last_updated': time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime())
     } 
