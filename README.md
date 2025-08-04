@@ -47,39 +47,39 @@ The Disgitbot project aims to create a comprehensive Discord bot that integrates
 <h4>Image 2: Data Collection</h4>
 </div>
 
-<div id="image-3-oauth-process">
-<img src="images/Screenshot%202025-08-03%20at%208.24.03%E2%80%AFPM.png" width="600" alt="OAuth Process"/>
-<h4>Image 3: OAuth Process</h4>
+<div id="image-3-raw-github-data">
+<img src="images/Screenshot%202025-08-03%20at%208.24.03%E2%80%AFPM.png" width="600" alt="Raw GitHub Data Collection"/>
+<h4>Image 3: Raw GitHub Data Collection</h4>
 </div>
 
-<div id="image-4-authentication">
-<img src="images/Screenshot%202025-08-03%20at%208.24.14%E2%80%AFPM.png" width="600" alt="Authentication"/>
-<h4>Image 4: Authentication</h4>
+<div id="image-4-data-processing">
+<img src="images/Screenshot%202025-08-03%20at%208.24.14%E2%80%AFPM.png" width="600" alt="Processing of Raw Data Collected"/>
+<h4>Image 4: Processing of Raw Data Collected</h4>
 </div>
 
-<div id="image-5-data-processing">
-<img src="images/Screenshot%202025-08-03%20at%208.24.26%E2%80%AFPM.png" width="600" alt="Data Processing"/>
-<h4>Image 5: Data Processing</h4>
+<div id="image-5-data-storage">
+<img src="images/Screenshot%202025-08-03%20at%208.24.26%E2%80%AFPM.png" width="600" alt="Storage of Processed Data"/>
+<h4>Image 5: Storage of Processed Data</h4>
 </div>
 
-<div id="image-6-discord-integration">
-<img src="images/Screenshot%202025-08-03%20at%208.26.40%E2%80%AFPM.png" width="600" alt="Discord Integration"/>
-<h4>Image 6: Discord Integration</h4>
+<div id="image-6-github-oauth">
+<img src="images/Screenshot%202025-08-03%20at%208.26.40%E2%80%AFPM.png" width="600" alt="GitHub OAuth on Discord"/>
+<h4>Image 6: GitHub OAuth on Discord</h4>
 </div>
 
 <div id="image-7-cloud-logs">
-<img src="images/Screenshot%202025-08-03%20at%208.27.13%E2%80%AFPM.png" width="600" alt="Cloud Logs"/>
-<h4>Image 7: Cloud Logs</h4>
+<img src="images/Screenshot%202025-08-03%20at%208.27.13%E2%80%AFPM.png" width="600" alt="Cloud Logs of GitHub OAuth"/>
+<h4>Image 7: Cloud Logs of GitHub OAuth</h4>
 </div>
 
-<div id="image-8-role-system">
-<img src="images/Screenshot%202025-08-03%20at%207.53.51%E2%80%AFPM.png" width="600" alt="Role System"/>
-<h4>Image 8: Role System</h4>
+<div id="image-8-auto-role-update">
+<img src="images/Screenshot%202025-08-03%20at%208.20.08%E2%80%AFPM.png" width="600" alt="Auto Role Update"/>
+<h4>Image 8: Auto Role Update</h4>
 </div>
 
-<div id="image-9-auto-update">
-<img src="images/Screenshot%202025-08-03%20at%208.20.08%E2%80%AFPM.png" width="600" alt="Auto Update"/>
-<h4>Image 9: Auto Update</h4>
+<div id="image-9-github-actions">
+<img src="images/Screenshot%202025-08-03%20at%207.53.51%E2%80%AFPM.png" width="600" alt="GitHub Actions Data Collection Process"/>
+<h4>Image 9: GitHub Actions Data Collection Process</h4>
 </div>
 
 <div id="image-10-role-assignment">
