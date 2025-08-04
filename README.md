@@ -24,12 +24,12 @@ The Disgitbot project aims to create a comprehensive Discord bot that integrates
 
 | Status     | Task                                             | Week      | Timeline           | Issue / Report Link                                                                                 | Images                |
 |------------|--------------------------------------------------|-----------|--------------------|-----------------------------------------------------------------------------------------------------|-----------------------|
-| Completed  | Discord Bot for Real-Time GitHub Contribution Stats | 1-2       | May 27 - June 9, 2025     | [Issue #2](https://github.com/ruxailab/disgitbot/issues/2)                                          | [Image 1: Discord Command](#image-1-discord-command)<br/>[Image 2: Data Collection](#image-2-data-collection)<br/>[Image 3: OAuth Process](#image-3-oauth-process)<br/>[Image 4: Authentication](#image-4-authentication)<br/>[Image 5: Data Processing](#image-5-data-processing)<br/>[Image 6: Discord Integration](#image-6-discord-integration)<br/>[Image 7: Cloud Logs](#image-7-cloud-logs) |
-| Completed  | Discord Role Auto-Update Bot                     | 3-4       | June 10 - June 23, 2025    | [Issue #9](https://github.com/ruxailab/disgitbot/issues/9)                                          | [Image 8: Role System](#image-8-role-system)<br/>[Image 9: Auto Update](#image-9-auto-update)<br/>[Image 10: Role Assignment](#image-10-role-assignment) |
-| Completed  | AI-Assisted Pull Request Review Integration       | 5-7       | June 24 - July 14, 2025 | [Issue #3](https://github.com/ruxailab/disgitbot/issues/3)                                          | [Image 11: PR Review](#image-11-pr-review) |
-| Completed  | Automatic Labelling for PRs Using PR Labeller    | 8         | July 15 - July 21, 2025   | [Issue #4](https://github.com/ruxailab/disgitbot/issues/4)                                          | [Image 12: PR Labeller](#image-12-pr-labeller) |
-| Completed  | Research Metric Tracking and Channel Creation     | 9-10      | July 22 - August 4, 2025 | [Issue #8](https://github.com/ruxailab/disgitbot/issues/8)                                          | [Image 15: Metric Tracking](#image-15-metric-tracking) |
-| Completed  | Contributor Analytics and Hall of Fame Visualization | 11-12        | July 29 - August 11, 2025 | [Issue #6](https://github.com/ruxailab/disgitbot/issues/6)                                          | [Image 13: Analytics](#image-13-analytics)<br/>[Image 14: Hall of Fame](#image-14-hall-of-fame) |
+| Completed  | Discord Bot for Real-Time GitHub Contribution Stats | 1-2       | May 27 - June 9, 2025     | [Issue #2](https://github.com/ruxailab/disgitbot/issues/2)                                          | [Discord Command](#image-1-discord-command) • [Data Pipeline](#image-2-data-collection) • [GitHub Actions](#image-3-github-actions) • [Raw Data](#image-4-raw-github-data) • [Data Processing](#image-5-data-processing) • [Data Storage](#image-6-data-storage) • [GitHub OAuth](#image-7-github-oauth) • [Cloud Logs](#image-8-cloud-logs) |
+| Completed  | Discord Role Auto-Update Bot                     | 3-4       | June 10 - June 23, 2025    | [Issue #9](https://github.com/ruxailab/disgitbot/issues/9)                                          | [Auto Role Update](#image-9-auto-role-update) • [Role Assignment](#image-10-role-assignment) |
+| Completed  | AI-Assisted Pull Request Review Integration       | 5-7       | June 24 - July 14, 2025 | [Issue #3](https://github.com/ruxailab/disgitbot/issues/3)                                          | [PR Review](#image-11-pr-review) |
+| Completed  | Automatic Labelling for PRs Using PR Labeller    | 8         | July 15 - July 21, 2025   | [Issue #4](https://github.com/ruxailab/disgitbot/issues/4)                                          | [PR Labeller](#image-12-pr-labeller) |
+| Completed  | Research Metric Tracking and Channel Creation     | 9-10      | July 22 - August 4, 2025 | [Issue #8](https://github.com/ruxailab/disgitbot/issues/8)                                          | [Metric Tracking](#image-15-metric-tracking) |
+| Completed  | Contributor Analytics and Hall of Fame Visualization | 11-12        | July 29 - August 11, 2025 | [Issue #6](https://github.com/ruxailab/disgitbot/issues/6)                                          | [Analytics](#image-13-analytics) • [Hall of Fame](#image-14-hall-of-fame) |
 
 ---
 
@@ -43,43 +43,43 @@ The Disgitbot project aims to create a comprehensive Discord bot that integrates
 </div>
 
 <div id="image-2-data-collection">
-<img src="images/Screenshot%202025-08-03%20at%207.55.07%E2%80%AFPM.png" width="600" alt="Data Collection"/>
-<h4>Image 2: Data Collection</h4>
+<img src="images/Screenshot%202025-08-03%20at%207.55.07%E2%80%AFPM.png" width="600" alt="Data Collection Pipeline"/>
+<h4>Image 2: Data Collection Pipeline</h4>
 </div>
 
-<div id="image-3-raw-github-data">
-<img src="images/Screenshot%202025-08-03%20at%208.24.03%E2%80%AFPM.png" width="600" alt="Raw GitHub Data Collection"/>
-<h4>Image 3: Raw GitHub Data Collection</h4>
+<div id="image-3-github-actions">
+<img src="images/Screenshot%202025-08-03%20at%207.53.51%E2%80%AFPM.png" width="600" alt="GitHub Actions Process"/>
+<h4>Image 3: GitHub Actions Process</h4>
 </div>
 
-<div id="image-4-data-processing">
-<img src="images/Screenshot%202025-08-03%20at%208.24.14%E2%80%AFPM.png" width="600" alt="Processing of Raw Data Collected"/>
-<h4>Image 4: Processing of Raw Data Collected</h4>
+<div id="image-4-raw-github-data">
+<img src="images/Screenshot%202025-08-03%20at%208.24.03%E2%80%AFPM.png" width="600" alt="Raw GitHub Data"/>
+<h4>Image 4: Raw GitHub Data</h4>
 </div>
 
-<div id="image-5-data-storage">
-<img src="images/Screenshot%202025-08-03%20at%208.24.26%E2%80%AFPM.png" width="600" alt="Storage of Processed Data"/>
-<h4>Image 5: Storage of Processed Data</h4>
+<div id="image-5-data-processing">
+<img src="images/Screenshot%202025-08-03%20at%208.24.14%E2%80%AFPM.png" width="600" alt="Data Processing"/>
+<h4>Image 5: Data Processing</h4>
 </div>
 
-<div id="image-6-github-oauth">
+<div id="image-6-data-storage">
+<img src="images/Screenshot%202025-08-03%20at%208.24.26%E2%80%AFPM.png" width="600" alt="Data Storage"/>
+<h4>Image 6: Data Storage</h4>
+</div>
+
+<div id="image-7-github-oauth">
 <img src="images/Screenshot%202025-08-03%20at%208.26.40%E2%80%AFPM.png" width="600" alt="GitHub OAuth on Discord"/>
-<h4>Image 6: GitHub OAuth on Discord</h4>
+<h4>Image 7: GitHub OAuth on Discord</h4>
 </div>
 
-<div id="image-7-cloud-logs">
-<img src="images/Screenshot%202025-08-03%20at%208.27.13%E2%80%AFPM.png" width="600" alt="Cloud Logs of GitHub OAuth"/>
-<h4>Image 7: Cloud Logs of GitHub OAuth</h4>
+<div id="image-8-cloud-logs">
+<img src="images/Screenshot%202025-08-03%20at%208.27.13%E2%80%AFPM.png" width="600" alt="OAuth Cloud Logs"/>
+<h4>Image 8: OAuth Cloud Logs</h4>
 </div>
 
-<div id="image-8-auto-role-update">
+<div id="image-9-auto-role-update">
 <img src="images/Screenshot%202025-08-03%20at%208.20.08%E2%80%AFPM.png" width="600" alt="Auto Role Update"/>
-<h4>Image 8: Auto Role Update</h4>
-</div>
-
-<div id="image-9-github-actions">
-<img src="images/Screenshot%202025-08-03%20at%207.53.51%E2%80%AFPM.png" width="600" alt="GitHub Actions Data Collection Process"/>
-<h4>Image 9: GitHub Actions Data Collection Process</h4>
+<h4>Image 9: Auto Role Update</h4>
 </div>
 
 <div id="image-10-role-assignment">
