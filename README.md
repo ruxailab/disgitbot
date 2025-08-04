@@ -1,4 +1,4 @@
-# GSoC 2025 Report
+# GSoC 2025
 
 **Repository:** [disgitbot](https://github.com/ruxailab/disgitbot)
 
