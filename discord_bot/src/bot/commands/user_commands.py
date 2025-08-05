@@ -8,7 +8,7 @@ import discord
 from discord import app_commands
 import asyncio
 import threading
-from ...core.role_service import RoleService
+from ...services.role_service import RoleService
 from ..auth import get_github_username_for_user, wait_for_username
 from shared.firestore import get_document, set_document, query_collection
 

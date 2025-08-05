@@ -180,7 +180,7 @@ class PRReviewSystem:
         try:
             # Import here to avoid circular dependencies
             sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'discord_bot'))
-            from src.core.notification_service import NotificationService
+            from src.services.notification_service import NotificationService
             
             async with NotificationService() as notification_service:
                 await notification_service.send_pr_automation_notification(pr_data, comment_body)

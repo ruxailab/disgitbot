@@ -8,7 +8,7 @@ import discord
 from discord import app_commands
 from typing import Literal
 import re
-from src.core.notification_service import WebhookManager
+from src.services.notification_service import WebhookManager
 
 class NotificationCommands:
     """Handles notification management Discord commands."""

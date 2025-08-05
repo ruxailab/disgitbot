@@ -1,21 +1,23 @@
 """
-Core Services
+Discord Guild Manager
 
-Discord bot functionality.
+Manages Discord server roles and channels based on GitHub data.
 """
 
 import discord
 from discord.ext import commands
 from typing import Dict, Any, Optional, List
 import time
-from .config import get_discord_token
+import os
 from shared.firestore import get_document, set_document, update_document, query_collection
 
-class DiscordBotService:
-    """Discord bot implementation for role and channel management."""
+class GuildService:
+    """Manages Discord guild roles and channels based on GitHub activity."""
     
     def __init__(self, role_service = None):
-        self._token = get_discord_token()
+        self._token = os.getenv('DISCORD_BOT_TOKEN')
+        if not self._token:
+            raise ValueError("DISCORD_BOT_TOKEN environment variable is required")
         self._role_service = role_service
     
     async def update_roles_and_channels(self, user_mappings: Dict[str, str], contributions: Dict[str, Any], metrics: Dict[str, Any]) -> bool:
