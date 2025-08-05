@@ -84,6 +84,8 @@ jobs:
         GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
         GOOGLE_APPLICATION_CREDENTIALS: discord_bot/config/credentials.json
         PYTHONPATH: ${{ github.workspace }}
+        # Enable Discord notifications for PR automation
+        DISCORD_NOTIFICATIONS_ENABLED: true
       run: |
         cd ${{ github.event_name == 'workflow_call' && 'pr-automation/' || '' }}pr_review
         python main.py \

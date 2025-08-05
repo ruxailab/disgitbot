@@ -10,7 +10,7 @@ import discord
 from discord.ext import commands
 from dotenv import load_dotenv
 
-from .commands import UserCommands, AdminCommands, AnalyticsCommands
+from .commands import UserCommands, AdminCommands, AnalyticsCommands, NotificationCommands
 
 class DiscordBot:
     """Main Discord bot class with modular command registration."""
@@ -56,10 +56,12 @@ class DiscordBot:
         user_commands = UserCommands(self.bot)
         admin_commands = AdminCommands(self.bot)
         analytics_commands = AnalyticsCommands(self.bot)
+        notification_commands = NotificationCommands(self.bot)
         
         user_commands.register_commands()
         admin_commands.register_commands()
         analytics_commands.register_commands()
+        notification_commands.register_commands()
         
         print("All command modules registered")
     

@@ -14,12 +14,12 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first to leverage Docker cache
-COPY config/discord_bot_requirements.txt .
+COPY requirements.txt .
 
 # Upgrade pip to latest version to avoid upgrade notices
 RUN pip install --upgrade pip
 
-RUN pip install --no-cache-dir --root-user-action=ignore -r discord_bot_requirements.txt
+RUN pip install --no-cache-dir --root-user-action=ignore -r requirements.txt
 
 # Create config directory and empty credentials file (will be overwritten by volume mount)
 RUN mkdir -p /app/config && echo "{}" > /app/config/credentials.json

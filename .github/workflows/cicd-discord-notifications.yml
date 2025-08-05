@@ -1,0 +1,181 @@
+name: CI/CD Discord Notifications
+
+on:
+  # Trigger on any workflow completion
+  workflow_run:
+    workflows: ["*"]
+    types: 
+      - completed
+      - requested
+
+  # Make this workflow reusable for other repositories
+  workflow_call:
+    inputs:
+      repository:
+        required: false
+        type: string
+        description: 'Repository name (owner/repo) - defaults to calling repo'
+      workflow_name:
+        required: false
+        type: string
+        description: 'Workflow name - defaults to triggering workflow'
+      status:
+        required: false
+        type: string
+        description: 'Workflow status - defaults to conclusion'
+      run_url:
+        required: false
+        type: string
+        description: 'Workflow run URL'
+      commit_sha:
+        required: false
+        type: string
+        description: 'Commit SHA'
+      branch:
+        required: false
+        type: string
+        description: 'Branch name'
+    secrets:
+      GOOGLE_CREDENTIALS_JSON:
+        required: true
+
+jobs:
+  notify-discord:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    
+    steps:
+    - name: Checkout notification system
+      uses: actions/checkout@v4
+      with:
+        repository: 'ruxailab/disgitbot'
+        path: 'notification-system'
+        token: ${{ github.token }}
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+    
+    - name: Set up Google Credentials
+      run: echo "${{ secrets.GOOGLE_CREDENTIALS_JSON }}" | base64 --decode > notification-system/discord_bot/config/credentials.json
+    
+    - name: Install dependencies
+      run: |
+        cd notification-system
+        pip install -r discord_bot/requirements.txt
+    
+    - name: Determine notification parameters
+      id: params
+      run: |
+        # Use workflow_call inputs if available, otherwise extract from workflow_run event
+        if [ "${{ github.event_name }}" = "workflow_call" ]; then
+          REPO="${{ inputs.repository || github.repository }}"
+          WORKFLOW_NAME="${{ inputs.workflow_name || 'Unknown Workflow' }}"
+          STATUS="${{ inputs.status || 'unknown' }}"
+          RUN_URL="${{ inputs.run_url || github.event.workflow_run.html_url }}"
+          COMMIT_SHA="${{ inputs.commit_sha || github.sha }}"
+          BRANCH="${{ inputs.branch || github.ref_name }}"
+        else
+          REPO="${{ github.repository }}"
+          WORKFLOW_NAME="${{ github.event.workflow_run.name }}"
+          # Map GitHub workflow conclusions to our status format
+          CONCLUSION="${{ github.event.workflow_run.conclusion }}"
+          case "$CONCLUSION" in
+            "success") STATUS="success" ;;
+            "failure") STATUS="failure" ;;
+            "cancelled") STATUS="cancelled" ;;
+            "skipped") STATUS="cancelled" ;;
+            *) STATUS="in_progress" ;;
+          esac
+          RUN_URL="${{ github.event.workflow_run.html_url }}"
+          COMMIT_SHA="${{ github.event.workflow_run.head_sha }}"
+          BRANCH="${{ github.event.workflow_run.head_branch }}"
+        fi
+        
+        echo "repository=$REPO" >> $GITHUB_OUTPUT
+        echo "workflow_name=$WORKFLOW_NAME" >> $GITHUB_OUTPUT
+        echo "status=$STATUS" >> $GITHUB_OUTPUT
+        echo "run_url=$RUN_URL" >> $GITHUB_OUTPUT
+        echo "commit_sha=$COMMIT_SHA" >> $GITHUB_OUTPUT
+        echo "branch=$BRANCH" >> $GITHUB_OUTPUT
+    
+    - name: Check if repository is monitored
+      id: check_monitoring
+      env:
+        GOOGLE_APPLICATION_CREDENTIALS: notification-system/discord_bot/config/credentials.json
+        PYTHONPATH: ${{ github.workspace }}/notification-system
+      run: |
+        cd notification-system
+        python -c "
+        import sys
+        sys.path.append('discord_bot')
+        from src.core.notification_service import WebhookManager
+        
+        repo = '${{ steps.params.outputs.repository }}'
+        monitored_repos = WebhookManager.get_monitored_repositories()
+        
+        if repo in monitored_repos:
+            print('Repository is monitored for CI/CD notifications')
+            print('should_notify=true')
+        else:
+            print(f'Repository {repo} is not in monitored list: {monitored_repos}')  
+            print('should_notify=false')
+        " | tee check_output.log
+        
+        # Extract should_notify value
+        if grep -q "should_notify=true" check_output.log; then
+          echo "should_notify=true" >> $GITHUB_OUTPUT
+        else
+          echo "should_notify=false" >> $GITHUB_OUTPUT
+        fi
+    
+    - name: Send Discord notification
+      if: steps.check_monitoring.outputs.should_notify == 'true'
+      env:
+        GOOGLE_APPLICATION_CREDENTIALS: notification-system/discord_bot/config/credentials.json
+        PYTHONPATH: ${{ github.workspace }}/notification-system
+      run: |
+        cd notification-system
+        python -c "
+        import asyncio
+        import sys
+        sys.path.append('discord_bot')
+        from src.core.notification_service import NotificationService
+        
+        async def send_notification():
+            async with NotificationService() as service:
+                success = await service.send_cicd_notification(
+                    repo='${{ steps.params.outputs.repository }}',
+                    workflow_name='${{ steps.params.outputs.workflow_name }}',
+                    status='${{ steps.params.outputs.status }}',
+                    run_url='${{ steps.params.outputs.run_url }}',
+                    commit_sha='${{ steps.params.outputs.commit_sha }}',
+                    branch='${{ steps.params.outputs.branch }}'
+                )
+                if success:
+                    print('✅ Discord notification sent successfully')
+                else:
+                    print('❌ Failed to send Discord notification')
+                    sys.exit(1)
+        
+        asyncio.run(send_notification())
+        "
+    
+    - name: Log notification attempt
+      if: always()
+      run: |
+        echo "=== Notification Summary ==="
+        echo "Repository: ${{ steps.params.outputs.repository }}"
+        echo "Workflow: ${{ steps.params.outputs.workflow_name }}"
+        echo "Status: ${{ steps.params.outputs.status }}"
+        echo "Monitored: ${{ steps.check_monitoring.outputs.should_notify }}"
+        echo "Event Type: ${{ github.event_name }}"
+        if [ "${{ github.event_name }}" = "workflow_run" ]; then
+          echo "Triggering Workflow: ${{ github.event.workflow_run.name }}"
+          echo "Conclusion: ${{ github.event.workflow_run.conclusion }}"
+        fi
+
+# Global environment variables
+env:
+  PYTHONPATH: ${{ github.workspace }}/notification-system

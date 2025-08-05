@@ -8,6 +8,7 @@ import sys
 import logging
 from typing import Dict, Any, List
 import json
+import asyncio
 
 from config import GITHUB_TOKEN, GOOGLE_API_KEY, REPO_OWNER
 from utils.github_client import GitHubClient
@@ -104,6 +105,9 @@ class PRReviewSystem:
             
             self.github_client.create_issue_comment(repo, pr_number, comment_body)
             
+            # Send Discord notification
+            asyncio.create_task(self._send_discord_notification(results, comment_body))
+            
             # Return processing results
             results = {
                 'pr_number': pr_number,
@@ -120,12 +124,15 @@ class PRReviewSystem:
             
         except Exception as e:
             logger.error(f"Failed to process PR #{pr_number}: {e}")
-            return {
+            error_results = {
                 'pr_number': pr_number,
                 'repository': repo,
                 'status': 'error',
                 'error': str(e)
             }
+            # Send error notification to Discord
+            asyncio.create_task(self._send_discord_notification(error_results, None))
+            return error_results
     
     def _build_comprehensive_comment(self, metrics: Dict, labels: List[Dict], reviewers: Dict, ai_review: Dict) -> str:
         """Build clean, well-organized PR comment"""
@@ -168,6 +175,17 @@ class PRReviewSystem:
         
         return '\n'.join(comment_parts)
     
+    async def _send_discord_notification(self, pr_data: Dict[str, Any], comment_body: str):
+        """Send Discord notification for PR automation."""
+        try:
+            # Import here to avoid circular dependencies
+            sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'discord_bot'))
+            from src.core.notification_service import NotificationService
+            
+            async with NotificationService() as notification_service:
+                await notification_service.send_pr_automation_notification(pr_data, comment_body)
+        except Exception as e:
+            logger.error(f"Failed to send Discord notification: {e}")
 
 
 def main():

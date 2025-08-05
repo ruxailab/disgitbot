@@ -72,7 +72,7 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 
 # Upgrade pip and install dependencies
 python -m pip install --upgrade pip
-pip install -r discord_bot/config/discord_bot_requirements.txt
+pip install -r discord_bot/requirements.txt
 ```
 
 # 2. Project Structure
@@ -88,7 +88,7 @@ discord_bot/
  config/
     .env                    # Your environment variables
     credentials.json        # Firebase service account key
-    discord_bot_requirements.txt
+    requirements.txt
  deployment/                 # Cloud deployment scripts
 ```
 

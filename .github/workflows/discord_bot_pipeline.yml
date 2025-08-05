@@ -20,7 +20,7 @@ jobs:
         with:
           python-version: '3.13'
           cache: 'pip'
-          cache-dependency-path: 'discord_bot/config/discord_bot_requirements.txt'
+          cache-dependency-path: 'discord_bot/requirements.txt'
 
       - name: Cache system dependencies
         uses: actions/cache@v4
@@ -38,7 +38,7 @@ jobs:
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip wheel setuptools
-          pip install -r discord_bot/config/discord_bot_requirements.txt
+          pip install -r discord_bot/requirements.txt
 
       - name: Set up Google Credentials
         run: echo "${{ secrets.GOOGLE_CREDENTIALS_JSON }}" | base64 --decode > discord_bot/config/credentials.json

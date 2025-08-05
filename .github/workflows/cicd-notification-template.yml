@@ -1,0 +1,33 @@
+# CI/CD Discord Notification Template
+# 
+# Copy this file to any repository that wants to receive CI/CD notifications in Discord.
+# Place it at: .github/workflows/cicd-discord-notifications.yml
+#
+# Prerequisites:
+# 1. Repository must be added to monitoring list via Discord bot command: /add_repo owner/repo
+# 2. CI/CD webhook URL must be configured via Discord bot command: /set_webhook cicd YOUR_WEBHOOK_URL
+# 3. GOOGLE_CREDENTIALS_JSON secret must be configured in repository settings
+
+name: CI/CD Discord Notifications
+
+on:
+  # Trigger after any workflow completion
+  workflow_run:
+    workflows: ["*"]
+    types: 
+      - completed
+
+jobs:
+  notify-discord:
+    # Only run if the triggering workflow has concluded (not just requested)
+    if: github.event.workflow_run.conclusion != null
+    uses: ruxailab/disgitbot/.github/workflows/cicd-discord-notifications.yml@main
+    with:
+      repository: ${{ github.repository }}
+      workflow_name: ${{ github.event.workflow_run.name }}
+      status: ${{ github.event.workflow_run.conclusion == 'success' && 'success' || github.event.workflow_run.conclusion == 'failure' && 'failure' || github.event.workflow_run.conclusion == 'cancelled' && 'cancelled' || 'unknown' }}
+      run_url: ${{ github.event.workflow_run.html_url }}
+      commit_sha: ${{ github.event.workflow_run.head_sha }}
+      branch: ${{ github.event.workflow_run.head_branch }}
+    secrets:
+      GOOGLE_CREDENTIALS_JSON: ${{ secrets.GOOGLE_CREDENTIALS_JSON }}
