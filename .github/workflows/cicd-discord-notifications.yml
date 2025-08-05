@@ -110,7 +110,7 @@ jobs:
         python -c "
         import sys
         sys.path.append('discord_bot')
-        from src.core.notification_service import WebhookManager
+        from src.services.notification_service import WebhookManager
         
         repo = '${{ steps.params.outputs.repository }}'
         monitored_repos = WebhookManager.get_monitored_repositories()
@@ -141,7 +141,7 @@ jobs:
         import asyncio
         import sys
         sys.path.append('discord_bot')
-        from src.core.notification_service import NotificationService
+        from src.services.notification_service import NotificationService
         
         async def send_notification():
             async with NotificationService() as service:
