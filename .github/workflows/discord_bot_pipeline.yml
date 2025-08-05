@@ -54,7 +54,7 @@ jobs:
           python -u -c "
           import sys, json
           sys.path.insert(0, 'src')
-          from core.github_service import GitHubService
+          from services.github_service import GitHubService
           print('Collecting GitHub data...')
           github_service = GitHubService()
           raw_data = github_service.collect_organization_data()
@@ -188,8 +188,8 @@ jobs:
           from shared.firestore import query_collection  # Uses PYTHONPATH (no path setup needed)
           import sys, json                               # Standard library imports
           sys.path.insert(0, 'src')                     # Setup for local modules
-          from core.services import DiscordBotService    # Uses src/ path
-          from core.role_service import RoleService      # Uses src/ path
+          from services.guild_service import GuildService     # Uses src/ path
+          from services.role_service import RoleService       # Uses src/ path
           
           print('Loading processed data...')
           with open('processed_data.json', 'r') as f:
@@ -200,7 +200,7 @@ jobs:
           
           print('Initializing Discord services...')
           role_service = RoleService()
-          discord_service = DiscordBotService(role_service)
+          guild_service = GuildService(role_service)
           
           print('Getting user mappings...')
           user_mappings_data = query_collection('discord')
@@ -214,7 +214,7 @@ jobs:
           
           print('Updating Discord roles and channels...')
           import asyncio
-          success = asyncio.run(discord_service.update_roles_and_channels(user_mappings, contributions, repo_metrics))
+          success = asyncio.run(guild_service.update_roles_and_channels(user_mappings, contributions, repo_metrics))
           print(f'Discord updates completed: {success}')
           "
 
