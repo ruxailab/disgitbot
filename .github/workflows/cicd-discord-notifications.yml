@@ -53,9 +53,9 @@ jobs:
         token: ${{ github.token }}
     
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
-        python-version: '3.9'
+        python-version: '3.13'
     
     - name: Set up Google Credentials
       run: echo "${{ secrets.GOOGLE_CREDENTIALS_JSON }}" | base64 --decode > notification-system/discord_bot/config/credentials.json
