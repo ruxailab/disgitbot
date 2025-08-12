@@ -9,7 +9,7 @@ Picture this: you're in a Discord server where your role automatically updates b
 That's exactly what we built with Disgitbot.
 
 <img src="images/Screenshot%202025-08-03%20at%207.53.39%E2%80%AFPM.png" width="600" alt="Discord Bot in Action"/>
-*The bot responds to user commands with real-time GitHub contribution data*
+<em>The bot responds to user commands with real-time GitHub contribution data</em>
 
 ## What We Built
 
@@ -18,7 +18,7 @@ Disgitbot is a comprehensive Discord bot that integrates GitHub activity with Di
 The project was completed as part of Google Summer of Code 2025, working with Uramaki LAB to create something that would actually make developers' lives easier.
 
 <img src="images/Screenshot%202025-08-03%20at%207.55.07%E2%80%AFPM.png" width="600" alt="Data Pipeline Overview"/>
-*The complete data collection and processing pipeline*
+<em>The complete data collection and processing pipeline</em>
 
 ## The Core Architecture
 
@@ -27,7 +27,7 @@ At its heart, Disgitbot runs on a clean, modular architecture. We built it using
 The bot connects to GitHub's API, processes the data through a custom pipeline, stores everything in Firestore, and then updates Discord automatically. It's like having a personal assistant that never sleeps.
 
 <img src="images/Screenshot%202025-08-03%20at%207.53.51%E2%80%AFPM.png" width="600" alt="GitHub Actions Process"/>
-*GitHub Actions workflow that powers the entire system*
+<em>GitHub Actions workflow that powers the entire system</em>
 
 ## Six Major Features, One Bot
 
@@ -71,7 +71,7 @@ This is where it gets interesting. The bot automatically assigns Discord roles b
 The system runs every night, recalculating everyone's contributions and updating their roles accordingly. It even assigns special medal roles to the top three contributors.
 
 <img src="images/Screenshot%202025-08-03%20at%208.20.08%E2%80%AFPM.png" width="600" alt="Auto Role Update"/>
-*Automatic role assignment based on GitHub contributions*
+<em>Automatic role assignment based on GitHub contributions</em>
 
 ```mermaid
 graph TD
@@ -103,7 +103,7 @@ When someone opens a pull request, the bot automatically analyzes it using Googl
 The AI looks at the PR title, description, and code diff to understand what the change does. It then matches this against the repository's available labels and assigns them with confidence scores.
 
 <img src="images/Screenshot%202025-08-03%20at%207.55.47%E2%80%AFPM.png" width="600" alt="PR Review Automation"/>
-*AI-powered PR review and automation*
+<em>AI-powered PR review and automation</em>
 
 ```mermaid
 graph TD
@@ -142,7 +142,7 @@ The bot doesn't just guess at labels—it learns from your repository's existing
 This ensures consistency across your entire organization. No more manually applying labels or forgetting to categorize PRs properly.
 
 <img src="images/Screenshot%202025-08-03%20at%208.07.50%E2%80%AFPM.png" width="600" alt="PR Labeling System"/>
-*AI-powered automatic label assignment*
+<em>AI-powered automatic label assignment</em>
 
 ```mermaid
 graph TD
@@ -180,7 +180,7 @@ The bot creates and updates Discord voice channels with real-time repository sta
 These metrics are aggregated from all your repositories, giving you a bird's-eye view of your organization's GitHub activity.
 
 <img src="images/Screenshot%202025-08-03%20at%207.56.28%E2%80%AFPM.png" width="600" alt="Live Metrics"/>
-*Real-time repository metrics displayed in Discord*
+<em>Real-time repository metrics displayed in Discord</em>
 
 ```mermaid
 graph TD
@@ -212,10 +212,10 @@ The bot generates beautiful charts and leaderboards showing contributor activity
 The hall of fame system tracks leaders in multiple categories (PRs, issues, commits) across different time periods (daily, weekly, monthly, all-time).
 
 <img src="images/Screenshot%202025-08-03%20at%207.55.59%E2%80%AFPM.png" width="600" alt="Analytics Dashboard"/>
-*Interactive analytics and contributor insights*
+<em>Interactive analytics and contributor insights</em>
 
 <img src="images/Screenshot%202025-08-03%20at%207.56.18%E2%80%AFPM.png" width="600" alt="Hall of Fame"/>
-*Top contributors leaderboard*
+<em>Top contributors leaderboard</em>
 
 ```mermaid
 graph TD
@@ -258,7 +258,7 @@ Everything runs through a daily GitHub Actions workflow that:
 The pipeline is designed to handle rate limits gracefully and can process hundreds of repositories without hitting API limits.
 
 <img src="images/Screenshot%202025-08-03%20at%208.24.14%E2%80%AFPM.png" width="600" alt="Data Processing"/>
-*Data processing and transformation pipeline*
+<em>Data processing and transformation pipeline</em>
 
 ### AI Integration
 
@@ -275,7 +275,7 @@ The bot runs on Google Cloud Run with request-based billing, meaning it only cos
 We've optimized the deployment process with a comprehensive script that handles everything from environment setup to service deployment. The bot automatically manages its own scaling and resource allocation.
 
 <img src="images/Screenshot%202025-08-03%20at%208.27.13%E2%80%AFPM.png" width="600" alt="Cloud Deployment"/>
-*Cloud deployment and monitoring logs*
+<em>Cloud deployment and monitoring logs</em>
 
 ## Real-World Impact
 
