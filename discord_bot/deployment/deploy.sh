@@ -533,10 +533,15 @@ main() {
     echo
     echo -e "${YELLOW}This will:${NC}"
     echo "  • Build and push Docker image using Google Cloud Build (no local Docker needed!)"
-    echo "  • Deploy to Cloud Run (may take 2-5 minutes)"
+    echo "  • Deploy to Cloud Run with REQUEST-BASED BILLING (cost optimized!)"
     echo "  • Set up secrets and environment variables"
     echo "  • Enable required Google Cloud services"
     echo "  • Generate a public URL for your bot"
+    echo
+    echo -e "${GREEN}COST OPTIMIZATION:${NC}"
+    echo "  • Uses REQUEST-BASED billing (only pay when processing requests)"
+    echo "  • Scales to zero when not in use (no charges during idle time)"
+    echo "  • Estimated cost: ~$0.000024 per 100ms of CPU time + $0.00000240 per 100ms of memory"
     echo -e "${PURPLE}================================${NC}"
     echo
     read -p "Proceed with deployment? (y/N): " confirm
@@ -688,8 +693,9 @@ main() {
           --clear-secrets
     fi
     
-    # Deploy to Cloud Run
-    print_step "Deploying to Cloud Run..."
+    # Deploy to Cloud Run with REQUEST-BASED BILLING (cost optimized)
+    print_step "Deploying to Cloud Run with REQUEST-BASED BILLING..."
+    print_step "This will scale to zero when not in use, significantly reducing costs!"
     gcloud run deploy $SERVICE_NAME \
       --image=gcr.io/$PROJECT_ID/$SERVICE_NAME:latest \
       --platform=managed \
@@ -703,7 +709,7 @@ main() {
       --concurrency=80 \
       --timeout=300s \
       --allow-unauthenticated \
-      --no-cpu-throttling \
+      --cpu-throttling \
       --execution-environment=gen2 \
       --update-secrets=/secret/firebase-credentials=$SECRET_NAME:latest \
       --set-env-vars="$ENV_VARS"
