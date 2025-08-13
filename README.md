@@ -1,4 +1,6 @@
 # GSoC 2025
+# GSoC 2025
+> For deploying the Discord bot on your own server, refer to the [Discord Bot Setup Guide](discord_bot/README.md).
 
 **Repository:** [disgitbot](https://github.com/ruxailab/disgitbot)
 
