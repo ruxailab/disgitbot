@@ -19,6 +19,18 @@
 
 The Disgitbot project aims to create a comprehensive Discord bot that integrates GitHub activity with Discord communities, providing real-time notifications, contribution analytics, and automated workflow management. The project focuses on enhancing community engagement and streamlining development workflows through intelligent automation.
 
+## How DisGitBot Works (High-Level)
+
+DisGitBot bridges GitHub repositories and Discord communities by automatically capturing
+repository activity and presenting useful insights inside Discord.
+
+At a high level:
+1. GitHub webhooks listen for events such as pull requests, commits, and issues
+2. Incoming events are validated and processed by backend services
+3. Automation and AI-assisted logic handle labeling, reviews, and classification
+4. Contribution data is stored and indexed for analytics
+5. Results are delivered to Discord via bot commands, roles, and notifications
+
 ---
 
 ## Timeline & Tasks
