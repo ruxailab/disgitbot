@@ -135,6 +135,10 @@ At a high level:
 
 <div id="diagram-1-contribution-stats-pipeline">
 <h4>Diagram 1: Discord Bot for Real-Time GitHub Contribution Stats - Data Pipeline Architecture</h4>
+<h5><i>This diagram shows the end-to-end data pipeline used by DisGitBot to collect GitHub
+contribution data, process it through analytics workflows, store results, and expose
+real-time statistics to users via Discord commands.</i></h5>
+
 
 ```mermaid
 graph TD
@@ -166,6 +170,10 @@ graph TD
 
 <div id="diagram-2-role-update-system">
 <h4>Diagram 2: Discord Role Auto-Update Bot - Role Update Workflow</h4>
+<h5><i>This diagram illustrates the automated workflow used by DisGitBot to periodically
+evaluate GitHub contributions, determine contributor role levels, and synchronize
+Discord server roles based on updated contribution statistics.</h5></i>
+
 
 ```mermaid
 graph TD
@@ -193,6 +201,10 @@ graph TD
 
 <div id="diagram-3-pr-review-integration">
 <h4>Diagram 3: AI-Assisted Pull Request Review Integration - PR Review Automation</h4>
+<h5><i>This diagram describes the automated pull request review workflow in DisGitBot,
+where PR events trigger AI-assisted analysis, metrics computation, label prediction,
+reviewer assignment, and notification of review outcomes.</i></h5>
+
 
 ```mermaid
 graph TD
@@ -227,6 +239,10 @@ graph TD
 
 <div id="diagram-4-pr-labeling-workflow">
 <h4>Diagram 4: Automatic Labelling for PRs Using PR Labeller - AI Labeling System</h4>
+<h5><i>This diagram outlines the AI-driven pull request labeling workflow, where PR events
+trigger automated analysis using repository-specific labels, confidence-based
+classification, and application of labels to ensure consistent and efficient PR tagging.</i></h5>
+
 
 ```mermaid
 graph TD
@@ -260,6 +276,10 @@ graph TD
 
 <div id="diagram-5-metrics-tracking-system">
 <h4>Diagram 5: Research Metric Tracking and Channel Creation - Metrics & Channels</h4>
+<h5><i>This diagram shows how DisGitBot periodically aggregates repository metrics and
+synchronizes them with Discord by creating and updating channels that display
+live repository statistics in real time.
+</i><h5>
 
 ```mermaid
 graph TD
@@ -287,6 +307,10 @@ graph TD
 
 <div id="diagram-6-analytics-hall-of-fame">
 <h4>Diagram 6: Contributor Analytics and Hall of Fame Visualization - Analytics & Visualization</h4>
+<h5><i>This diagram illustrates how DisGitBot processes contribution data to generate
+analytics, hall-of-fame rankings, and visual insights, which are then exposed
+to users through interactive Discord charts and commands.</i><h5>
+
 
 ```mermaid
 graph TD
