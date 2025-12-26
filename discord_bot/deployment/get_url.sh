@@ -45,6 +45,13 @@ if ! command -v gcloud &> /dev/null; then
     exit 1
 fi
 
+# Ensure fzf is available for interactive selection
+print_step "Checking fzf (interactive selector)..."
+if ! command -v fzf &> /dev/null; then
+    print_error "fzf is required for this script's menus. Please install it (see README)."
+    exit 1
+fi
+
 # Check authentication with better error handling
 print_step "Verifying Google Cloud authentication..."
 auth_account=$(gcloud auth list --filter=status:ACTIVE --format="value(account)" 2>/dev/null | head -n1)
@@ -61,70 +68,26 @@ print_success "Google Cloud CLI is ready!"
 # Function to select from options with arrow keys
 interactive_select() {
     local prompt="$1"
-    local options=("${@:2}")
-    local selected=0
-    local num_options=${#options[@]}
-    
-    # Function to display options
-    display_options() {
-        clear
-        echo -e "\n${PURPLE}================================${NC}"
-        echo -e "${PURPLE}   Discord Bot URL Getter Tool   ${NC}"
-        echo -e "${PURPLE}================================${NC}\n"
-        echo -e "${BLUE}$prompt${NC}"
-        echo -e "${YELLOW}Use ↑/↓ arrow keys to navigate, SPACE/ENTER to select, q to quit${NC}\n"
-        
-        for i in "${!options[@]}"; do
-            if [ $i -eq $selected ]; then
-                echo -e "${GREEN}${options[i]}${NC}"
-            else
-                echo -e "  ${options[i]}"
-            fi
-        done
-    }
-    
-    display_options
-    
-    while true; do
-        # Read a single character
-        read -rsn1 key
-        
-        case $key in
-            # Arrow up
-            $'\x1b')
-                read -rsn2 key
-                case $key in
-                    '[A') # Up arrow
-                        ((selected--))
-                        if [ $selected -lt 0 ]; then
-                            selected=$((num_options - 1))
-                        fi
-                        display_options
-                        ;;
-                    '[B') # Down arrow
-                        ((selected++))
-                        if [ $selected -ge $num_options ]; then
-                            selected=0
-                        fi
-                        display_options
-                        ;;
-                esac
-                ;;
-            ' '|'') # Space or Enter
-                clear
-                echo -e "\n${GREEN}Selected: ${options[$selected]}${NC}\n"
-                # Use a global variable to store the selection
-                INTERACTIVE_SELECTION=$selected
-                return 0
-                ;;
-            'q'|'Q') # Quit
-                clear
-                print_warning "Selection cancelled."
-                exit 0
-                ;;
-        esac
+    shift
+    local options=("$@")
+
+    echo "$prompt" >&2
+    selection=$(printf "%s\n" "${options[@]}" | fzf --prompt="> " --height=10 --border)
+
+    if [ -z "$selection" ]; then
+        echo "Cancelled."
+        exit 1
+    fi
+
+    # Find index
+    for i in "${!options[@]}"; do
+        if [[ "${options[$i]}" == "$selection" ]]; then
+            INTERACTIVE_SELECTION=$i
+            return
+        fi
     done
 }
+
 
 # Function to select Google Cloud Project
 select_project() {

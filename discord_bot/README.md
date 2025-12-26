@@ -92,6 +92,15 @@ python -m pip install --upgrade pip
 pip install -r discord_bot/requirements.txt
 ```
 
+### Install `fzf` (interactive selector)
+
+The deployment helper uses [`fzf`](https://github.com/junegunn/fzf) for project/region menus. Install it before running any deployment scripts (and ensure `fzf` is on your `PATH`):
+
+- **macOS:** `brew install fzf`
+- **Windows:** `choco install fzf` (Chocolatey) or `winget install fzf`
+- **Ubuntu/Debian:** `sudo apt install fzf`
+- **Fedora:** `sudo dnf install fzf`
+
 # 2. Project Structure
 
 ```
@@ -273,7 +282,7 @@ If you plan to run GitHub Actions from branches other than `main`, also add the 
 
 **What this does:** Creates a placeholder Cloud Run service to get your stable URL, which you'll need for GitHub OAuth setup.
 
-1. **Run the URL getter script:**
+1. **Run the URL getter script** (requires `fzf`, see prerequisites):
    ```bash
    ./discord_bot/deployment/get_url.sh
    ```
