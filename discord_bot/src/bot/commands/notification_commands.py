@@ -194,7 +194,7 @@ class NotificationCommands:
             try:
                 from shared.firestore import get_document
                 
-                webhook_config = get_document('notification_config', 'webhooks')
+                webhook_config = get_document('global_config', 'ci_cd_webhooks')
                 
                 embed = discord.Embed(
                     title="Webhook Configuration Status",
