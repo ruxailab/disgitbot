@@ -56,6 +56,7 @@ class PRReviewSystem:
         Returns:
             Processing results
         """
+        results = {}
         try:
             logger.info(f"Processing PR #{pr_number} in {repo}")
             
