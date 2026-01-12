@@ -56,6 +56,14 @@ class PRReviewSystem:
         Returns:
             Processing results
         """
+        # Initialize results early to avoid UnboundLocalError
+        results = {
+            'pr_number': pr_number,
+            'repository': repo,
+            'status': 'error',
+            'error': 'Unknown error occurred'
+        }
+        
         try:
             logger.info(f"Processing PR #{pr_number} in {repo}")
             
@@ -105,10 +113,7 @@ class PRReviewSystem:
             
             self.github_client.create_issue_comment(repo, pr_number, comment_body)
             
-            # Send Discord notification
-            asyncio.create_task(self._send_discord_notification(results, comment_body))
-            
-            # Return processing results
+            # Update results with success data BEFORE sending notification
             results = {
                 'pr_number': pr_number,
                 'repository': repo,
@@ -118,6 +123,9 @@ class PRReviewSystem:
                 'ai_review_summary': ai_review.get('summary', ''),
                 'status': 'success'
             }
+            
+            # Send Discord notification with properly initialized results
+            asyncio.create_task(self._send_discord_notification(results, comment_body))
             
             logger.info(f"Successfully processed PR #{pr_number}")
             return results
