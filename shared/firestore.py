@@ -165,19 +165,19 @@ ORG_SCOPED_COLLECTIONS = {
 }
 GLOBAL_COLLECTIONS = {
     'global_config',
-    'notification_config',
 }
 
-def get_document(collection: str, document_id: str, discord_server_id: str = None) -> Optional[Dict[str, Any]]:
+def get_document(collection: str, document_id: str, discord_server_id: str = None, github_org: str = None) -> Optional[Dict[str, Any]]:
     """Get a document from Firestore with explicit collection routing."""
     mt_client = get_mt_client()
 
     if collection in ORG_SCOPED_COLLECTIONS:
-        if not discord_server_id:
-            raise ValueError(f"discord_server_id required for org-scoped collection: {collection}")
-        github_org = mt_client.get_org_from_server(discord_server_id)
         if not github_org:
-            raise ValueError(f"No GitHub org found for Discord server: {discord_server_id}")
+            if not discord_server_id:
+                raise ValueError(f"discord_server_id or github_org required for org-scoped collection: {collection}")
+            github_org = mt_client.get_org_from_server(discord_server_id)
+            if not github_org:
+                raise ValueError(f"No GitHub org found for Discord server: {discord_server_id}")
         return mt_client.get_org_document(github_org, collection, document_id)
 
     if collection == 'discord_users':
@@ -192,16 +192,17 @@ def get_document(collection: str, document_id: str, discord_server_id: str = Non
 
     raise ValueError(f"Unsupported collection: {collection}")
 
-def set_document(collection: str, document_id: str, data: Dict[str, Any], merge: bool = False, discord_server_id: str = None) -> bool:
+def set_document(collection: str, document_id: str, data: Dict[str, Any], merge: bool = False, discord_server_id: str = None, github_org: str = None) -> bool:
     """Set a document in Firestore with explicit collection routing."""
     mt_client = get_mt_client()
 
     if collection in ORG_SCOPED_COLLECTIONS:
-        if not discord_server_id:
-            raise ValueError(f"discord_server_id required for org-scoped collection: {collection}")
-        github_org = mt_client.get_org_from_server(discord_server_id)
         if not github_org:
-            raise ValueError(f"No GitHub org found for Discord server: {discord_server_id}")
+            if not discord_server_id:
+                raise ValueError(f"discord_server_id or github_org required for org-scoped collection: {collection}")
+            github_org = mt_client.get_org_from_server(discord_server_id)
+            if not github_org:
+                raise ValueError(f"No GitHub org found for Discord server: {discord_server_id}")
         return mt_client.set_org_document(github_org, collection, document_id, data, merge)
 
     if collection == 'discord_users':

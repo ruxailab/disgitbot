@@ -14,22 +14,23 @@ logger = logging.getLogger(__name__)
 class ReviewerAssigner:
     """Automatically assigns reviewers to pull requests using random selection."""
     
-    def __init__(self, config_path: Optional[str] = None):
+    def __init__(self, github_org: Optional[str] = None):
         """Initialize the reviewer assigner with Firestore configuration."""
+        self.github_org = github_org
         self.reviewers = self._load_reviewers()
         
     def _load_reviewers(self) -> List[str]:
         """Load reviewer pool from Firestore configuration."""
         try:
-            logger.info("REVIEWER DEBUG: Attempting to load reviewers from global_config/reviewer_pool")
-            reviewer_data = get_document('global_config', 'reviewer_pool')
+            logger.info(f"REVIEWER DEBUG: Attempting to load reviewers for org: {self.github_org}")
+            reviewer_data = get_document('pr_config', 'reviewers', github_org=self.github_org)
             
             if reviewer_data and 'reviewers' in reviewer_data:
                 reviewers = reviewer_data['reviewers']
-                logger.info(f"REVIEWER DEBUG: Successfully loaded {len(reviewers)} reviewers: {reviewers}")
+                logger.info(f"REVIEWER DEBUG: Successfully loaded {len(reviewers)} reviewers")
                 return reviewers
             
-            logger.error("REVIEWER DEBUG: No reviewer configuration found in Firestore")
+            logger.error(f"REVIEWER DEBUG: No reviewer configuration found for org {self.github_org} in pr_config/reviewers")
             logger.error(f"REVIEWER DEBUG: Retrieved data: {reviewer_data}")
             return []
               
@@ -104,7 +105,7 @@ class ReviewerAssigner:
                 'count': len(self.reviewers),
                 'last_updated': time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime())
             }
-            success = set_document('global_config', 'reviewer_pool', reviewer_data)
+            success = set_document('pr_config', 'reviewers', reviewer_data, github_org=self.github_org)
             if success:
                 logger.info(f"Saved {len(self.reviewers)} reviewers to Firestore")
             else:
