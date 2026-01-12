@@ -65,9 +65,21 @@ class DiscordBot:
                 # Check if server is already configured
                 from shared.firestore import get_mt_client
                 mt_client = get_mt_client()
-                server_config = mt_client.get_server_config(str(guild.id))
+                server_config = mt_client.get_server_config(str(guild.id)) or {}
 
-                if not server_config:
+                if not server_config.get('setup_completed'):
+                    # Check if we sent a reminder very recently (24h cooldown)
+                    last_reminder = server_config.get('setup_reminder_sent_at')
+                    if last_reminder:
+                        from datetime import datetime, timedelta
+                        try:
+                            last_dt = datetime.fromisoformat(last_reminder)
+                            if datetime.now() - last_dt < timedelta(hours=24):
+                                print(f"Skipping setup guidance for {guild.name}: already sent within 24h")
+                                return
+                        except ValueError:
+                            pass
+
                     # Server not configured - send setup message to system channel
                     system_channel = guild.system_channel
                     if not system_channel:
@@ -99,6 +111,13 @@ After setup, try these commands:
 *This message will only appear once during setup.*"""
 
                         await system_channel.send(setup_message)
+                        
+                        # Mark reminder as sent
+                        from datetime import datetime
+                        mt_client.set_server_config(str(guild.id), {
+                            **server_config,
+                            'setup_reminder_sent_at': datetime.now().isoformat()
+                        })
                         print(f"Sent setup guidance to server: {guild.name} (ID: {guild.id})")
 
             except Exception as e:
@@ -116,9 +135,21 @@ After setup, try these commands:
                 mt_client = get_mt_client()
 
                 for guild in self.bot.guilds:
-                    server_config = mt_client.get_server_config(str(guild.id))
+                    server_config = mt_client.get_server_config(str(guild.id)) or {}
 
-                    if not server_config:
+                    if not server_config.get('setup_completed'):
+                        # Check if we sent a reminder very recently (24h cooldown)
+                        last_reminder = server_config.get('setup_reminder_sent_at')
+                        if last_reminder:
+                            from datetime import datetime, timedelta
+                            try:
+                                last_dt = datetime.fromisoformat(last_reminder)
+                                if datetime.now() - last_dt < timedelta(hours=24):
+                                    print(f"Skipping setup reminder for {guild.name}: already sent within 24h")
+                                    continue
+                            except ValueError:
+                                pass
+
                         # Server not configured
                         system_channel = guild.system_channel
                         if not system_channel:
@@ -144,6 +175,13 @@ This server needs to be configured to track GitHub contributions.
 *This is a one-time setup message.*"""
 
                             await system_channel.send(setup_message)
+                            
+                            # Mark reminder as sent
+                            from datetime import datetime
+                            mt_client.set_server_config(str(guild.id), {
+                                **server_config,
+                                'setup_reminder_sent_at': datetime.now().isoformat()
+                            })
                             print(f"Sent setup reminder to server: {guild.name} (ID: {guild.id})")
 
             # Run the async function directly
