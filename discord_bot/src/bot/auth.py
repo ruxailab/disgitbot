@@ -59,7 +59,10 @@ def create_oauth_app():
 
     @app.route("/debug/servers")
     def debug_servers():
-        """Debug endpoint to see registered servers"""
+        """Debug endpoint to see registered servers (Protected)"""
+        admin_token = os.getenv("ADMIN_TOKEN")
+        if not admin_token or request.args.get("token") != admin_token:
+            return jsonify({"error": "Unauthorized"}), 401
         try:
             from shared.firestore import get_mt_client
 
@@ -404,11 +407,79 @@ def create_oauth_app():
                         **existing_config,
                         "initial_sync_triggered_at": datetime.now().isoformat()
                     })
+                    if github_org:
+                        try:
+                            # Trigger Discord notification
+                            import asyncio
+                            from threading import Thread
+                            
+                            def run_async_notification():
+                                loop = asyncio.new_event_loop()
+                                asyncio.set_event_loop(loop)
+                                loop.run_until_complete(send_discord_setup_notification(guild_id, github_org))
+                                loop.close()
+                            
+                            Thread(target=run_async_notification).start()
+                            
+                            # Trigger initial data collection for this organization
+                            trigger_data_pipeline_for_org(github_org)
+                        except Exception as e:
+                            print(f"Warning: Failed to trigger setup notifications: {e}")
                     return True
                 print(f"Failed to trigger pipeline: {resp.status_code} {resp.text[:200]}")
             except Exception as exc:
                 print(f"Error triggering pipeline: {exc}")
             return False
+
+        async def send_discord_setup_notification(guild_id: str, github_org: str):
+            """Send a success message to the Discord guild's system channel."""
+            import discord
+            import os
+            
+            token = os.getenv('DISCORD_BOT_TOKEN')
+            if not token:
+                return
+                
+            intents = discord.Intents.default()
+            client = discord.Client(intents=intents)
+            
+            @client.event
+            async def on_ready():
+                try:
+                    guild = client.get_guild(int(guild_id))
+                    if guild:
+                        channel = guild.system_channel
+                        if not channel:
+                            channel = next((ch for ch in guild.text_channels if ch.permissions_for(guild.me).send_messages), None)
+                        
+                        if channel:
+                            embed = discord.Embed(
+                                title="✅ DisgitBot Setup Complete!",
+                                description=f"This server is now connected to the GitHub organization: **{github_org}**",
+                                color=0x43b581
+                            )
+                            embed.add_field(name="Next Steps", value="1. Use `/link` to connect your GitHub account\n2. Configure webhooks with `/set_webhook`", inline=False)
+                            embed.set_footer(text="Powered by DisgitBot SaaS")
+                            
+                            await channel.send(embed=embed)
+                            print(f"Sent setup success notification to guild {guild_id}")
+                    
+                except Exception as e:
+                    print(f"Error sending Discord setup notification: {e}")
+                finally:
+                    await client.close()
+                    
+            try:
+                await client.start(token)
+            except Exception as e:
+                print(f"Failed to start Discord client for notification: {e}")
+
+        def trigger_data_pipeline_for_org(github_org):
+            # Placeholder for triggering a data pipeline for the given GitHub organization
+            # This would typically involve calling an external service or another part of the system
+            print(f"Triggering data pipeline for GitHub organization: {github_org}")
+            # Example: You might want to add a task to a queue here
+            pass
 
         sync_triggered = trigger_initial_sync(github_org)
 
