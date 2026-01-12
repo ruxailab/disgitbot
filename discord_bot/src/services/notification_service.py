@@ -33,19 +33,13 @@ class NotificationService:
             await self.session.close()
     
     async def send_pr_automation_notification(self, pr_data: Dict[str, Any], comment_body: str) -> bool:
-        """
-        Send PR automation notification to Discord channel.
-        
-        Args:
-            pr_data: PR processing results from automation system
-            comment_body: The comment body that was posted to GitHub
-            
-        Returns:
-            Success status
-        """
+        """Send PR automation notification."""
         try:
-            webhook_url = await self._get_webhook_url('pr_automation')
-            if not webhook_url:
+            repo = pr_data.get('repository', '')
+            github_org = repo.split('/')[0] if '/' in repo else None
+            
+            webhook_urls = await self._get_webhook_urls('pr_automation', github_org=github_org)
+            if not webhook_urls:
                 logger.warning("No webhook URL configured for PR automation notifications")
                 return False
             
@@ -56,7 +50,11 @@ class NotificationService:
                 "avatar_url": "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png"
             }
             
-            return await self._send_webhook(webhook_url, payload)
+            success = False
+            for url in webhook_urls:
+                if await self._send_webhook(url, payload):
+                    success = True
+            return success
             
         except Exception as e:
             logger.error(f"Failed to send PR automation notification: {e}")
@@ -64,23 +62,11 @@ class NotificationService:
     
     async def send_cicd_notification(self, repo: str, workflow_name: str, status: str, 
                                    run_url: str, commit_sha: str, branch: str) -> bool:
-        """
-        Send CI/CD status notification to Discord channel.
-        
-        Args:
-            repo: Repository name (owner/repo)
-            workflow_name: GitHub Actions workflow name
-            status: Workflow status (success, failure, in_progress, cancelled)
-            run_url: URL to the workflow run
-            commit_sha: Commit SHA that triggered the workflow
-            branch: Branch name
-            
-        Returns:
-            Success status
-        """
+        """Send CI/CD status notification."""
         try:
-            webhook_url = await self._get_webhook_url('cicd')
-            if not webhook_url:
+            github_org = repo.split('/')[0] if '/' in repo else None
+            webhook_urls = await self._get_webhook_urls('cicd', github_org=github_org)
+            if not webhook_urls:
                 logger.warning("No webhook URL configured for CI/CD notifications")
                 return False
             
@@ -91,7 +77,11 @@ class NotificationService:
                 "avatar_url": "https://github.githubassets.com/images/modules/logos_page/Octocat.png"
             }
             
-            return await self._send_webhook(webhook_url, payload)
+            success = False
+            for url in webhook_urls:
+                if await self._send_webhook(url, payload):
+                    success = True
+            return success
             
         except Exception as e:
             logger.error(f"Failed to send CI/CD notification: {e}")
@@ -214,14 +204,35 @@ class NotificationService:
         
         return embed
     
-    async def _get_webhook_url(self, notification_type: str) -> Optional[str]:
-        """Get webhook URL for specified notification type."""
+    async def _get_webhook_urls(self, notification_type: str, github_org: str = None) -> List[str]:
+        """Get all webhook URLs for specified notification type."""
+        urls = []
         try:
-            webhook_config = get_document('global_config', 'ci_cd_webhooks')
-            if not webhook_config:
-                return None
+            # First try org-scoped config
+            if github_org:
+                webhook_config = get_document('pr_config', 'webhooks', github_org=github_org)
+                if webhook_config:
+                    # New list format support
+                    if 'webhooks' in webhook_config:
+                        urls.extend([
+                            w['url'] for w in webhook_config['webhooks'] 
+                            if w.get('type') == notification_type and w.get('url')
+                        ])
+                    
+                    # Legacy fallback (single string format)
+                    legacy_url = webhook_config.get(f'{notification_type}_webhook_url')
+                    if legacy_url and legacy_url not in urls:
+                        urls.append(legacy_url)
             
-            return webhook_config.get(f'{notification_type}_webhook_url')
+            # Fallback to global config (legacy support)
+            if not urls:
+                webhook_config = get_document('global_config', 'ci_cd_webhooks')
+                if webhook_config:
+                    legacy_url = webhook_config.get(f'{notification_type}_webhook_url')
+                    if legacy_url:
+                        urls.append(legacy_url)
+            
+            return urls
         except Exception as e:
             logger.error(f"Failed to get webhook URL for {notification_type}: {e}")
             return None
@@ -252,23 +263,43 @@ class WebhookManager:
     """Manages webhook URL configuration and repository monitoring."""
     
     @staticmethod
-    def set_webhook_url(notification_type: str, webhook_url: str) -> bool:
+    def set_webhook_url(notification_type: str, webhook_url: str, discord_server_id: str = None) -> bool:
         """Set webhook URL for specified notification type."""
         try:
-            webhook_config = get_document('global_config', 'ci_cd_webhooks') or {}
+            webhook_config = get_document('pr_config', 'webhooks', discord_server_id=discord_server_id) or {}
+            
+            # Initialize modern list format
+            if 'webhooks' not in webhook_config:
+                webhook_config['webhooks'] = []
+            
+            # Remove any existing webhook for THIS server and THIS type to avoid duplicates
+            webhook_config['webhooks'] = [
+                w for w in webhook_config['webhooks'] 
+                if not (w.get('server_id') == discord_server_id and w.get('type') == notification_type)
+            ]
+            
+            # Add new webhook entry
+            webhook_config['webhooks'].append({
+                'type': notification_type,
+                'url': webhook_url,
+                'server_id': discord_server_id,
+                'last_updated': datetime.utcnow().isoformat()
+            })
+            
+            # Maintain legacy field for backward compatibility
             webhook_config[f'{notification_type}_webhook_url'] = webhook_url
             webhook_config['last_updated'] = datetime.utcnow().isoformat()
             
-            return set_document('global_config', 'ci_cd_webhooks', webhook_config)
+            return set_document('pr_config', 'webhooks', webhook_config, discord_server_id=discord_server_id)
         except Exception as e:
             logger.error(f"Failed to set webhook URL: {e}")
             return False
     
     @staticmethod
-    def get_monitored_repositories() -> List[str]:
+    def get_monitored_repositories(discord_server_id: str = None) -> List[str]:
         """Get list of repositories being monitored for CI/CD notifications."""
         try:
-            config = get_document('global_config', 'monitored_repositories')
+            config = get_document('pr_config', 'monitoring', discord_server_id=discord_server_id)
             if not config:
                 return []
             return config.get('repositories', [])
@@ -277,10 +308,10 @@ class WebhookManager:
             return []
     
     @staticmethod
-    def add_monitored_repository(repo: str) -> bool:
+    def add_monitored_repository(repo: str, discord_server_id: str = None) -> bool:
         """Add repository to CI/CD monitoring list."""
         try:
-            config = get_document('global_config', 'monitored_repositories') or {'repositories': []}
+            config = get_document('pr_config', 'monitoring', discord_server_id=discord_server_id) or {'repositories': []}
             repos = config.get('repositories', [])
             
             if repo not in repos:
@@ -288,17 +319,17 @@ class WebhookManager:
                 config['repositories'] = repos
                 config['last_updated'] = datetime.utcnow().isoformat()
                 
-                return set_document('global_config', 'monitored_repositories', config)
+                return set_document('pr_config', 'monitoring', config, discord_server_id=discord_server_id)
             return True  # Already exists
         except Exception as e:
             logger.error(f"Failed to add monitored repository: {e}")
             return False
     
     @staticmethod
-    def remove_monitored_repository(repo: str) -> bool:
+    def remove_monitored_repository(repo: str, discord_server_id: str = None) -> bool:
         """Remove repository from CI/CD monitoring list."""
         try:
-            config = get_document('global_config', 'monitored_repositories')
+            config = get_document('pr_config', 'monitoring', discord_server_id=discord_server_id)
             if not config:
                 return False
             
@@ -308,7 +339,7 @@ class WebhookManager:
                 config['repositories'] = repos
                 config['last_updated'] = datetime.utcnow().isoformat()
                 
-                return set_document('global_config', 'monitored_repositories', config)
+                return set_document('pr_config', 'monitoring', config, discord_server_id=discord_server_id)
             return True  # Already removed
         except Exception as e:
             logger.error(f"Failed to remove monitored repository: {e}")

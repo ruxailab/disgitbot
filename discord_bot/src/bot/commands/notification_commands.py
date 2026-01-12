@@ -48,7 +48,11 @@ class NotificationCommands:
                     return
                 
                 # Set the webhook URL
-                success = WebhookManager.set_webhook_url(notification_type, webhook_url)
+                success = WebhookManager.set_webhook_url(
+                    notification_type, 
+                    webhook_url, 
+                    discord_server_id=str(interaction.guild_id)
+                )
                 
                 if success:
                     await interaction.followup.send(
@@ -85,7 +89,10 @@ class NotificationCommands:
                     return
                 
                 # Add repository to monitoring list
-                success = WebhookManager.add_monitored_repository(repository)
+                success = WebhookManager.add_monitored_repository(
+                    repository, 
+                    discord_server_id=str(interaction.guild_id)
+                )
                 
                 if success:
                     await interaction.followup.send(
@@ -121,7 +128,10 @@ class NotificationCommands:
                     return
                 
                 # Remove repository from monitoring list
-                success = WebhookManager.remove_monitored_repository(repository)
+                success = WebhookManager.remove_monitored_repository(
+                    repository,
+                    discord_server_id=str(interaction.guild_id)
+                )
                 
                 if success:
                     await interaction.followup.send(
@@ -148,7 +158,9 @@ class NotificationCommands:
             await interaction.response.defer()
             
             try:
-                repositories = WebhookManager.get_monitored_repositories()
+                repositories = WebhookManager.get_monitored_repositories(
+                    discord_server_id=str(interaction.guild_id)
+                )
                 
                 embed = discord.Embed(
                     title="CI/CD Monitoring Status",
@@ -194,15 +206,24 @@ class NotificationCommands:
             try:
                 from shared.firestore import get_document
                 
-                webhook_config = get_document('global_config', 'ci_cd_webhooks')
+                webhook_config = get_document(
+                    'pr_config', 
+                    'webhooks', 
+                    discord_server_id=str(interaction.guild_id)
+                )
                 
                 embed = discord.Embed(
                     title="Webhook Configuration Status",
                     color=discord.Color.blue()
                 )
                 
-                # Check PR automation webhook
-                pr_webhook = webhook_config.get('pr_automation_webhook_url') if webhook_config else None
+                # New logic: Look in the webhooks list for this specific server
+                webhooks_list = webhook_config.get('webhooks', []) if webhook_config else []
+                
+                # Find PR automation webhook for THIS server
+                pr_webhook_entry = next((w for w in webhooks_list if w.get('type') == 'pr_automation' and w.get('server_id') == str(interaction.guild_id)), None)
+                pr_webhook = pr_webhook_entry['url'] if pr_webhook_entry else webhook_config.get('pr_automation_webhook_url')
+                
                 pr_status = "Configured" if pr_webhook else "Not configured"
                 embed.add_field(
                     name="PR Automation Notifications",
@@ -210,8 +231,10 @@ class NotificationCommands:
                     inline=True
                 )
                 
-                # Check CI/CD webhook
-                cicd_webhook = webhook_config.get('cicd_webhook_url') if webhook_config else None
+                # Find CI/CD webhook for THIS server
+                cicd_webhook_entry = next((w for w in webhooks_list if w.get('type') == 'cicd' and w.get('server_id') == str(interaction.guild_id)), None)
+                cicd_webhook = cicd_webhook_entry['url'] if cicd_webhook_entry else webhook_config.get('cicd_webhook_url')
+                
                 cicd_status = "Configured" if cicd_webhook else "Not configured"
                 embed.add_field(
                     name="CI/CD Notifications",
