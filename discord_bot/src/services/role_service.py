@@ -15,28 +15,28 @@ class RoleConfiguration:
         # PR Role Thresholds
         self.pr_thresholds = {
             "🌸 1+ PRs": 1,
-            "🌺 6+ PRs": 6,
-            "🌻 16+ PRs": 16,
-            "🌷 31+ PRs": 31,
-            "🌹 51+ PRs": 51
+            "🌺 5+ PRs": 5,
+            "🌻 10+ PRs": 10,
+            "🌷 25+ PRs": 25,
+            "🌹 50+ PRs": 50
         }
-        
-        # Issue Role Thresholds  
+
+        # Issue Role Thresholds
         self.issue_thresholds = {
             "🍃 1+ GitHub Issues Reported": 1,
-            "🌿 6+ GitHub Issues Reported": 6,
-            "🌱 16+ GitHub Issues Reported": 16,
-            "🌾 31+ GitHub Issues Reported": 31,
-            "🍀 51+ GitHub Issues Reported": 51
+            "🌿 5+ GitHub Issues Reported": 5,
+            "🌱 10+ GitHub Issues Reported": 10,
+            "🌾 25+ GitHub Issues Reported": 25,
+            "🍀 50+ GitHub Issues Reported": 50
         }
-        
+
         # Commit Role Thresholds
         self.commit_thresholds = {
             "☁️ 1+ Commits": 1,
-            "🌊 51+ Commits": 51,
-            "🌈 101+ Commits": 101,
-            "🌙 251+ Commits": 251,
-            "⭐ 501+ Commits": 501
+            "🌊 25+ Commits": 25,
+            "🌈 50+ Commits": 50,
+            "🌙 100+ Commits": 100,
+            "⭐ 250+ Commits": 250
         }
         
         # Medal roles for top 3 contributors
@@ -44,19 +44,19 @@ class RoleConfiguration:
         
         # Obsolete role names to clean up
         self.obsolete_roles = {
-            "Beginner (1-5 PRs)", "Contributor (6-15 PRs)", "Analyst (16-30 PRs)", 
-            "Expert (31-50 PRs)", "Master (51+ PRs)", "Beginner (1-5 Issues)", 
-            "Contributor (6-15 Issues)", "Analyst (16-30 Issues)", "Expert (31-50 Issues)", 
-            "Master (51+ Issues)", "Beginner (1-50 Commits)", "Contributor (51-100 Commits)", 
+            "Beginner (1-5 PRs)", "Contributor (6-15 PRs)", "Analyst (16-30 PRs)",
+            "Expert (31-50 PRs)", "Master (51+ PRs)", "Beginner (1-5 Issues)",
+            "Contributor (6-15 Issues)", "Analyst (16-30 Issues)", "Expert (31-50 Issues)",
+            "Master (51+ Issues)", "Beginner (1-50 Commits)", "Contributor (51-100 Commits)",
             "Analyst (101-250 Commits)", "Expert (251-500 Commits)", "Master (501+ Commits)",
-            # Clean up the old minimal names
+            # Old numeric thresholds
             "1+ PR", "6+ PR", "16+ PR", "31+ PR", "51+ PR",
-            "1+ Issue", "6+ Issue", "16+ Issue", "31+ Issue", "51+ Issue", 
+            "1+ Issue", "6+ Issue", "16+ Issue", "31+ Issue", "51+ Issue",
             "1+ Issue Reporter", "6+ Issue Reporter", "16+ Issue Reporter", "31+ Issue Reporter", "51+ Issue Reporter",
             "1+ Bug Hunter", "6+ Bug Hunter", "16+ Bug Hunter", "31+ Bug Hunter", "51+ Bug Hunter",
             "1+ Commit", "51+ Commit", "101+ Commit", "251+ Commit", "501+ Commit",
             "PR Champion", "PR Runner-up", "PR Bronze",
-            # Clean up previous emoji versions
+            # Old emoji versions
             "🌸 1+ PR", "🌺 6+ PR", "🌻 16+ PR", "🌷 31+ PR", "🌹 51+ PR",
             "🍃 1+ Issue", "🌿 6+ Issue", "🌱 16+ Issue", "🌾 31+ Issue", "🍀 51+ Issue",
             "🍃 1+ Issue Reporter", "🌿 6+ Issue Reporter", "🌱 16+ Issue Reporter", "🌾 31+ Issue Reporter", "🍀 51+ Issue Reporter",
@@ -107,6 +107,25 @@ class RoleService:
         commit_role = self._determine_role_for_threshold(commits_count, self.config.commit_thresholds)
         
         return pr_role, issue_role, commit_role
+
+    def determine_custom_roles(self, pr_count: int, issues_count: int, commits_count: int, role_rules: Dict[str, Any]) -> Dict[str, Optional[Dict[str, Any]]]:
+        """Determine custom roles from per-server role rules."""
+        return {
+            'pr': self._select_custom_rule(pr_count, role_rules.get('pr', [])),
+            'issue': self._select_custom_rule(issues_count, role_rules.get('issue', [])),
+            'commit': self._select_custom_rule(commits_count, role_rules.get('commit', []))
+        }
+
+    def _select_custom_rule(self, count: int, rules: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        """Pick the highest-threshold custom rule that the count satisfies."""
+        if not rules:
+            return None
+        sorted_rules = sorted(rules, key=lambda r: r.get('threshold', 0))
+        selected = None
+        for rule in sorted_rules:
+            if count >= int(rule.get('threshold', 0)):
+                selected = rule
+        return selected
     
     def _determine_role_for_threshold(self, count: int, thresholds: Dict[str, int]) -> Optional[str]:
         """Determine role for a specific contribution type."""
@@ -148,10 +167,10 @@ class RoleService:
         """Get RGB color for a specific role."""
         return self.config.role_colors.get(role_name)
     
-    def get_hall_of_fame_data(self) -> Optional[Dict[str, Any]]:
+    def get_hall_of_fame_data(self, discord_server_id: str) -> Optional[Dict[str, Any]]:
         """Get hall of fame data from storage."""
         from shared.firestore import get_document
-        return get_document('repo_stats', 'hall_of_fame')
+        return get_document('repo_stats', 'hall_of_fame', discord_server_id)
     
     def get_next_role(self, current_role: str, stats_type: str) -> str:
         """Determine the next role based on current role and stats type."""

@@ -13,18 +13,18 @@ import os
 class GitHubService:
     """GitHub API service for data collection."""
     
-    def __init__(self):
+    def __init__(self, repo_owner: str = None, token: Optional[str] = None, installation_id: Optional[int] = None):
         self.api_url = "https://api.github.com"
-        self.token = os.getenv('GITHUB_TOKEN')
-        self.repo_owner = os.getenv('REPO_OWNER', 'ruxailab')
-        
-        if not self.token:
-            raise ValueError("GITHUB_TOKEN environment variable is required")
+        self.token = token or os.getenv('GITHUB_TOKEN')
+        self.repo_owner = repo_owner or os.getenv('REPO_OWNER', 'ruxailab')
+        self.installation_id = installation_id
         
         self._request_count = 0
     
     def _get_headers(self) -> Dict[str, str]:
         """Get GitHub API headers with authentication."""
+        if not self.token:
+            raise ValueError("GitHub token is required for API access")
         return {
             "Authorization": f"token {self.token}",
             "Accept": "application/vnd.github.v3+json"
@@ -193,7 +193,8 @@ class GitHubService:
         print(f"DEBUG - Starting list pagination for: {base_url}")
         
         while True:
-            paginated_url = f"{base_url}?per_page={per_page}&page={page}"
+            joiner = "&" if "?" in base_url else "?"
+            paginated_url = f"{base_url}{joiner}per_page={per_page}&page={page}"
             response = self._make_request(paginated_url, rate_type)
             
             if not response or response.status_code != 200:
@@ -237,6 +238,48 @@ class GitHubService:
         labels_url = f"{self.api_url}/repos/{owner}/{repo}/labels"
         return self._paginate_list_results(labels_url, 'core')
 
+    def fetch_installation_repositories(self) -> List[Dict[str, str]]:
+        """Fetch repositories available to the current installation token."""
+        if not self.installation_id:
+            return []
+
+        try:
+            repos_url = f"{self.api_url}/installation/repositories"
+            all_repos: List[Dict[str, str]] = []
+            page = 1
+            per_page = 100
+
+            while True:
+                url = f"{repos_url}?per_page={per_page}&page={page}"
+                response = self._make_request(url, 'core')
+
+                if not response or response.status_code != 200:
+                    print(f"Failed to fetch installation repositories at page {page}")
+                    break
+
+                data = response.json() or {}
+                repos_data = data.get('repositories', []) or []
+                if not repos_data:
+                    break
+
+                for repo in repos_data:
+                    owner = (repo.get('owner') or {}).get('login')
+                    name = repo.get('name')
+                    if owner and name:
+                        all_repos.append({'name': name, 'owner': owner})
+
+                total = data.get('total_count', len(all_repos))
+                if len(repos_data) < per_page or len(all_repos) >= total:
+                    break
+
+                page += 1
+
+            print(f"Found {len(all_repos)} repositories for installation")
+            return all_repos
+        except Exception as e:
+            print(f"Error fetching installation repositories: {e}")
+            return []
+
     def fetch_organization_repositories(self) -> List[Dict[str, str]]:
         """Fetch all repositories for the organization."""
         try:
@@ -255,6 +298,14 @@ class GitHubService:
         except Exception as e:
             print(f"Error fetching repositories: {e}")
             return []
+
+    def fetch_accessible_repositories(self) -> List[Dict[str, str]]:
+        """Fetch repositories accessible by this token (installation or org token)."""
+        if self.installation_id:
+            repos = self.fetch_installation_repositories()
+            if repos:
+                return repos
+        return self.fetch_organization_repositories()
     
     def search_pull_requests(self, owner: str, repo: str) -> Dict[str, Any]:
         """Search for ALL pull requests in a repository with complete pagination."""
@@ -316,7 +367,7 @@ class GitHubService:
         return repo_data
 
     def collect_organization_data(self) -> Dict[str, Any]:
-        """Collect complete data for all repositories in the organization."""
+        """Collect complete data for all repositories accessible by this token."""
         print("========== Collecting Organization Data ==========")
         
         # Validate GitHub token
@@ -332,7 +383,7 @@ class GitHubService:
             print("WARNING: Unable to check initial rate limits")
         
         # Fetch all repositories
-        repos = self.fetch_organization_repositories()
+        repos = self.fetch_accessible_repositories()
         
         # Collect data for each repository
         all_data = {

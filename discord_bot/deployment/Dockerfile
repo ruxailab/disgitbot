@@ -16,10 +16,17 @@ RUN apt-get update && \
 # Copy requirements first to leverage Docker cache
 COPY requirements.txt .
 
-# Upgrade pip to latest version to avoid upgrade notices
-RUN pip install --upgrade pip
+# Copy only requirements files first to leverage Docker layer cache
+COPY pr_review/requirements.txt ./pr_review/requirements.txt
 
-RUN pip install --no-cache-dir --root-user-action=ignore -r requirements.txt
+# Upgrade pip to latest version to avoid upgrade notices
+RUN pip install --no-cache-dir --upgrade pip
+
+# Install dependencies from both requirements files
+RUN pip install --no-cache-dir --root-user-action=ignore -r requirements.txt -r pr_review/requirements.txt
+
+# Copy pr_review package (copied into build context by deploy script)
+COPY pr_review ./pr_review
 
 # Create config directory and empty credentials file (will be overwritten by volume mount)
 RUN mkdir -p /app/config && echo "{}" > /app/config/credentials.json

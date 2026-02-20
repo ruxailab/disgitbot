@@ -85,3 +85,5 @@ pre_prompt.txt
 reset.sh
 force-sync.sh
 create_test_pr.sh
+remove_emoji.py
+CLAUDE.md

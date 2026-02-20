@@ -9,13 +9,29 @@ import logging
 from typing import Dict, Any, List
 import json
 import asyncio
+from pathlib import Path
 
-from config import GITHUB_TOKEN, GOOGLE_API_KEY, REPO_OWNER
-from utils.github_client import GitHubClient
-from utils.metrics_calculator import MetricsCalculator
-from utils.ai_pr_labeler import AIPRLabeler
-from utils.reviewer_assigner import ReviewerAssigner
-from utils.design_formatter import format_design_analysis, format_metrics_summary
+# Add project root to sys.path to allow importing from 'shared'
+root_dir = Path(__file__).parent.parent
+if str(root_dir) not in sys.path:
+    sys.path.append(str(root_dir))
+
+try:
+    # When run as a package (from pr_review.main import ...)
+    from pr_review.config import GITHUB_TOKEN, GOOGLE_API_KEY, REPO_OWNER
+    from pr_review.utils.github_client import GitHubClient
+    from pr_review.utils.metrics_calculator import MetricsCalculator
+    from pr_review.utils.ai_pr_labeler import AIPRLabeler
+    from pr_review.utils.reviewer_assigner import ReviewerAssigner
+    from pr_review.utils.design_formatter import format_design_analysis, format_metrics_summary
+except ImportError:
+    # When run standalone (python main.py)
+    from config import GITHUB_TOKEN, GOOGLE_API_KEY, REPO_OWNER
+    from utils.github_client import GitHubClient
+    from utils.metrics_calculator import MetricsCalculator
+    from utils.ai_pr_labeler import AIPRLabeler
+    from utils.reviewer_assigner import ReviewerAssigner
+    from utils.design_formatter import format_design_analysis, format_metrics_summary
 
 
 # Configure logging
@@ -35,7 +51,7 @@ class PRReviewSystem:
             self.github_client = GitHubClient()
             self.metrics_calculator = MetricsCalculator()
             self.ai_labeler = AIPRLabeler()
-            self.reviewer_assigner = ReviewerAssigner()
+            self.reviewer_assigner = None # Will be initialized per request
 
             
             logger.info("PR Review System initialized successfully")
@@ -44,7 +60,7 @@ class PRReviewSystem:
             logger.error(f"Failed to initialize PR Review System: {e}")
             raise
     
-    def process_pull_request(self, repo: str, pr_number: int, experience_level: str = "intermediate") -> Dict[str, Any]:
+    async def process_pull_request(self, repo: str, pr_number: int, experience_level: str = "intermediate") -> Dict[str, Any]:
         """
         Process a pull request with full automation pipeline
         
@@ -80,6 +96,8 @@ class PRReviewSystem:
             
             # Step 4: Assign reviewers
             logger.info("Assigning reviewers...")
+            repo_owner = repo.split('/')[0] if '/' in repo else repo
+            self.reviewer_assigner = ReviewerAssigner(github_org=repo_owner)
             reviewer_assignments = self.reviewer_assigner.assign_reviewers(pr_data, repo)
             
             # Step 5: Skip AI review generation (not needed per mentor requirements)
@@ -105,10 +123,7 @@ class PRReviewSystem:
             
             self.github_client.create_issue_comment(repo, pr_number, comment_body)
             
-            # Send Discord notification
-            asyncio.create_task(self._send_discord_notification(results, comment_body))
-            
-            # Return processing results
+            # Prepare results
             results = {
                 'pr_number': pr_number,
                 'repository': repo,
@@ -119,19 +134,33 @@ class PRReviewSystem:
                 'status': 'success'
             }
             
+            # Send Discord notification
+            try:
+                # In CLI/Action mode, we await to ensure it's sent before process exits
+                await self._send_discord_notification(results, comment_body)
+            except Exception as e:
+                logger.error(f"Failed to send Discord notification: {e}")
+            
             logger.info(f"Successfully processed PR #{pr_number}")
             return results
-            
+
         except Exception as e:
             logger.error(f"Failed to process PR #{pr_number}: {e}")
+            import traceback
+            traceback.print_exc()
+            
+            # Send notification for failure
             error_results = {
                 'pr_number': pr_number,
                 'repository': repo,
                 'status': 'error',
                 'error': str(e)
             }
-            # Send error notification to Discord
-            asyncio.create_task(self._send_discord_notification(error_results, None))
+            try:
+                await self._send_discord_notification(error_results, None)
+            except Exception:
+                pass
+                
             return error_results
     
     def _build_comprehensive_comment(self, metrics: Dict, labels: List[Dict], reviewers: Dict, ai_review: Dict) -> str:
@@ -202,8 +231,17 @@ def main():
     # Initialize system
     system = PRReviewSystem()
     
-    # Process the PR
-    results = system.process_pull_request(repo, pr_number, experience_level)
+    # Process the pull request
+    try:
+        results = asyncio.run(system.process_pull_request(repo, pr_number, experience_level))
+        
+        # Exit with error code if processing failed
+        if results.get('status') == 'error':
+            sys.exit(1)
+            
+    except Exception as e:
+        logger.error(f"Fatal error: {e}")
+        sys.exit(1)
     
     # Print results in clean format
     print("\n" + "="*60)

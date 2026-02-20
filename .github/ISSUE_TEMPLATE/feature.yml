@@ -1,12 +1,12 @@
-name: ✨ Feature Request
+name:Feature Request
 description: Suggest a new feature to enhance our project
-title: '[✨ FEATURE]: '
+title: '[FEATURE]: '
 labels: [Enhancement]
 body:
   - type: markdown
     attributes:
       value: |
-        # Welcome to the Feature Request template! 🚀
+        # Welcome to the Feature Request template!
         Please use this template to suggest new features or improvements to enhance our project.
 
         Fill in the information below to help us understand and evaluate your feature request.
@@ -16,23 +16,23 @@ body:
           2. Explain the motivation behind the feature request.
           3. Specify the expected behavior.
 
-        Thank you for contributing to the growth of our project! 🙌
+        Thank you for contributing to the growth of our project!
 
   - type: textarea
     attributes:
-      label: Feature Description 📝
+      label: Feature Description
       description: A clear and concise description of the new feature.
     validations:
       required: true
   - type: textarea
     attributes:
-      label: Motivation 🌟
+      label: Motivation
       description: Explain the motivation behind the feature request.
     validations:
       required: true
   - type: textarea
     attributes:
-      label: Expected Behavior 🤔
+      label: Expected Behavior
       description: Specify the expected behavior of the new feature.
     validations:
       required: true

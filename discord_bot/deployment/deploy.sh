@@ -12,6 +12,11 @@ PURPLE='\033[0;35m'
 CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
+FZF_AVAILABLE=0
+if command -v fzf &>/dev/null; then
+    FZF_AVAILABLE=1
+fi
+
 # Helper functions
 print_header() {
     echo -e "\n${PURPLE}================================${NC}"
@@ -42,6 +47,12 @@ DEFAULT_CREDENTIALS_PATH="$ROOT_DIR/config/credentials.json"
 ENV_PATH="$ROOT_DIR/config/.env"
 
 print_header
+
+if [ "$FZF_AVAILABLE" -eq 1 ]; then
+    print_success "fzf detected: you can type to filter options in selection menus."
+else
+    print_warning "fzf not detected; falling back to arrow-key menu navigation."
+fi
 
 # Check if gcloud is installed and authenticated
 print_step "Checking Google Cloud CLI..."
@@ -132,6 +143,31 @@ interactive_select() {
     done
 }
 
+fuzzy_select_or_fallback() {
+    local prompt="$1"
+    shift
+    local options=("$@")
+
+    if [ "$FZF_AVAILABLE" -eq 1 ]; then
+        local selection
+        selection=$(printf '%s\n' "${options[@]}" | fzf --prompt="$prompt> " --height=15 --border --exit-0)
+        if [ -z "$selection" ]; then
+            print_warning "Selection cancelled."
+            exit 0
+        fi
+        for i in "${!options[@]}"; do
+            if [[ "${options[$i]}" == "$selection" ]]; then
+                INTERACTIVE_SELECTION=$i
+                return
+            fi
+        done
+        print_error "Unable to match selection."
+        exit 1
+    else
+        interactive_select "$prompt" "${options[@]}"
+    fi
+}
+
 # Function to select Google Cloud Project
 select_project() {
     print_step "Fetching your Google Cloud projects..."
@@ -156,7 +192,7 @@ select_project() {
     done <<< "$projects"
     
     # Interactive selection
-    interactive_select "Select a Google Cloud Project:" "${project_options[@]}"
+    fuzzy_select_or_fallback "Select a Google Cloud Project" "${project_options[@]}"
     selection=$INTERACTIVE_SELECTION
     
     PROJECT_ID="${project_ids[$selection]}"
@@ -297,35 +333,52 @@ create_new_env_file() {
         print_warning "Discord Bot Token is required!"
     done
     
-    # GitHub Token
-    while true; do
-        read -p "GitHub Token: " github_token
-        if [ -n "$github_token" ]; then
-            break
-        fi
-        print_warning "GitHub Token is required!"
-    done
-    
     # GitHub Client ID
     read -p "GitHub Client ID: " github_client_id
     
     # GitHub Client Secret
     read -p "GitHub Client Secret: " github_client_secret
     
-    # Repository Owner
-    read -p "Repository Owner: " repo_owner
-    
     # OAuth Base URL (optional - will auto-detect on Cloud Run)
     read -p "OAuth Base URL (optional): " oauth_base_url
-    
+
+    # Discord Bot Client ID
+    read -p "Discord Bot Client ID: " discord_bot_client_id
+
+    # GitHub App configuration (invite-only mode)
+    read -p "GitHub App ID: " github_app_id
+    read -p "GitHub App Private Key (base64): " github_app_private_key_b64
+    read -p "GitHub App Slug: " github_app_slug
+
+    # SECRET_KEY (auto-generate if left blank)
+    echo -e "${BLUE}SECRET_KEY is used to sign session cookies (required for security).${NC}"
+    read -p "SECRET_KEY (leave blank to auto-generate): " secret_key
+    if [ -z "$secret_key" ]; then
+        secret_key=$(python3 -c "import secrets; print(secrets.token_hex(32))")
+        print_success "Auto-generated SECRET_KEY"
+    fi
+
+    # /sync optional vars
+    echo -e "\n${BLUE}Optional: /sync command (manually trigger the data pipeline).${NC}"
+    echo -e "${BLUE}Leave blank to use defaults (REPO_OWNER=ruxailab, REPO_NAME=disgitbot, WORKFLOW_REF=main).${NC}"
+    read -p "REPO_OWNER (GitHub org that owns the pipeline repo) [ruxailab]: " repo_owner
+    read -p "REPO_NAME (pipeline repo name) [disgitbot]: " repo_name
+    read -p "WORKFLOW_REF (branch/tag to dispatch on) [main]: " workflow_ref
+
     # Create .env file
     cat > "$ENV_PATH" << EOF
 DISCORD_BOT_TOKEN=$discord_token
-GITHUB_TOKEN=$github_token
 GITHUB_CLIENT_ID=$github_client_id
 GITHUB_CLIENT_SECRET=$github_client_secret
-REPO_OWNER=$repo_owner
 OAUTH_BASE_URL=$oauth_base_url
+DISCORD_BOT_CLIENT_ID=$discord_bot_client_id
+GITHUB_APP_ID=$github_app_id
+GITHUB_APP_PRIVATE_KEY_B64=$github_app_private_key_b64
+GITHUB_APP_SLUG=$github_app_slug
+SECRET_KEY=$secret_key
+REPO_OWNER=$repo_owner
+REPO_NAME=$repo_name
+WORKFLOW_REF=$workflow_ref
 EOF
     
     print_success ".env file created successfully!"
@@ -341,29 +394,60 @@ edit_env_file() {
     read -p "Discord Bot Token [$DISCORD_BOT_TOKEN]: " new_discord_token
     discord_token=${new_discord_token:-$DISCORD_BOT_TOKEN}
     
-    read -p "GitHub Token [$GITHUB_TOKEN]: " new_github_token
-    github_token=${new_github_token:-$GITHUB_TOKEN}
-    
     read -p "GitHub Client ID [$GITHUB_CLIENT_ID]: " new_github_client_id
     github_client_id=${new_github_client_id:-$GITHUB_CLIENT_ID}
     
     read -p "GitHub Client Secret [$GITHUB_CLIENT_SECRET]: " new_github_client_secret
     github_client_secret=${new_github_client_secret:-$GITHUB_CLIENT_SECRET}
     
-    read -p "Repository Owner [$REPO_OWNER]: " new_repo_owner
-    repo_owner=${new_repo_owner:-$REPO_OWNER}
-    
     read -p "OAuth Base URL [$OAUTH_BASE_URL]: " new_oauth_base_url
     oauth_base_url=${new_oauth_base_url:-$OAUTH_BASE_URL}
+
+    read -p "Discord Bot Client ID [$DISCORD_BOT_CLIENT_ID]: " new_discord_bot_client_id
+    discord_bot_client_id=${new_discord_bot_client_id:-$DISCORD_BOT_CLIENT_ID}
+
+    read -p "GitHub App ID [$GITHUB_APP_ID]: " new_github_app_id
+    github_app_id=${new_github_app_id:-$GITHUB_APP_ID}
+
+    read -p "GitHub App Private Key (base64) [$GITHUB_APP_PRIVATE_KEY_B64]: " new_github_app_private_key_b64
+    github_app_private_key_b64=${new_github_app_private_key_b64:-$GITHUB_APP_PRIVATE_KEY_B64}
+
+    read -p "GitHub App Slug [$GITHUB_APP_SLUG]: " new_github_app_slug
+    github_app_slug=${new_github_app_slug:-$GITHUB_APP_SLUG}
+
+    read -p "SECRET_KEY [$SECRET_KEY]: " new_secret_key
+    secret_key=${new_secret_key:-$SECRET_KEY}
     
+    # Auto-generate if still empty (e.g. key was missing in old .env and user pressed Enter)
+    if [ -z "$secret_key" ]; then
+        echo -e "${BLUE}SECRET_KEY is empty. Auto-generating a secure key...${NC}"
+        secret_key=$(python3 -c "import secrets; print(secrets.token_hex(32))")
+        print_success "Generated: $secret_key"
+    fi
+
+    # /sync optional vars
+    echo -e "\n${BLUE}Optional: /sync vars (press Enter to keep current or use default).${NC}"
+    read -p "REPO_OWNER [${REPO_OWNER:-ruxailab}]: " new_repo_owner
+    repo_owner=${new_repo_owner:-${REPO_OWNER:-}}
+    read -p "REPO_NAME [${REPO_NAME:-disgitbot}]: " new_repo_name
+    repo_name=${new_repo_name:-${REPO_NAME:-}}
+    read -p "WORKFLOW_REF [${WORKFLOW_REF:-main}]: " new_workflow_ref
+    workflow_ref=${new_workflow_ref:-${WORKFLOW_REF:-}}
+
     # Update .env file
     cat > "$ENV_PATH" << EOF
 DISCORD_BOT_TOKEN=$discord_token
-GITHUB_TOKEN=$github_token
 GITHUB_CLIENT_ID=$github_client_id
 GITHUB_CLIENT_SECRET=$github_client_secret
-REPO_OWNER=$repo_owner
 OAUTH_BASE_URL=$oauth_base_url
+DISCORD_BOT_CLIENT_ID=$discord_bot_client_id
+GITHUB_APP_ID=$github_app_id
+GITHUB_APP_PRIVATE_KEY_B64=$github_app_private_key_b64
+GITHUB_APP_SLUG=$github_app_slug
+SECRET_KEY=$secret_key
+REPO_OWNER=$repo_owner
+REPO_NAME=$repo_name
+WORKFLOW_REF=$workflow_ref
 EOF
     
     print_success ".env file updated successfully!"
@@ -469,7 +553,7 @@ get_deployment_config() {
         "custom"
     )
     
-    interactive_select "Select a Google Cloud Region:" "${region_options[@]}"
+    fuzzy_select_or_fallback "Select a Google Cloud Region" "${region_options[@]}"
     region_choice=$INTERACTIVE_SELECTION
     
     if [ $region_choice -eq 5 ]; then  # Custom region
@@ -489,7 +573,7 @@ get_deployment_config() {
     declare -a memory_values=("512Mi" "1Gi" "2Gi" "custom")
     declare -a cpu_values=("1" "1" "2" "custom")
     
-    interactive_select "Select Resource Configuration:" "${resource_options[@]}"
+    fuzzy_select_or_fallback "Select Resource Configuration" "${resource_options[@]}"
     resource_choice=$INTERACTIVE_SELECTION
     
     if [ $resource_choice -eq 3 ]; then  # Custom
@@ -669,6 +753,15 @@ main() {
         print_warning "Shared directory not found - skipping shared copy"
     fi
     
+    # Copy pr_review directory into build context for PR automation
+    print_step "Copying pr_review directory into build context..."
+    if [ -d "$(dirname "$ROOT_DIR")/pr_review" ]; then
+        cp -r "$(dirname "$ROOT_DIR")/pr_review" "$ROOT_DIR/pr_review"
+        print_success "pr_review directory copied successfully"
+    else
+        print_warning "pr_review directory not found - skipping pr_review copy"
+    fi
+    
     # Use Cloud Build to build and push the image
     gcloud builds submit \
       --tag gcr.io/$PROJECT_ID/$SERVICE_NAME:latest \
@@ -680,6 +773,10 @@ main() {
     if [ -d "$ROOT_DIR/shared" ]; then
         rm -rf "$ROOT_DIR/shared"
         print_step "Cleaned up temporary shared directory"
+    fi
+    if [ -d "$ROOT_DIR/pr_review" ]; then
+        rm -rf "$ROOT_DIR/pr_review"
+        print_step "Cleaned up temporary pr_review directory"
     fi
     print_success "Build completed and temporary files cleaned up!"
     

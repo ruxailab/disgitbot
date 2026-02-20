@@ -154,9 +154,9 @@ jobs:
                     branch='${{ steps.params.outputs.branch }}'
                 )
                 if success:
-                    print('✅ Discord notification sent successfully')
+                    print('Discord notification sent successfully')
                 else:
-                    print('❌ Failed to send Discord notification')
+                    print('Failed to send Discord notification')
                     sys.exit(1)
         
         asyncio.run(send_notification())

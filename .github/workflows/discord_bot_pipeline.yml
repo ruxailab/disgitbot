@@ -3,10 +3,13 @@ name: Discord Bot Data Pipeline
 on:
   schedule:
     - cron: '0 0 * * *'  # Run daily at midnight UTC
-  workflow_dispatch: {}  # Allow manual trigger
   push:
-    branches:
-      - main
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      organization:
+        description: "GitHub org to collect stats for"
+        required: true
 
 jobs:
   discord-bot-pipeline:
@@ -41,31 +44,119 @@ jobs:
           pip install -r discord_bot/requirements.txt
 
       - name: Set up Google Credentials
-        run: echo "${{ secrets.GOOGLE_CREDENTIALS_JSON }}" | base64 --decode > discord_bot/config/credentials.json
+        run: |
+          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            echo "Using production Firestore credentials"
+            echo "${{ secrets.GOOGLE_CREDENTIALS_JSON }}" | base64 --decode > discord_bot/config/credentials.json
+          else
+            echo "Using development Firestore credentials"
+            echo "${{ secrets.DEV_GOOGLE_CREDENTIALS_JSON }}" | base64 --decode > discord_bot/config/credentials.json
+          fi
 
-      - name: Collect GitHub Data
+      - name: Collect GitHub Data for Multiple Organizations
         env:
-          GITHUB_TOKEN: ${{ secrets.DEV_GH_TOKEN }}
-          REPO_OWNER: ${{ secrets.REPO_OWNER }}
+          GITHUB_APP_ID: ${{ secrets.GH_APP_ID }}
+          GITHUB_APP_PRIVATE_KEY_B64: ${{ secrets.GH_APP_PRIVATE_KEY_B64 }}
+          TARGET_ORG: ${{ github.event.inputs.organization }}
           PYTHONUNBUFFERED: 1
-          PYTHONPATH: ${{ github.workspace }}
+          PYTHONPATH: ${{ github.workspace }}/discord_bot:${{ github.workspace }}
         run: |
           cd discord_bot
           python -u -c "
-          import sys, json
+          import sys, json, os
+          print('Current working directory:', os.getcwd())
+          print('Python path:', sys.path)
+          print('Files in parent directory:', os.listdir('..'))
+
+          # Add parent directory to path
+          parent_dir = os.path.abspath('..')
+          if parent_dir not in sys.path:
+              sys.path.insert(0, parent_dir)
+
+          print('Updated Python path:', sys.path)
+          print('Shared module path:', os.path.join(parent_dir, 'shared'))
+          print('Shared firestore exists:', os.path.exists(os.path.join(parent_dir, 'shared', 'firestore.py')))
+
+          try:
+              import shared.firestore
+              print('Successfully imported shared.firestore')
+              print('Available functions in shared.firestore:', dir(shared.firestore))
+          except Exception as e:
+              print('Error importing shared.firestore:', e)
+              raise
+
+          try:
+              from shared.firestore import get_mt_client
+              print('Successfully imported get_mt_client')
+          except Exception as e:
+              print('Error importing get_mt_client:', e)
+              print('Available functions:', [x for x in dir(shared.firestore) if not x.startswith('_')])
+              raise
+
           sys.path.insert(0, 'src')
           from services.github_service import GitHubService
-          print('Collecting GitHub data...')
-          github_service = GitHubService()
-          raw_data = github_service.collect_organization_data()
-          print(f'Collected data for {len(raw_data.get(\"repositories\", {}))} repositories')
-          print('Saving raw data...')
-          with open('raw_data.json', 'w') as f:
-            json.dump(raw_data, f)
-          print('Raw data saved to raw_data.json')
+          from services.github_app_service import GitHubAppService
+          
+          print('Getting registered organizations...')
+          mt_client = get_mt_client()
+          target_org = os.getenv('TARGET_ORG') or None
+
+          # Get all registered Discord servers
+          import firebase_admin
+          from firebase_admin import firestore
+          db = mt_client.db
+          servers_ref = db.collection('discord_servers')
+          servers = {doc.id: doc.to_dict() for doc in servers_ref.stream()}
+
+          print(f'Found {len(servers)} total servers in Firestore:')
+          for server_id, server_data in servers.items():
+            print(f'  Server ID: {server_id}')
+            print(f'  Data: {server_data}')
+
+          # Extract unique GitHub installations (preferred) with a stable org key
+          installations = {}
+          for server_id, server_config in servers.items():
+            installation_id = server_config.get('github_installation_id')
+            github_org = server_config.get('github_org')
+            if installation_id and github_org:
+              installations[int(installation_id)] = github_org
+              print(f'Found installation: {installation_id} for {github_org} (server {server_id})')
+            else:
+              print(f'Skipping server {server_id}: missing github_installation_id or github_org')
+              print(f'Available keys: {list(server_config.keys())}')
+
+          print(f'Found {len(installations)} unique installations: {installations}')
+
+          if target_org:
+            target_org_lower = target_org.lower()
+            installations = {
+              installation_id: github_org
+              for installation_id, github_org in installations.items()
+              if str(github_org).lower() == target_org_lower
+            }
+            print(f'Filtered installations for target org {target_org}: {installations}')
+          
+          # Collect data for each installation (GitHub App token)
+          all_org_data = {}
+          gh_app = GitHubAppService()
+          for installation_id, github_org in installations.items():
+            print(f'Collecting data for installation {installation_id} ({github_org})')
+            token = gh_app.get_installation_access_token(installation_id)
+            if not token:
+              print(f'Failed to get installation token for {installation_id}, skipping')
+              continue
+            github_service = GitHubService(github_org, token=token, installation_id=installation_id)
+            raw_data = github_service.collect_organization_data()
+            all_org_data[github_org] = raw_data
+            print(f'Collected data for {len(raw_data.get(\"repositories\", {}))} repositories in {github_org}')
+          
+          print('Saving all organization data...')
+          with open('all_org_data.json', 'w') as f:
+            json.dump(all_org_data, f)
+          print('All organization data saved to all_org_data.json')
           "
 
-      - name: Process Contributions & Analytics
+      - name: Process Contributions & Analytics for Multiple Organizations
         env:
           PYTHONUNBUFFERED: 1
           PYTHONPATH: ${{ github.workspace }}
@@ -76,107 +167,126 @@ jobs:
           sys.path.insert(0, 'src')
           from pipeline.processors import contribution_functions, analytics_functions, metrics_functions, reviewer_functions
           
-          print('Loading raw data...')
-          with open('raw_data.json', 'r') as f:
-            raw_data = json.load(f)
+          print('Loading all organization data...')
+          with open('all_org_data.json', 'r') as f:
+            all_org_data = json.load(f)
           
-          print('Processing contributions...')
-          contributions = contribution_functions.process_raw_data(raw_data)
-          contributions = contribution_functions.calculate_rankings(contributions)
-          contributions = contribution_functions.calculate_streaks_and_averages(contributions)
+          # Process each organization separately
+          all_processed_data = {}
+          for github_org, raw_data in all_org_data.items():
+            print(f'Processing organization: {github_org}')
+            
+            print('Processing contributions...')
+            contributions = contribution_functions.process_raw_data(raw_data)
+            contributions = contribution_functions.calculate_rankings(contributions)
+            contributions = contribution_functions.calculate_streaks_and_averages(contributions)
+            
+            print('Creating analytics...')
+            hall_of_fame = analytics_functions.create_hall_of_fame_data(contributions)
+            analytics_data = analytics_functions.create_analytics_data(contributions)
+            
+            print('Calculating metrics...')
+            repo_metrics = metrics_functions.create_repo_metrics(raw_data, contributions)
+            
+            print('Processing repository labels...')
+            processed_labels = metrics_functions.process_repository_labels(raw_data)
+            
+            print('Generating reviewer pool...')
+            reviewer_pool = reviewer_functions.generate_reviewer_pool(contributions, github_org=github_org)
+            contributor_summary = reviewer_functions.get_contributor_summary(contributions)
+            
+            print(f'Processed {len(contributions)} contributors for {github_org}')
+            print(f'Generated reviewer pool with {reviewer_pool.get(\"count\", 0)} reviewers for {github_org}')
+            
+            all_processed_data[github_org] = {
+              'contributions': contributions,
+              'hall_of_fame': hall_of_fame,
+              'analytics_data': analytics_data,
+              'repo_metrics': repo_metrics,
+              'processed_labels': processed_labels,
+              'reviewer_pool': reviewer_pool,
+              'contributor_summary': contributor_summary
+            }
           
-          print('Creating analytics...')
-          hall_of_fame = analytics_functions.create_hall_of_fame_data(contributions)
-          analytics_data = analytics_functions.create_analytics_data(contributions)
-          
-          print('Calculating metrics...')
-          repo_metrics = metrics_functions.create_repo_metrics(raw_data, contributions)
-          
-          print('Processing repository labels...')
-          processed_labels = metrics_functions.process_repository_labels(raw_data)
-          
-          print('Generating reviewer pool...')
-          reviewer_pool = reviewer_functions.generate_reviewer_pool(contributions)
-          contributor_summary = reviewer_functions.get_contributor_summary(contributions)
-          
-          print(f'Processed {len(contributions)} contributors')
-          print(f'Generated reviewer pool with {reviewer_pool.get(\"count\", 0)} reviewers')
-          
-          print('Saving processed data...')
-          processed_data = {
-            'contributions': contributions,
-            'hall_of_fame': hall_of_fame,
-            'analytics_data': analytics_data,
-            'repo_metrics': repo_metrics,
-            'processed_labels': processed_labels,
-            'reviewer_pool': reviewer_pool,
-            'contributor_summary': contributor_summary
-          }
-          with open('processed_data.json', 'w') as f:
-            json.dump(processed_data, f)
-          print('Processed data saved to processed_data.json')
+          print('Saving all processed data...')
+          with open('all_processed_data.json', 'w') as f:
+            json.dump(all_processed_data, f)
+          print('All processed data saved to all_processed_data.json')
           "
 
-      - name: Store Data in Firestore
+      - name: Store Data in Multi-Tenant Firestore
         env:
           GOOGLE_APPLICATION_CREDENTIALS: discord_bot/config/credentials.json
+          TARGET_ORG: ${{ github.event.inputs.organization }}
           PYTHONUNBUFFERED: 1
           PYTHONPATH: ${{ github.workspace }}
         run: |
           cd discord_bot
           python -u -c "
-          from shared.firestore import set_document, query_collection, update_document
+          from shared.firestore import get_mt_client
           import json
+          import os
           
-          print('Loading processed data...')
-          with open('processed_data.json', 'r') as f:
-            data = json.load(f)
+          print('Loading all processed data...')
+          with open('all_processed_data.json', 'r') as f:
+            all_processed_data = json.load(f)
           
-          contributions = data['contributions']
-          hall_of_fame = data['hall_of_fame']
-          analytics_data = data['analytics_data']
-          repo_metrics = data['repo_metrics']
-          processed_labels = data['processed_labels']
-          reviewer_pool = data['reviewer_pool']
-          contributor_summary = data['contributor_summary']
+          mt_client = get_mt_client()
+          target_org = os.getenv('TARGET_ORG') or None
           
-          print('Storing data in Firestore...')
-          set_document('repo_stats', 'metrics', repo_metrics)
-          set_document('repo_stats', 'hall_of_fame', hall_of_fame)
-          set_document('repo_stats', 'analytics', analytics_data)
+          # Store data for each organization
+          for github_org, data in all_processed_data.items():
+            if target_org and str(github_org).lower() != target_org.lower():
+              continue
+            print(f'Storing data for organization: {github_org}')
+            
+            contributions = data['contributions']
+            hall_of_fame = data['hall_of_fame']
+            analytics_data = data['analytics_data']
+            repo_metrics = data['repo_metrics']
+            processed_labels = data['processed_labels']
+            reviewer_pool = data['reviewer_pool']
+            contributor_summary = data['contributor_summary']
+            
+            print(f'Storing repo stats for {github_org}...')
+            mt_client.set_org_document(github_org, 'repo_stats', 'metrics', repo_metrics)
+            mt_client.set_org_document(github_org, 'repo_stats', 'hall_of_fame', hall_of_fame)
+            mt_client.set_org_document(github_org, 'repo_stats', 'analytics', analytics_data)
+            mt_client.set_org_document(github_org, 'repo_stats', 'contributor_summary', contributor_summary)
+            
+            print(f'Storing reviewer pool for {github_org}...')
+            mt_client.set_org_document(github_org, 'pr_config', 'reviewers', reviewer_pool)
+            print(f'Stored reviewer pool with {reviewer_pool.get(\"count\", 0)} reviewers for {github_org}')
+            
+            print(f'Storing repository labels for {github_org}...')
+            labels_stored = 0
+            for repo_name, label_data in processed_labels.items():
+              doc_id = repo_name.replace('/', '_')
+              if mt_client.set_org_document(github_org, 'repository_labels', doc_id, label_data):
+                labels_stored += 1
+                print(f\"Stored {label_data['count']} labels for {repo_name} in {github_org}\")
+            
+            print(f'Stored labels for {labels_stored} repositories in {github_org}')
+            
+            # Store per-username contributions for instant stats lookup
+            contribution_count = 0
+            for username, user_data in contributions.items():
+              payload = {
+                'github_username': username,
+                'pr_count': user_data.get('pr_count', 0),
+                'issues_count': user_data.get('issues_count', 0),
+                'commits_count': user_data.get('commits_count', 0),
+                'stats': user_data.get('stats', {}),
+                'rankings': user_data.get('rankings', {})
+              }
+              if mt_client.set_org_document(github_org, 'contributions', username, payload):
+                contribution_count += 1
+            print(f'Stored contribution data for {contribution_count} GitHub users in {github_org}')
           
-          print('Storing reviewer pool...')
-          set_document('pr_config', 'reviewers', reviewer_pool)
-          set_document('repo_stats', 'contributor_summary', contributor_summary)
-          print(f'Stored reviewer pool with {reviewer_pool.get(\"count\", 0)} reviewers')
-          
-          print('Storing repository labels...')
-          labels_stored = 0
-          for repo_name, label_data in processed_labels.items():
-            doc_id = repo_name.replace('/', '_')
-            if set_document('repository_labels', doc_id, label_data):
-              labels_stored += 1
-              print(f\"Stored {label_data['count']} labels for {repo_name}\")
-          
-          print(f'Stored labels for {labels_stored} repositories')
-          
-          user_mappings = query_collection('discord')
-          stored_count = 0
-          
-          for username, user_data in contributions.items():
-            discord_id = None
-            for uid, data in user_mappings.items():
-              if data.get('github_id') == username:
-                discord_id = uid
-                break
-            if discord_id:
-              if update_document('discord', discord_id, user_data):
-                stored_count += 1
-          
-          print(f'Stored data for {stored_count} users')
+          print('All organization data stored successfully!')
           "
 
-      - name: Update Discord Roles & Channels
+      - name: Update Discord Roles & Channels for All Servers
         env:
           DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
           GOOGLE_APPLICATION_CREDENTIALS: discord_bot/config/credentials.json
@@ -185,37 +295,63 @@ jobs:
         run: |
           cd discord_bot
           python -u -c "
-          from shared.firestore import query_collection  # Uses PYTHONPATH (no path setup needed)
-          import sys, json                               # Standard library imports
-          sys.path.insert(0, 'src')                     # Setup for local modules
-          from services.guild_service import GuildService     # Uses src/ path
-          from services.role_service import RoleService       # Uses src/ path
+          from shared.firestore import get_mt_client
+          import sys, json
+          sys.path.insert(0, 'src')
+          from services.guild_service import GuildService
+          from services.role_service import RoleService
           
-          print('Loading processed data...')
-          with open('processed_data.json', 'r') as f:
-            data = json.load(f)
+          print('Loading all processed data...')
+          with open('all_processed_data.json', 'r') as f:
+            all_processed_data = json.load(f)
           
-          contributions = data['contributions']
-          repo_metrics = data['repo_metrics']
+          mt_client = get_mt_client()
           
           print('Initializing Discord services...')
           role_service = RoleService()
           guild_service = GuildService(role_service)
           
-          print('Getting user mappings...')
-          user_mappings_data = query_collection('discord')
-          user_mappings = {}
-          for discord_id, data in user_mappings_data.items():
-            github_id = data.get('github_id')
-            if github_id:
-              user_mappings[discord_id] = github_id
+          # Get all registered Discord servers
+          servers_ref = mt_client.db.collection('discord_servers')
+          servers = {doc.id: doc.to_dict() for doc in servers_ref.stream()}
           
-          print(f'Found {len(user_mappings)} user mappings')
+          print(f'Found {len(servers)} registered Discord servers')
           
-          print('Updating Discord roles and channels...')
-          import asyncio
-          success = asyncio.run(guild_service.update_roles_and_channels(user_mappings, contributions, repo_metrics))
-          print(f'Discord updates completed: {success}')
+          # Update each Discord server with its organization's data
+          for discord_server_id, server_config in servers.items():
+            github_org = server_config.get('github_org')
+            if not github_org or github_org not in all_processed_data:
+              print(f'Skipping server {discord_server_id}: no data for org {github_org}')
+              continue
+            
+            print(f'Updating Discord server {discord_server_id} with {github_org} data...')
+            
+            org_data = all_processed_data[github_org]
+            contributions = org_data['contributions']
+            repo_metrics = org_data['repo_metrics']
+            
+            # Get user mappings for this server's organization
+            user_mappings_data = mt_client.db.collection('discord_users').stream()
+            user_mappings = {}
+            for doc in user_mappings_data:
+              user_data = doc.to_dict()
+              github_id = user_data.get('github_id')
+              servers_list = user_data.get('servers', [])
+              
+              # Include user if they're in this server and have contributions in this org
+              if github_id and discord_server_id in servers_list and github_id in contributions:
+                user_mappings[doc.id] = github_id
+            
+            print(f'Found {len(user_mappings)} user mappings for server {discord_server_id}')
+            
+            # Update Discord roles and channels for this server
+            import asyncio
+            success = asyncio.run(guild_service.update_roles_and_channels(
+              discord_server_id, user_mappings, contributions, repo_metrics
+            ))
+            print(f'Discord updates for server {discord_server_id} completed: {success}')
+          
+          print('All Discord server updates completed!')
           "
 
       - name: Pipeline Summary

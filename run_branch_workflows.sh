@@ -14,15 +14,15 @@ run_workflow() {
     local workflow_name="$2"
     
     echo ""
-    echo "🚀 Triggering: $workflow_name"
+    echo "Triggering: $workflow_name"
     echo "   File: $workflow_file"
     echo "   Branch: $CURRENT_BRANCH"
     
     # Try to run the workflow
     if gh workflow run "$workflow_file" --ref "$CURRENT_BRANCH"; then
-        echo "✅ Successfully triggered: $workflow_name"
+        echo "Successfully triggered: $workflow_name"
     else
-        echo "❌ Failed to trigger: $workflow_name"
+        echo "Failed to trigger: $workflow_name"
         return 1
     fi
 }
@@ -34,17 +34,17 @@ echo "============================================================"
 
 # Check if GitHub CLI is available
 if ! command -v gh &> /dev/null; then
-    echo "❌ GitHub CLI (gh) not found. Install from: https://cli.github.com/"
+    echo "GitHub CLI (gh) not found. Install from: https://cli.github.com/"
     exit 1
 fi
 
 # Check if authenticated
 if ! gh auth status &> /dev/null; then
-    echo "❌ GitHub CLI not authenticated. Run: gh auth login"
+    echo "GitHub CLI not authenticated. Run: gh auth login"
     exit 1
 fi
 
-echo "✅ GitHub CLI is ready"
+echo "GitHub CLI is ready"
 
 # Run all workflows
 echo ""
@@ -61,8 +61,8 @@ echo "============================================================"
 echo "All workflows triggered on branch: $CURRENT_BRANCH"
 echo "============================================================"
 echo ""
-echo "💡 Check workflow status:"
+echo "Check workflow status:"
 echo "   gh run list --branch $CURRENT_BRANCH"
 echo ""
-echo "💡 Watch workflow logs:"
+echo "Watch workflow logs:"
 echo "   gh run watch" 

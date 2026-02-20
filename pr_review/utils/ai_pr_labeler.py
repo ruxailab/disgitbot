@@ -53,7 +53,8 @@ class AIPRLabeler(BaseAIAnalyzer):
             from shared.firestore import get_document
             
             doc_id = repo.replace('/', '_')
-            label_data = get_document('repository_labels', doc_id)
+            github_org = repo.split('/')[0] if '/' in repo else None
+            label_data = get_document('repository_labels', doc_id, github_org=github_org)
             
             if label_data and 'labels' in label_data:
                 label_names = [

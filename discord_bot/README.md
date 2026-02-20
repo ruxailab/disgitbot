@@ -1,5 +1,24 @@
 # Discord Bot Setup Guide
 
+# Quick Start (Hosted Bot Users)
+
+Use this section if you only want to invite the hosted bot and use it in your Discord server.
+
+1. **Invite the bot** using the link provided by the maintainers.
+2. In your Discord server, run: `/setup`
+3. Click **Install GitHub App** and select the org/repo(s) to track.
+4. Each user links their GitHub account with: `/link`
+5. (Optional) Configure role rules:
+   ```
+   /configure roles action:add metric:commits threshold:1 role:@Contributor
+   /configure roles action:add metric:prs threshold:10 role:@ActiveContributor
+   /configure roles action:add metric:prs threshold:50 role:@CoreTeam
+   ```
+
+That’s it. No local setup, no tokens, no config files.
+
+**Note:** This section is for maintainers (RUXAILAB) or anyone who wants to run/modify the code themselves. If you only want to use the hosted bot, use the **Quick Start (Hosted Bot Users)** section above and skip the prerequisites.
+
 # 1. Prerequisites
 
 ### Python 3.13 Setup
@@ -105,11 +124,13 @@ cp discord_bot/config/.env.example discord_bot/config/.env
 
 **Your `.env` file needs these values:**
 - `DISCORD_BOT_TOKEN=` (Discord bot authentication)
-- `GITHUB_TOKEN=` (GitHub API access)
 - `GITHUB_CLIENT_ID=` (GitHub OAuth app ID)
 - `GITHUB_CLIENT_SECRET=` (GitHub OAuth app secret)
-- `REPO_OWNER=` (Your GitHub organization name)
-- `OAUTH_BASE_URL=` (Your Cloud Run URL - set in Step 4)
+- `OAUTH_BASE_URL=` (Your Cloud Run URL - set in Step 3)
+- `DISCORD_BOT_CLIENT_ID=` (Discord application ID)
+- `GITHUB_APP_ID=` (GitHub App ID)
+- `GITHUB_APP_PRIVATE_KEY_B64=` (GitHub App private key, base64)
+- `GITHUB_APP_SLUG=` (GitHub App slug)
 
 **Additional files you need:**
 - `discord_bot/config/credentials.json` (Firebase/Google Cloud credentials)
@@ -117,10 +138,15 @@ cp discord_bot/config/.env.example discord_bot/config/.env
 **GitHub repository secrets you need to configure:**
 Go to your GitHub repository → Settings → Secrets and variables → Actions → Click "New repository secret" for each:
 - `DISCORD_BOT_TOKEN`
-- `GH_TOKEN` 
 - `GOOGLE_CREDENTIALS_JSON`
-- `REPO_OWNER`
 - `CLOUD_RUN_URL`
+- `GH_APP_ID`
+- `GH_APP_PRIVATE_KEY_B64`
+
+If you plan to run GitHub Actions from branches other than `main`, also add the matching development secrets so the workflows can deploy correctly:
+- `DEV_GOOGLE_CREDENTIALS_JSON`
+- `DEV_CLOUD_RUN_URL`
+
 
 ---
 
@@ -167,6 +193,10 @@ Go to your GitHub repository → Settings → Secrets and variables → Actions 
    - Click "Reset Token" → Copy the token
    - **Add to `.env`:** `DISCORD_BOT_TOKEN=your_token_here`
    - **Add to GitHub Secrets:** Create secret named `DISCORD_BOT_TOKEN`
+8. **Grab the Discord bot client ID:**
+   - Stay in the same Discord application and open the **General Information** tab
+   - Copy the **Application ID** (this is sometimes labeled "Client ID")
+   - **Add to `.env`:** `DISCORD_BOT_CLIENT_ID=your_application_id`
 
 ### Step 2: Get credentials.json (config file) + GOOGLE_CREDENTIALS_JSON (GitHub Secret)
 
@@ -214,26 +244,9 @@ Go to your GitHub repository → Settings → Secrets and variables → Actions 
    - Paste the JSON content and encode it to base64
    - Copy the base64 string
    - **Add to GitHub Secrets:** Create secret named `GOOGLE_CREDENTIALS_JSON` with the base64 string
+   - *(Do this for non-main branches)* Create another secret named `DEV_GOOGLE_CREDENTIALS_JSON` with the same base64 string so development branches can run GitHub Actions.
 
-### Step 3: Get GITHUB_TOKEN (.env) + GH_TOKEN (GitHub Secret)
-
-**What this configures:** 
-- `.env` file: `GITHUB_TOKEN=your_token_here`
-- GitHub Secret: `GH_TOKEN`
-
-**What this does:** Allows the bot to access GitHub API to fetch repository and contribution data.
-
-1. **Go to GitHub Token Settings:** https://github.com/settings/tokens
-2. **Create New Token:**
-   - Click "Generate new token" → "Generate new token (classic)"
-3. **Set Permissions:**
-   - Check only: [x] `repo` (this gives full repository access)
-4. **Generate and Save:**
-   - Click "Generate token" → Copy the token
-   - **Add to `.env`:** `GITHUB_TOKEN=your_token_here`
-   - **Add to GitHub Secrets:** Create secret named `GH_TOKEN`
-
-### Step 4: Get Cloud Run URL (Placeholder Deployment)
+### Step 3: Get Cloud Run URL (Placeholder Deployment)
 
 **What this configures:** 
 - `.env` file: `OAUTH_BASE_URL=YOUR_CLOUD_RUN_URL` 
@@ -259,8 +272,18 @@ Go to your GitHub repository → Settings → Secrets and variables → Actions 
    - **Add to `.env`:** `OAUTH_BASE_URL=YOUR_CLOUD_RUN_URL`
    - **Example:** `OAUTH_BASE_URL=https://discord-bot-abcd1234-uc.a.run.app`
    - **Add to GitHub Secrets:** Create secret named `CLOUD_RUN_URL` with the same URL
+   - *(Do this for non-main branches)* Create a `DEV_CLOUD_RUN_URL` pointing to the staging/test Cloud Run service so development workflows continue to function. (You may reuse CLOUD_RUN_URL if you are not deploying production from main.)
 
-### Step 5: Get GITHUB_CLIENT_ID (.env) + GITHUB_CLIENT_SECRET (.env)
+3. **Configure Discord OAuth Redirect URI:**
+   - Go to [Discord Developer Portal](https://discord.com/developers/applications)
+   - Select your bot application (same one from Step 1)
+   - Go to **OAuth2** → **General**
+   - In the **Redirects** section, click **Add Redirect**
+   - Add: `YOUR_CLOUD_RUN_URL/setup`
+   - **Example:** `https://discord-bot-abcd1234-uc.a.run.app/setup`
+   - Click **Save Changes**
+
+### Step 4: Get GITHUB_CLIENT_ID (.env) + GITHUB_CLIENT_SECRET (.env)
 
 **What this configures:** 
 - `.env` file: `GITHUB_CLIENT_ID=your_client_id`
@@ -273,33 +296,56 @@ Go to your GitHub repository → Settings → Secrets and variables → Actions 
    - Click "New OAuth App"
 3. **Fill in Application Details:**
    - **Application name:** `Your Bot Name` (anything you want)
-   - **Homepage URL:** `YOUR_CLOUD_RUN_URL` (from Step 4)
+   - **Homepage URL:** `YOUR_CLOUD_RUN_URL` (from Step 3)
    - **Authorization callback URL:** `YOUR_CLOUD_RUN_URL/login/github/authorized`
    
    **Example URLs:** If your Cloud Run URL is `https://discord-bot-abcd1234-uc.a.run.app`, then:
    - Homepage URL: `https://discord-bot-abcd1234-uc.a.run.app`
    - Callback URL: `https://discord-bot-abcd1234-uc.a.run.app/login/github/authorized`
+   - After OAuth completes, the app will redirect users to `/auth/callback` for the success page.
 
 4. **Get Credentials:**
    - Click "Register application"
    - Copy the "Client ID" → **Add to `.env`:** `GITHUB_CLIENT_ID=your_client_id`
    - Click "Generate a new client secret" → Copy it → **Add to `.env`:** `GITHUB_CLIENT_SECRET=your_secret`
 
-### Step 6: Get REPO_OWNER (.env) + REPO_OWNER (GitHub Secret)
+### Step 5: Create GitHub App (GITHUB_APP_ID / PRIVATE_KEY / SLUG)
 
-**What this configures:** 
-- `.env` file: `REPO_OWNER=your_org_name`
-- GitHub Secret: `REPO_OWNER`
+**What this configures:**
+- `.env` file: `GITHUB_APP_ID=...`, `GITHUB_APP_PRIVATE_KEY_B64=...`, `GITHUB_APP_SLUG=...`
+- GitHub Secrets: `GH_APP_ID`, `GH_APP_PRIVATE_KEY_B64`
 
-**What this does:** Tells the bot which GitHub organization's repositories to monitor for contributions.
+**What this does:** Allows DisgitBot to read repository data without user PATs.
 
-1. **Find Your Organization Name:**
-   - Go to your organization's repositories page (example: `https://github.com/orgs/ruxailab/repositories`)
-   - The organization name is the part after `/orgs/` (example: `ruxailab`)
-2. **Set in Configuration:**
-   - **Add to `.env`:** `REPO_OWNER=your_org_name` (example: `REPO_OWNER=ruxailab`)
-   - **Add to GitHub Secrets:** Create secret named `REPO_OWNER` with the same value
-   - **Important:** Use ONLY the organization name, NOT the full URL
+**Where these values come from:**
+- `GITHUB_APP_ID`: shown on the GitHub App settings page (App ID field).
+- `GITHUB_APP_PRIVATE_KEY_B64`: base64 of the downloaded `.pem` private key.
+- `GITHUB_APP_SLUG`: the URL slug of your GitHub App (shown in the app page URL).
+
+1. **Create the GitHub App (org or personal):**
+   - For org: `https://github.com/organizations/<ORG>/settings/apps`
+   - For personal: `https://github.com/settings/apps`
+2. **Set these URLs:**
+   - **Homepage URL:** `YOUR_CLOUD_RUN_URL`
+   - **Setup URL:** `YOUR_CLOUD_RUN_URL/github/app/setup`
+   - **Callback URL:** leave empty
+3. **Enable redirect on update (important for multiple Discord servers):**
+   - Turn on **Redirect on update** so GitHub redirects back to the Setup URL even when the App is already installed.
+   - This lets a second Discord server complete setup using the same org installation.
+4. **Permissions (read-only):**
+   - Metadata (required), Contents, Issues, Pull requests
+   - Webhooks: OFF
+5. **Install target:** choose **Any account** so anyone can install it.
+6. **Generate a private key:**
+   - Download the `.pem` file
+   - Base64 it (keep BEGIN/END lines): `base64 -w 0 path/to/private-key.pem`
+7. **Set `.env` values:**
+   - `GITHUB_APP_ID=...` (App ID from the GitHub App page)
+   - `GITHUB_APP_PRIVATE_KEY_B64=...` (base64 from step 5)
+   - `GITHUB_APP_SLUG=...` (the app slug shown in the app page URL)
+
+**Security note:** Never commit the private key or base64 value to git. Treat it like a password.
+
 
 ---
 
@@ -343,9 +389,10 @@ The deployment script will:
    # Set your repository as default for GitHub CLI
    gh repo set-default
    
-   # Trigger the workflow to fetch data and assign roles
-   gh workflow run update-discord-roles.yml
+   # Trigger the data pipeline to fetch data and assign roles
+   gh workflow run discord_bot_pipeline.yml -f organization=<your_org>
    ```
+   Use the GitHub org you want to sync (the org where the GitHub App is installed), for example `-f organization=your-org`. This runs the full data pipeline, pushes metrics to Firestore, and refreshes Discord roles/channels for every registered server connected to that org.
 
 ---
 
@@ -409,7 +456,7 @@ python -u main.py 2>&1 | tee -a discord_bot.log
 ```python
 def run_discord_bot_async():
     """Run the Discord bot asynchronously using existing bot setup"""
-    print("🤖 Starting Discord bot...")
+    print("Starting Discord bot...")
     
     try:
         # Import the existing Discord bot with all commands
@@ -419,7 +466,7 @@ def run_discord_bot_async():
         print(" Discord bot setup imported successfully")
         
         # Get the bot instance and run it
-        print("🤖 Starting Discord bot connection...")
+        print("Starting Discord bot connection...")
         discord_bot_module.bot.run(discord_bot_module.TOKEN)
 ```
 
@@ -428,12 +475,12 @@ def run_discord_bot_async():
 **File: `discord_bot/main.py` (Lines 64-75)**
 ```python
 # Start Discord bot in a separate thread
-print("🧵 Setting up Discord bot thread...")
+print("Setting up Discord bot thread...")
 def start_discord_bot():
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     try:
-        print("🤖 Starting Discord bot in thread...")
+        print("Starting Discord bot in thread...")
         run_discord_bot_async()
     except Exception as e:
         print(f" Discord bot error: {e}")
@@ -686,7 +733,6 @@ async def link(interaction: discord.Interaction):
 # Check required environment variables
 required_vars = [
     "DISCORD_BOT_TOKEN", 
-    "GITHUB_TOKEN", 
     "GITHUB_CLIENT_ID", 
     "GITHUB_CLIENT_SECRET",
     "OAUTH_BASE_URL"      # ← This is your Cloud Run URL

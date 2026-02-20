@@ -6,8 +6,6 @@ on:
     types: [opened, synchronize, reopened]
 
   push:
-    branches:
-      - post_visualization_refactor
 
   workflow_dispatch:
     inputs:
@@ -41,7 +39,7 @@ on:
         default: 'process_pr'
         description: 'Action to perform'
     secrets:
-      DEV_GH_TOKEN:
+      GH_TOKEN:
         required: true
       GOOGLE_API_KEY:
         required: true
@@ -63,7 +61,7 @@ jobs:
         # If called from another repo, checkout this master repo
         repository: ${{ github.event_name == 'workflow_call' && 'ruxailab/disgitbot' || github.repository }}
         path: ${{ github.event_name == 'workflow_call' && 'pr-automation' || '.' }}
-        token: ${{ secrets.DEV_GH_TOKEN || github.token }}
+        token: ${{ secrets.GH_TOKEN || github.token }}
       
     - name: Set up Python
       uses: actions/setup-python@v4
@@ -71,7 +69,14 @@ jobs:
         python-version: '3.9'
         
     - name: Set up Google Credentials
-      run: echo "${{ secrets.GOOGLE_CREDENTIALS_JSON }}" | base64 --decode > discord_bot/config/credentials.json
+      run: |
+          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            echo "Using production Firestore credentials for PR automation"
+            echo "${{ secrets.GOOGLE_CREDENTIALS_JSON }}" | base64 --decode > discord_bot/config/credentials.json
+          else
+            echo "Using development Firestore credentials for PR automation"
+            echo "${{ secrets.DEV_GOOGLE_CREDENTIALS_JSON }}" | base64 --decode > discord_bot/config/credentials.json
+          fi
         
     - name: Install dependencies
       run: |
@@ -80,7 +85,7 @@ jobs:
         
     - name: Run PR automation
       env:
-        GITHUB_TOKEN: ${{ secrets.DEV_GH_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
         GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
         GOOGLE_APPLICATION_CREDENTIALS: discord_bot/config/credentials.json
         PYTHONPATH: ${{ github.workspace }}

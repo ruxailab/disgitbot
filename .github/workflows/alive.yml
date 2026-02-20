@@ -3,6 +3,8 @@ name: Keep Discord Bot Alive
 on:
   schedule:
     - cron: '0 */6 * * *'  # Every 6 hours at minute 0
+  push:
+  pull_request:
   workflow_dispatch:
 
 jobs:
@@ -10,17 +12,26 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 360  # 6 hours maximum
     steps:
-      - name: Validate CLOUD_RUN_URL
+      - name: Select and Validate Cloud Run URL
         run: |
-          if [ -z "${{ secrets.CLOUD_RUN_URL }}" ]; then
-            echo "CLOUD_RUN_URL secret is not set"
+          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            echo "Using production Cloud Run URL"
+            CLOUD_RUN_URL="${{ secrets.CLOUD_RUN_URL }}"
+          else
+            echo "Using development Cloud Run URL"
+            CLOUD_RUN_URL="${{ secrets.DEV_CLOUD_RUN_URL }}"
+          fi
+
+          if [ -z "$CLOUD_RUN_URL" ]; then
+            echo "Cloud Run URL secret is not set for branch ${{ github.ref_name }}"
             exit 1
           fi
-          echo "CLOUD_RUN_URL is configured"
+          echo "Cloud Run URL is configured: $CLOUD_RUN_URL"
+          echo "CLOUD_RUN_URL=$CLOUD_RUN_URL" >> $GITHUB_ENV
 
       - name: Persistent Ping Loop
         env:
-          CLOUD_RUN_URL: ${{ secrets.CLOUD_RUN_URL }}
+          CLOUD_RUN_URL: ${{ env.CLOUD_RUN_URL }}
         run: |
           echo "Starting persistent ping loop for 6 hours"
           echo "Will ping every 5 minutes (72 total pings)"

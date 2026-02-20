@@ -66,7 +66,7 @@ class WorkflowRunner:
             return
         
         for i, workflow in enumerate(self.workflows, 1):
-            manual_trigger = "✅" if workflow['has_workflow_dispatch'] else "❌"
+            manual_trigger = "" if workflow['has_workflow_dispatch'] else ""
             print(f"{i}. {workflow['name']}")
             print(f"   File: {workflow['file']}")
             print(f"   Manual trigger: {manual_trigger}")
@@ -92,16 +92,16 @@ class WorkflowRunner:
                 'gh', 'workflow', 'run', workflow['name']
             ], capture_output=True, text=True, check=True)
             
-            print(f"✅ Successfully triggered: {workflow['name']}")
+            print(f"Successfully triggered: {workflow['name']}")
             print(f"Output: {result.stdout}")
             return True
             
         except subprocess.CalledProcessError as e:
-            print(f"❌ Failed to trigger workflow: {e}")
+            print(f"Failed to trigger workflow: {e}")
             print(f"Error: {e.stderr}")
             return False
         except FileNotFoundError:
-            print("❌ GitHub CLI (gh) not found. Please install it first:")
+            print("GitHub CLI (gh) not found. Please install it first:")
             print("https://cli.github.com/")
             return False
     
@@ -119,7 +119,7 @@ class WorkflowRunner:
             return results
         
         for workflow in manual_workflows:
-            print(f"\n🚀 Triggering: {workflow['name']}")
+            print(f"\nTriggering: {workflow['name']}")
             success = self.run_workflow(workflow['name'])
             results[workflow['name']] = success
         
@@ -129,7 +129,7 @@ class WorkflowRunner:
         print("="*60)
         
         for name, success in results.items():
-            status = "✅ SUCCESS" if success else "❌ FAILED"
+            status = "SUCCESS" if success else "FAILED"
             print(f"{status}: {name}")
         
         return results
@@ -159,27 +159,27 @@ class WorkflowRunner:
         
         # Check if we're in a git repository
         if not Path('.git').exists():
-            print("❌ Not in a git repository")
+            print("Not in a git repository")
             return False
         
         # Check if GitHub CLI is installed
         try:
             subprocess.run(['gh', '--version'], capture_output=True, check=True)
-            print("✅ GitHub CLI is installed")
+            print("GitHub CLI is installed")
         except (subprocess.CalledProcessError, FileNotFoundError):
-            print("❌ GitHub CLI not found. Install from: https://cli.github.com/")
+            print("GitHub CLI not found. Install from: https://cli.github.com/")
             return False
         
         # Check if authenticated with GitHub
         try:
             result = subprocess.run(['gh', 'auth', 'status'], capture_output=True, text=True)
             if result.returncode == 0:
-                print("✅ GitHub CLI is authenticated")
+                print("GitHub CLI is authenticated")
             else:
-                print("❌ GitHub CLI not authenticated. Run: gh auth login")
+                print("GitHub CLI not authenticated. Run: gh auth login")
                 return False
         except Exception:
-            print("❌ Could not check GitHub CLI authentication")
+            print("Could not check GitHub CLI authentication")
             return False
         
         return True

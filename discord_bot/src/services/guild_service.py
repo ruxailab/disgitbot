@@ -5,11 +5,9 @@ Manages Discord server roles and channels based on GitHub data.
 """
 
 import discord
-from discord.ext import commands
-from typing import Dict, Any, Optional, List
-import time
+from typing import Dict, Any
 import os
-from shared.firestore import get_document, set_document, update_document, query_collection
+from shared.firestore import get_mt_client
 
 class GuildService:
     """Manages Discord guild roles and channels based on GitHub activity."""
@@ -20,12 +18,19 @@ class GuildService:
             raise ValueError("DISCORD_BOT_TOKEN environment variable is required")
         self._role_service = role_service
     
-    async def update_roles_and_channels(self, user_mappings: Dict[str, str], contributions: Dict[str, Any], metrics: Dict[str, Any]) -> bool:
+    async def update_roles_and_channels(self, discord_server_id: str, user_mappings: Dict[str, str], contributions: Dict[str, Any], metrics: Dict[str, Any]) -> bool:
         """Update Discord roles and channels in a single connection session."""
         intents = discord.Intents.default()
         intents.message_content = True
         intents.members = True
         client = discord.Client(intents=intents)
+
+        # Get server's GitHub organization for organization-specific data
+        from shared.firestore import get_mt_client
+        mt_client = get_mt_client()
+        server_config = mt_client.get_server_config(discord_server_id)
+        github_org = server_config.get('github_org') if server_config else None
+        role_rules = server_config.get('role_rules') if server_config else {}
         
         success = False
         
@@ -41,15 +46,24 @@ class GuildService:
                     return
                 
                 for guild in client.guilds:
-                    print(f"Processing guild: {guild.name} (ID: {guild.id})")
-                    
-                    # Update roles
-                    updated_count = await self._update_roles_for_guild(guild, user_mappings, contributions)
-                    print(f"Updated {updated_count} members in {guild.name}")
-                    
-                    # Update channels
-                    await self._update_channels_for_guild(guild, metrics)
-                    print(f"Updated channels in {guild.name}")
+                    if str(guild.id) == discord_server_id:
+                        print(f"Processing guild: {guild.name} (ID: {guild.id})")
+
+                        # Update roles with organization-specific data
+                        updated_count = await self._update_roles_for_guild(
+                            guild,
+                            user_mappings,
+                            contributions,
+                            github_org,
+                            role_rules or {}
+                        )
+                        print(f"Updated {updated_count} members in {guild.name}")
+
+                        # Update channels
+                        await self._update_channels_for_guild(guild, metrics)
+                        print(f"Updated channels in {guild.name}")
+                    else:
+                        print(f"Skipping guild {guild.name} - not the target server {discord_server_id}")
                 
                 success = True
                 print("Discord updates completed successfully")
@@ -71,18 +85,44 @@ class GuildService:
             traceback.print_exc()
             return False
     
-    async def _update_roles_for_guild(self, guild: discord.Guild, user_mappings: Dict[str, str], contributions: Dict[str, Any]) -> int:
+    async def _update_roles_for_guild(
+        self,
+        guild: discord.Guild,
+        user_mappings: Dict[str, str],
+        contributions: Dict[str, Any],
+        github_org: str,
+        role_rules: Dict[str, Any]
+    ) -> int:
         """Update roles for a single guild using role service."""
         if not self._role_service:
             print("Role service not available - skipping role updates")
             return 0
-        
-        hall_of_fame_data = self._role_service.get_hall_of_fame_data()
+  
+        # Get organization-specific hall of fame data
+        from shared.firestore import get_mt_client
+        mt_client = get_mt_client()
+        hall_of_fame_data = mt_client.get_org_document(github_org, 'repo_stats', 'hall_of_fame') if github_org else None
         medal_assignments = self._role_service.get_medal_assignments(hall_of_fame_data or {})
         
         obsolete_roles = self._role_service.get_obsolete_role_names()
         current_roles = set(self._role_service.get_all_role_names())
         existing_roles = {role.name: role for role in guild.roles}
+        existing_roles_by_id = {role.id: role for role in guild.roles}
+
+        custom_role_ids = set()
+        custom_role_names = set()
+        for rules in role_rules.values():
+            if not isinstance(rules, list):
+                continue
+            for rule in rules:
+                role_id = str(rule.get('role_id', '')).strip()
+                role_name = str(rule.get('role_name', '')).strip()
+                if role_id.isdigit():
+                    custom_role_ids.add(int(role_id))
+                if role_name:
+                    custom_role_names.add(role_name)
+
+        managed_role_names = current_roles | custom_role_names
         
         # Remove obsolete roles from server
         for role_name in obsolete_roles:
@@ -109,6 +149,19 @@ class GuildService:
                 except Exception as e:
                     print(f"Error creating role {role_name}: {e}")
         
+        def resolve_custom_role(rule: Dict[str, Any]):
+            if not rule:
+                return None
+            role_id = str(rule.get('role_id', '')).strip()
+            if role_id.isdigit():
+                role_obj = existing_roles_by_id.get(int(role_id))
+                if role_obj:
+                    return role_obj
+            role_name = str(rule.get('role_name', '')).strip()
+            if role_name:
+                return existing_roles.get(role_name)
+            return None
+
         # Update users
         updated_count = 0
         for member in guild.members:
@@ -123,26 +176,43 @@ class GuildService:
             
             # Get correct roles for user
             pr_role, issue_role, commit_role = self._role_service.determine_roles(pr_count, issues_count, commits_count)
-            correct_roles = {pr_role, issue_role, commit_role}
+            custom_roles = self._role_service.determine_custom_roles(pr_count, issues_count, commits_count, role_rules)
+
+            pr_role_obj = resolve_custom_role(custom_roles.get('pr')) or existing_roles.get(pr_role)
+            issue_role_obj = resolve_custom_role(custom_roles.get('issue')) or existing_roles.get(issue_role)
+            commit_role_obj = resolve_custom_role(custom_roles.get('commit')) or existing_roles.get(commit_role)
+
+            correct_role_objs = []
+            for role_obj in (pr_role_obj, issue_role_obj, commit_role_obj):
+                if role_obj and role_obj not in correct_role_objs:
+                    correct_role_objs.append(role_obj)
+
             if github_username in medal_assignments:
-                correct_roles.add(medal_assignments[github_username])
-            correct_roles.discard(None)
-            
+                medal_role_name = medal_assignments[github_username]
+                medal_role_obj = existing_roles.get(medal_role_name)
+                if medal_role_obj and medal_role_obj not in correct_role_objs:
+                    correct_role_objs.append(medal_role_obj)
+
+            correct_role_ids = {role.id for role in correct_role_objs}
+
             # Remove obsolete roles and roles user outgrew
-            user_bot_roles = [role for role in member.roles if role.name in (obsolete_roles | current_roles)]
-            roles_to_remove = [role for role in user_bot_roles if role.name not in correct_roles]
+            user_bot_roles = [
+                role for role in member.roles
+                if role.name in (obsolete_roles | managed_role_names) or role.id in custom_role_ids
+            ]
+            roles_to_remove = [role for role in user_bot_roles if role.id not in correct_role_ids]
             
             if roles_to_remove:
                 await member.remove_roles(*roles_to_remove)
                 print(f"Removed {[r.name for r in roles_to_remove]} from {member.name}")
             
             # Add missing roles
-            for role_name in correct_roles:
-                if role_name in roles and roles[role_name] not in member.roles:
-                    await member.add_roles(roles[role_name])
-                    print(f"Added {role_name} to {member.name}")
+            for role_obj in correct_role_objs:
+                if role_obj not in member.roles:
+                    await member.add_roles(role_obj)
+                    print(f"Added {role_obj.name} to {member.name}")
             
-            if roles_to_remove or any(role_name in roles and roles[role_name] not in member.roles for role_name in correct_roles):
+            if roles_to_remove or any(role_obj not in member.roles for role_obj in correct_role_objs):
                 updated_count += 1
         
         return updated_count
@@ -153,9 +223,26 @@ class GuildService:
             print(f"Updating channels in guild: {guild.name}")
             
             # Find or create stats category
-            stats_category = discord.utils.get(guild.categories, name="REPOSITORY STATS")
-            if not stats_category:
+            # Use a list scan instead of discord.utils.get so we can detect and
+            # clean up duplicate categories (can appear if setup and the pipeline
+            # both try to create the category at the same time).
+            all_stats_categories = [c for c in guild.categories if c.name == "REPOSITORY STATS"]
+            if not all_stats_categories:
                 stats_category = await guild.create_category("REPOSITORY STATS")
+            else:
+                stats_category = all_stats_categories[0]
+                # Delete any extras, including all their channels
+                for dup in all_stats_categories[1:]:
+                    for ch in dup.channels:
+                        try:
+                            await ch.delete()
+                        except Exception:
+                            pass
+                    try:
+                        await dup.delete()
+                        print(f"Deleted duplicate REPOSITORY STATS category in {guild.name}")
+                    except Exception as e:
+                        print(f"Could not delete duplicate category in {guild.name}: {e}")
             
             # Channel names for all repository metrics
             channels_to_update = [

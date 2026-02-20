@@ -7,95 +7,325 @@ Handles user-related Discord commands like linking, stats, and hall of fame.
 import discord
 from discord import app_commands
 import asyncio
-import threading
+import datetime
 from ...services.role_service import RoleService
-from ..auth import get_github_username_for_user, wait_for_username
-from shared.firestore import get_document, set_document
+from ..auth import get_github_username_for_user, register_link_event, unregister_link_event, oauth_sessions, oauth_sessions_lock
+from shared.firestore import get_document, set_document, get_mt_client
 
 class UserCommands:
     """Handles user-related Discord commands."""
-    
+
     def __init__(self, bot):
         self.bot = bot
-        self.verification_lock = threading.Lock()
+        self._active_links: set[str] = set()  # Per-user tracking, not global lock
+
+    async def _safe_defer(self, interaction):
+        """Safely defer interaction with error handling."""
+        try:
+            if interaction.response.is_done():
+                return
+            await interaction.response.defer(ephemeral=True)
+        except discord.errors.InteractionResponded:
+            # Interaction was already responded to, continue anyway
+            pass
+        except discord.errors.HTTPException as exc:
+            if exc.code == 40060:
+                return
+            raise
+
+    async def _safe_followup(self, interaction, message, embed=False):
+        """Safely send followup message with error handling."""
+        try:
+            if embed:
+                await interaction.followup.send(embed=message, ephemeral=True)
+            else:
+                await interaction.followup.send(message, ephemeral=True)
+        except discord.errors.InteractionResponded:
+            # Interaction was already responded to, continue anyway
+            pass
+        except discord.errors.HTTPException as exc:
+            if exc.code == 40060:
+                return
+            raise
     
     def register_commands(self):
         """Register all user commands with the bot."""
+        self.bot.tree.add_command(self._help_command())
         self.bot.tree.add_command(self._link_command())
         self.bot.tree.add_command(self._unlink_command())
         self.bot.tree.add_command(self._getstats_command())
         self.bot.tree.add_command(self._halloffame_command())
+
+    def _help_command(self):
+        """Create the help command."""
+        @app_commands.command(name="help", description="How DisgitBot works and how to get started")
+        async def help_cmd(interaction: discord.Interaction):
+            await interaction.response.defer(ephemeral=True)
+
+            is_admin = interaction.user.guild_permissions.administrator
+
+            # --- Embed 1: Getting Started ---
+            start_embed = discord.Embed(
+                title="DisgitBot — Getting Started",
+                description=(
+                    "DisgitBot tracks GitHub contributions for your organization "
+                    "and displays stats, leaderboards, and auto-assigns roles in Discord."
+                ),
+                color=discord.Color.blurple()
+            )
+            start_embed.add_field(
+                name="1️⃣  Setup (admin, one-time)",
+                value=(
+                    "`/setup` → click link → install GitHub App on your org\n"
+                    "Choose **All repositories** for automatic tracking of new repos."
+                ),
+                inline=False
+            )
+            start_embed.add_field(
+                name="2️⃣  Link your account",
+                value="`/link` → authorize with GitHub → your stats are now tracked",
+                inline=False
+            )
+            start_embed.add_field(
+                name="3️⃣  View stats",
+                value=(
+                    "`/getstats` — your personal contribution stats\n"
+                    "`/halloffame` — top 3 contributors leaderboard"
+                ),
+                inline=False
+            )
+
+            # --- Embed 2: Good to Know ---
+            faq_embed = discord.Embed(
+                title="Good to Know",
+                color=discord.Color.greyple()
+            )
+            faq_embed.add_field(
+                name="📊  When does data update?",
+                value=(
+                    "Automatically every night (midnight UTC).\n"
+                    "Admins can force refresh with `/sync`.\n"
+                    "After first setup, wait ~5–10 minutes for initial data."
+                ),
+                inline=False
+            )
+            faq_embed.add_field(
+                name="📦  New repos not showing up?",
+                value=(
+                    "If the GitHub App was installed with **Selected repositories**, "
+                    "new repos won't be tracked automatically.\n"
+                    "→ Go to **GitHub → Settings → GitHub Apps → Configure** "
+                    "and add the new repo, or switch to **All repositories**."
+                ),
+                inline=False
+            )
+            faq_embed.add_field(
+                name="👤  My stats are empty?",
+                value=(
+                    "Make sure you've run `/link` first.\n"
+                    "If you just set up, data may not be synced yet — "
+                    "try `/sync` (admin) or wait for the next automatic sync."
+                ),
+                inline=False
+            )
+
+            embeds = [start_embed, faq_embed]
+
+            # --- Embed 3: Admin Commands (only shown to admins) ---
+            if is_admin:
+                admin_embed = discord.Embed(
+                    title="Admin Commands",
+                    color=discord.Color.orange()
+                )
+                admin_embed.add_field(
+                    name="Commands",
+                    value=(
+                        "`/setup` — connect or check GitHub org connection\n"
+                        "`/sync` — manually trigger data refresh (12h cooldown)\n"
+                        "`/configure roles` — auto-assign roles based on contributions\n"
+                        "`/setup_voice_stats` — voice channel repo stats display\n"
+                        "`/check_permissions` — verify bot has required permissions"
+                    ),
+                    inline=False
+                )
+                admin_embed.add_field(
+                    name="Setup flow for organizations",
+                    value=(
+                        "If a **non-owner** member runs `/setup`, GitHub sends "
+                        "an install **request** to the org owner.\n"
+                        "After the owner approves on GitHub, "
+                        "someone must run `/setup` again in Discord to complete the link."
+                    ),
+                    inline=False
+                )
+                embeds.append(admin_embed)
+
+            await interaction.followup.send(embeds=embeds, ephemeral=True)
+
+        return help_cmd
     
     def _link_command(self):
         """Create the link command."""
         @app_commands.command(name="link", description="Link your Discord to GitHub")
         async def link(interaction: discord.Interaction):
-            await interaction.response.defer(ephemeral=True)
+            await self._safe_defer(interaction)
 
-            if not self.verification_lock.acquire(blocking=False):
-                await interaction.followup.send("The verification process is currently busy. Please try again later.", ephemeral=True)
+            discord_user_id = str(interaction.user.id)
+
+            if discord_user_id in self._active_links:
+                await self._safe_followup(interaction, "You already have a link process in progress. Please complete it or wait for it to expire.")
                 return
 
+            self._active_links.add(discord_user_id)
             try:
-                discord_user_id = str(interaction.user.id)
-                
-                oauth_url = get_github_username_for_user(discord_user_id)
-                await interaction.followup.send(f"Please complete GitHub authentication: {oauth_url}", ephemeral=True)
+                discord_server_id = str(interaction.guild.id)
+                mt_client = get_mt_client()
 
-                github_username = await asyncio.get_event_loop().run_in_executor(
-                    None, wait_for_username, discord_user_id
-                )
+                existing_user_data = await asyncio.to_thread(mt_client.get_user_mapping, discord_user_id) or {}
+                existing_github = existing_user_data.get('github_id')
+                existing_servers = existing_user_data.get('servers', [])
+
+                if existing_github:
+                    if discord_server_id not in existing_servers:
+                        existing_servers.append(discord_server_id)
+                        existing_user_data['servers'] = existing_servers
+                        await asyncio.to_thread(mt_client.set_user_mapping, discord_user_id, existing_user_data)
+
+                    await self._safe_followup(
+                        interaction,
+                        f"Already linked to GitHub user: `{existing_github}`\n"
+                        f"Use `/unlink` to disconnect and relink."
+                    )
+                    return
+
+                oauth_url = get_github_username_for_user(discord_user_id)
+                await self._safe_followup(interaction, f"Please complete GitHub authentication: {oauth_url}")
+
+                # Event-driven wait: no threads tied up, Flask callback wakes us instantly
+                link_event = asyncio.Event()
+                register_link_event(discord_user_id, link_event)
+                try:
+                    await asyncio.wait_for(link_event.wait(), timeout=300)
+                except asyncio.TimeoutError:
+                    # Clean up timed-out OAuth session
+                    with oauth_sessions_lock:
+                        oauth_sessions.pop(discord_user_id, None)
+                    await self._safe_followup(interaction, "Authentication timed out or failed. Please try again.")
+                    return
+                finally:
+                    unregister_link_event(discord_user_id)
+
+                # Event fired — read result from oauth_sessions
+                github_username = None
+                with oauth_sessions_lock:
+                    session_data = oauth_sessions.pop(discord_user_id, None)
+                if session_data and session_data.get('status') == 'completed':
+                    github_username = session_data.get('github_username')
+                elif session_data and session_data.get('status') == 'failed':
+                    error = session_data.get('error', 'Unknown error')
+                    print(f"OAuth failed for {discord_user_id}: {error}")
 
                 if github_username:
-                    set_document('discord', discord_user_id, {
+
+                    # Add this server to user's server list
+                    servers_list = existing_user_data.get('servers', [])
+                    if discord_server_id not in servers_list:
+                        servers_list.append(discord_server_id)
+
+                    # Update user mapping with server association
+                    user_data = {
                         'github_id': github_username,
-                        'pr_count': 0,
-                        'issues_count': 0,
-                        'commits_count': 0,
-                        'role': 'member'
-                    })
-                    
-                    # Trigger the data pipeline to collect stats for the new user
-                    await self._trigger_data_pipeline()
-                    
-                    await interaction.followup.send(f"Successfully linked to GitHub user: `{github_username}`\n Your stats will be available within a few minutes!", ephemeral=True)
+                        'servers': servers_list,
+                        'pr_count': existing_user_data.get('pr_count', 0),
+                        'issues_count': existing_user_data.get('issues_count', 0),
+                        'commits_count': existing_user_data.get('commits_count', 0),
+                        'role': existing_user_data.get('role', 'member'),
+                        'last_linked_server': discord_server_id,
+                        'last_updated': str(interaction.created_at)
+                    }
+
+                    await asyncio.to_thread(mt_client.set_user_mapping, discord_user_id, user_data)
+
+                    await self._safe_followup(
+                        interaction,
+                        f"Successfully linked to GitHub user: `{github_username}`\n"
+                        f"Use `/getstats` to view your contribution data."
+                    )
                 else:
-                    await interaction.followup.send("Authentication timed out or failed. Please try again.", ephemeral=True)
+                    await self._safe_followup(interaction, "Authentication timed out or failed. Please try again.")
 
             except Exception as e:
                 print("Error in /link:", e)
-                await interaction.followup.send("Failed to link GitHub account.", ephemeral=True)
+                await self._safe_followup(interaction, "Failed to link GitHub account.")
             finally:
-                self.verification_lock.release()
+                self._active_links.discard(discord_user_id)
         
         return link
+
+    def _empty_user_stats(self, last_updated: str | None = None) -> dict:
+        """Return an empty stats payload for users with no synced data yet."""
+        current_month = datetime.datetime.now(datetime.timezone.utc).strftime("%B")
+        return {
+            "pr_count": 0,
+            "issues_count": 0,
+            "commits_count": 0,
+            "stats": {
+                "current_month": current_month,
+                "last_updated": last_updated or "Not synced yet",
+                "pr": {
+                    "daily": 0,
+                    "weekly": 0,
+                    "monthly": 0,
+                    "all_time": 0,
+                    "current_streak": 0,
+                    "longest_streak": 0,
+                    "avg_per_day": 0
+                },
+                "issue": {
+                    "daily": 0,
+                    "weekly": 0,
+                    "monthly": 0,
+                    "all_time": 0,
+                    "current_streak": 0,
+                    "longest_streak": 0,
+                    "avg_per_day": 0
+                },
+                "commit": {
+                    "daily": 0,
+                    "weekly": 0,
+                    "monthly": 0,
+                    "all_time": 0,
+                    "current_streak": 0,
+                    "longest_streak": 0,
+                    "avg_per_day": 0
+                }
+            },
+            "rankings": {}
+        }
     
     def _unlink_command(self):
         """Create the unlink command."""
         @app_commands.command(name="unlink", description="Unlinks your Discord account from your GitHub username")
         async def unlink(interaction: discord.Interaction):
             try:
-                await interaction.response.defer(ephemeral=True)
+                await self._safe_defer(interaction)
 
-                user_data = get_document('discord', str(interaction.user.id))
+                discord_user_id = str(interaction.user.id)
+                discord_server_id = str(interaction.guild.id)
+                mt_client = get_mt_client()
 
-                if user_data:
-                    # Delete document by setting it to empty (Firestore will remove it)
-                    set_document('discord', str(interaction.user.id), {})
-                    await interaction.followup.send(
-                        "Successfully unlinked your Discord account from your GitHub username.",
-                        ephemeral=True
-                    )
-                    print(f"Unlinked Discord user {interaction.user.name}")
-                else:
-                    await interaction.followup.send(
-                        "Your Discord account is not linked to any GitHub username.",
-                        ephemeral=True
-                    )
+                user_mapping = await asyncio.to_thread(mt_client.get_user_mapping, discord_user_id) or {}
+                if not user_mapping.get('github_id'):
+                    await self._safe_followup(interaction, "Your Discord account is not linked to any GitHub username.")
+                    return
+
+                await asyncio.to_thread(mt_client.set_user_mapping, discord_user_id, {})
+                await self._safe_followup(interaction, "Successfully unlinked your Discord account from your GitHub username.")
+                print(f"Unlinked Discord user {interaction.user.name}")
 
             except Exception as e:
                 print(f"Error unlinking user: {e}")
-                await interaction.followup.send("An error occurred while unlinking your account.", ephemeral=True)
+                await self._safe_followup(interaction, "An error occurred while unlinking your account.")
         
         return unlink
     
@@ -109,47 +339,49 @@ class UserCommands:
             app_commands.Choice(name="Commits", value="commit")
         ])
         async def getstats(interaction: discord.Interaction, type: str = "pr"):
-            await interaction.response.defer()
-            
+            try:
+                await self._safe_defer(interaction)
+            except Exception:
+                pass
+
             try:
                 stats_type = type.lower().strip()
                 if stats_type not in ["pr", "issue", "commit"]:
                     stats_type = "pr"
-                
+
                 user_id = str(interaction.user.id)
-                
-                # Get user's Discord data to find their GitHub username
-                discord_user_data = get_document('discord', user_id)
-                if not discord_user_data or not discord_user_data.get('github_id'):
-                    await interaction.followup.send(
-                        "Your Discord account is not linked to a GitHub username. Use `/link` to link it.",
-                        ephemeral=True
-                    )
+
+                # Check global link mapping first
+                discord_server_id = str(interaction.guild.id)
+                mt_client = get_mt_client()
+                user_mapping = await asyncio.to_thread(mt_client.get_user_mapping, user_id) or {}
+                github_username = user_mapping.get('github_id')
+                if not github_username:
+                    await self._safe_followup(interaction, "Your Discord account is not linked to a GitHub username. Use `/link` to link it.")
                     return
-                
-                github_username = discord_user_data['github_id']
-                
-                # Use the Discord user data which should contain the full contribution stats
-                # The pipeline updates Discord documents with full contribution data
-                user_data = discord_user_data
-                    
+
+                github_org = await asyncio.to_thread(mt_client.get_org_from_server, discord_server_id)
+                if not github_org:
+                    await self._safe_followup(interaction, "This server is not configured yet. Run `/setup` first.")
+                    return
+
+                # Fetch org-scoped stats for this GitHub username
+                user_data = await asyncio.to_thread(mt_client.get_org_document, github_org, 'contributions', github_username)
                 if not user_data:
-                    await interaction.followup.send(
-                        f"No contribution data found for GitHub user '{github_username}'.",
-                        ephemeral=True
-                    )
-                    return
+                    metrics = await asyncio.to_thread(get_document, 'repo_stats', 'metrics', discord_server_id)
+                    last_updated = metrics.get('last_updated') if metrics else None
+                    user_data = self._empty_user_stats(last_updated)
 
                 # Get stats and create embed
                 embed = await self._create_stats_embed(user_data, github_username, stats_type, interaction)
                 if embed:
-                    await interaction.followup.send(embed=embed)
-                
+                    await self._safe_followup(interaction, embed, embed=True)
+
             except Exception as e:
                 print(f"Error in getstats command: {e}")
                 import traceback
                 traceback.print_exc()
-                await interaction.followup.send("📊 Unable to retrieve your stats. This might be because you just linked your account and your data isn't populated yet. Please try again in a few minutes!", ephemeral=True)
+                await self._safe_followup(interaction, "Unable to retrieve your stats. This might be because you just linked your account and your data isn't populated yet. Please try again in a few minutes!")
         
         return getstats
     
@@ -169,22 +401,31 @@ class UserCommands:
             app_commands.Choice(name="Daily", value="daily")
         ])
         async def halloffame(interaction: discord.Interaction, type: str = "pr", period: str = "all_time"):
-            await interaction.response.defer()
-            
-            hall_of_fame_data = get_document('repo_stats', 'hall_of_fame')
-            
-            if not hall_of_fame_data:
-                await interaction.followup.send("Hall of fame data not available yet.", ephemeral=True)
-                return
-            
-            top_3 = hall_of_fame_data.get(type, {}).get(period, [])
-            
-            if not top_3:
-                await interaction.followup.send(f"No data for {type} {period}.", ephemeral=True)
-                return
-            
-            embed = self._create_halloffame_embed(top_3, type, period, hall_of_fame_data.get('last_updated'))
-            await interaction.followup.send(embed=embed)
+            try:
+                await self._safe_defer(interaction)
+            except Exception:
+                pass
+
+            try:
+                discord_server_id = str(interaction.guild.id)
+                hall_of_fame_data = await asyncio.to_thread(get_document, 'repo_stats', 'hall_of_fame', discord_server_id)
+
+                if not hall_of_fame_data:
+                    await self._safe_followup(interaction, "Hall of fame data not available yet.")
+                    return
+
+                top_3 = hall_of_fame_data.get(type, {}).get(period, [])
+
+                if not top_3:
+                    await self._safe_followup(interaction, f"No data for {type} {period}.")
+                    return
+
+                embed = self._create_halloffame_embed(top_3, type, period, hall_of_fame_data.get('last_updated'))
+                await self._safe_followup(interaction, embed, embed=True)
+
+            except Exception as e:
+                print(f"Error in halloffame command: {e}")
+                await self._safe_followup(interaction, "Unable to retrieve hall of fame data.")
         
         return halloffame
     
@@ -219,19 +460,28 @@ class UserCommands:
         # Check if stats data exists
         stats = user_data.get("stats")
         if not stats or stats_field not in stats:
-            await interaction.followup.send(
-                "Your stats are being collected! Please check back in 5 min after the bot has gathered your contribution data.",
-                ephemeral=True
-            )
+            await self._safe_followup(interaction, "Your stats are being collected! Please check back in 5 min after the bot has gathered your contribution data.")
             return None
             
         # Get enhanced stats
         type_stats = stats[stats_field]
         
         # Create enhanced embed
+        discord_server_id = str(interaction.guild.id) if interaction.guild else None
+        org_name = None
+        if discord_server_id:
+            try:
+                org_name = await asyncio.to_thread(get_mt_client().get_org_from_server, discord_server_id)
+            except Exception as e:
+                print(f"Error fetching org for server {discord_server_id}: {e}")
+
+        org_label = org_name or "your linked"
         embed = discord.Embed(
             title=f"GitHub Contribution Metrics for {github_username}",
-            description=f"Stats tracked across all RUXAILAB repositories. Updated daily. Last update: {stats.get('last_updated', datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC'))}",
+            description=(
+                f"Stats tracked across {org_label} repositories. "
+                f"Updated daily. Last update: {stats.get('last_updated', datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC'))}"
+            ),
             color=discord.Color.blue()
         )
         
@@ -302,36 +552,3 @@ class UserCommands:
         embed.set_footer(text=f"Last updated: {last_updated or 'Unknown'}")
         return embed
     
-    async def _trigger_data_pipeline(self):
-        """Trigger the GitHub Actions workflow to collect data for the new user."""
-        import aiohttp
-        import os
-        
-        # GitHub API endpoint for triggering workflow_dispatch
-        repo_owner = os.getenv('REPO_OWNER', 'ruxailab')
-        repo_name = "disgitbot"
-        workflow_id = "discord_bot_pipeline.yml"
-        
-        url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/actions/workflows/{workflow_id}/dispatches"
-        
-        headers = {
-            "Authorization": f"token {os.getenv('GITHUB_TOKEN')}",
-            "Accept": "application/vnd.github.v3+json"
-        }
-        
-        payload = {
-            "ref": "main"
-        }
-        
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(url, headers=headers, json=payload) as response:
-                    if response.status == 204:
-                        print("Successfully triggered data pipeline")
-                        return True
-                    else:
-                        print(f"Failed to trigger pipeline. Status: {response.status}")
-                        return False
-        except Exception as e:
-            print(f"Error triggering pipeline: {e}")
-            return False
