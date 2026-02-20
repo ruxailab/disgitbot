@@ -333,17 +333,11 @@ create_new_env_file() {
         print_warning "Discord Bot Token is required!"
     done
     
-    # GitHub Token (optional for GitHub App mode)
-    read -p "GitHub Token (optional): " github_token
-    
     # GitHub Client ID
     read -p "GitHub Client ID: " github_client_id
     
     # GitHub Client Secret
     read -p "GitHub Client Secret: " github_client_secret
-    
-    # Repository Owner
-    read -p "Repository Owner: " repo_owner
     
     # OAuth Base URL (optional - will auto-detect on Cloud Run)
     read -p "OAuth Base URL (optional): " oauth_base_url
@@ -355,19 +349,36 @@ create_new_env_file() {
     read -p "GitHub App ID: " github_app_id
     read -p "GitHub App Private Key (base64): " github_app_private_key_b64
     read -p "GitHub App Slug: " github_app_slug
-    
+
+    # SECRET_KEY (auto-generate if left blank)
+    echo -e "${BLUE}SECRET_KEY is used to sign session cookies (required for security).${NC}"
+    read -p "SECRET_KEY (leave blank to auto-generate): " secret_key
+    if [ -z "$secret_key" ]; then
+        secret_key=$(python3 -c "import secrets; print(secrets.token_hex(32))")
+        print_success "Auto-generated SECRET_KEY"
+    fi
+
+    # /sync optional vars
+    echo -e "\n${BLUE}Optional: /sync command (manually trigger the data pipeline).${NC}"
+    echo -e "${BLUE}Leave blank to use defaults (REPO_OWNER=ruxailab, REPO_NAME=disgitbot, WORKFLOW_REF=main).${NC}"
+    read -p "REPO_OWNER (GitHub org that owns the pipeline repo) [ruxailab]: " repo_owner
+    read -p "REPO_NAME (pipeline repo name) [disgitbot]: " repo_name
+    read -p "WORKFLOW_REF (branch/tag to dispatch on) [main]: " workflow_ref
+
     # Create .env file
     cat > "$ENV_PATH" << EOF
 DISCORD_BOT_TOKEN=$discord_token
-GITHUB_TOKEN=$github_token
 GITHUB_CLIENT_ID=$github_client_id
 GITHUB_CLIENT_SECRET=$github_client_secret
-REPO_OWNER=$repo_owner
 OAUTH_BASE_URL=$oauth_base_url
 DISCORD_BOT_CLIENT_ID=$discord_bot_client_id
 GITHUB_APP_ID=$github_app_id
 GITHUB_APP_PRIVATE_KEY_B64=$github_app_private_key_b64
 GITHUB_APP_SLUG=$github_app_slug
+SECRET_KEY=$secret_key
+REPO_OWNER=$repo_owner
+REPO_NAME=$repo_name
+WORKFLOW_REF=$workflow_ref
 EOF
     
     print_success ".env file created successfully!"
@@ -383,17 +394,11 @@ edit_env_file() {
     read -p "Discord Bot Token [$DISCORD_BOT_TOKEN]: " new_discord_token
     discord_token=${new_discord_token:-$DISCORD_BOT_TOKEN}
     
-    read -p "GitHub Token [$GITHUB_TOKEN]: " new_github_token
-    github_token=${new_github_token:-$GITHUB_TOKEN}
-    
     read -p "GitHub Client ID [$GITHUB_CLIENT_ID]: " new_github_client_id
     github_client_id=${new_github_client_id:-$GITHUB_CLIENT_ID}
     
     read -p "GitHub Client Secret [$GITHUB_CLIENT_SECRET]: " new_github_client_secret
     github_client_secret=${new_github_client_secret:-$GITHUB_CLIENT_SECRET}
-    
-    read -p "Repository Owner [$REPO_OWNER]: " new_repo_owner
-    repo_owner=${new_repo_owner:-$REPO_OWNER}
     
     read -p "OAuth Base URL [$OAUTH_BASE_URL]: " new_oauth_base_url
     oauth_base_url=${new_oauth_base_url:-$OAUTH_BASE_URL}
@@ -409,19 +414,40 @@ edit_env_file() {
 
     read -p "GitHub App Slug [$GITHUB_APP_SLUG]: " new_github_app_slug
     github_app_slug=${new_github_app_slug:-$GITHUB_APP_SLUG}
+
+    read -p "SECRET_KEY [$SECRET_KEY]: " new_secret_key
+    secret_key=${new_secret_key:-$SECRET_KEY}
     
+    # Auto-generate if still empty (e.g. key was missing in old .env and user pressed Enter)
+    if [ -z "$secret_key" ]; then
+        echo -e "${BLUE}SECRET_KEY is empty. Auto-generating a secure key...${NC}"
+        secret_key=$(python3 -c "import secrets; print(secrets.token_hex(32))")
+        print_success "Generated: $secret_key"
+    fi
+
+    # /sync optional vars
+    echo -e "\n${BLUE}Optional: /sync vars (press Enter to keep current or use default).${NC}"
+    read -p "REPO_OWNER [${REPO_OWNER:-ruxailab}]: " new_repo_owner
+    repo_owner=${new_repo_owner:-${REPO_OWNER:-}}
+    read -p "REPO_NAME [${REPO_NAME:-disgitbot}]: " new_repo_name
+    repo_name=${new_repo_name:-${REPO_NAME:-}}
+    read -p "WORKFLOW_REF [${WORKFLOW_REF:-main}]: " new_workflow_ref
+    workflow_ref=${new_workflow_ref:-${WORKFLOW_REF:-}}
+
     # Update .env file
     cat > "$ENV_PATH" << EOF
 DISCORD_BOT_TOKEN=$discord_token
-GITHUB_TOKEN=$github_token
 GITHUB_CLIENT_ID=$github_client_id
 GITHUB_CLIENT_SECRET=$github_client_secret
-REPO_OWNER=$repo_owner
 OAUTH_BASE_URL=$oauth_base_url
 DISCORD_BOT_CLIENT_ID=$discord_bot_client_id
 GITHUB_APP_ID=$github_app_id
 GITHUB_APP_PRIVATE_KEY_B64=$github_app_private_key_b64
 GITHUB_APP_SLUG=$github_app_slug
+SECRET_KEY=$secret_key
+REPO_OWNER=$repo_owner
+REPO_NAME=$repo_name
+WORKFLOW_REF=$workflow_ref
 EOF
     
     print_success ".env file updated successfully!"
@@ -727,6 +753,15 @@ main() {
         print_warning "Shared directory not found - skipping shared copy"
     fi
     
+    # Copy pr_review directory into build context for PR automation
+    print_step "Copying pr_review directory into build context..."
+    if [ -d "$(dirname "$ROOT_DIR")/pr_review" ]; then
+        cp -r "$(dirname "$ROOT_DIR")/pr_review" "$ROOT_DIR/pr_review"
+        print_success "pr_review directory copied successfully"
+    else
+        print_warning "pr_review directory not found - skipping pr_review copy"
+    fi
+    
     # Use Cloud Build to build and push the image
     gcloud builds submit \
       --tag gcr.io/$PROJECT_ID/$SERVICE_NAME:latest \
@@ -738,6 +773,10 @@ main() {
     if [ -d "$ROOT_DIR/shared" ]; then
         rm -rf "$ROOT_DIR/shared"
         print_step "Cleaned up temporary shared directory"
+    fi
+    if [ -d "$ROOT_DIR/pr_review" ]; then
+        rm -rf "$ROOT_DIR/pr_review"
+        print_step "Cleaned up temporary pr_review directory"
     fi
     print_success "Build completed and temporary files cleaned up!"
     

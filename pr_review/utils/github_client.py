@@ -8,7 +8,11 @@ import requests
 import logging
 from typing import List, Dict, Any, Optional
 from github import Github
-from config import GITHUB_TOKEN
+
+try:
+    from pr_review.config import GITHUB_TOKEN
+except ImportError:
+    from config import GITHUB_TOKEN
 
 class GitHubClient:
     """GitHub API client for PR review system"""

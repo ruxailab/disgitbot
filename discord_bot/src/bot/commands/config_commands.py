@@ -4,9 +4,13 @@ Configuration Commands Module
 Server configuration commands for role mappings and setup checks.
 """
 
+import asyncio
+import logging
 import discord
 from discord import app_commands
 from shared.firestore import get_mt_client
+
+logger = logging.getLogger(__name__)
 
 
 class ConfigCommands:
@@ -64,7 +68,7 @@ class ConfigCommands:
                 return
 
             mt_client = get_mt_client()
-            server_config = mt_client.get_server_config(str(guild.id)) or {}
+            server_config = await asyncio.to_thread(mt_client.get_server_config, str(guild.id)) or {}
             if not server_config.get('setup_completed'):
                 await interaction.followup.send("Run `/setup` first to connect GitHub.", ephemeral=True)
                 return
@@ -84,7 +88,7 @@ class ConfigCommands:
             if action_value == "reset":
                 role_rules = {'pr': [], 'issue': [], 'commit': []}
                 server_config['role_rules'] = role_rules
-                mt_client.set_server_config(str(guild.id), server_config)
+                await asyncio.to_thread(mt_client.set_server_config, str(guild.id), server_config)
                 await interaction.followup.send("Role rules reset to defaults.", ephemeral=True)
                 return
 
@@ -98,6 +102,27 @@ class ConfigCommands:
 
                 if threshold <= 0:
                     await interaction.followup.send("Threshold must be a positive number.", ephemeral=True)
+                    return
+
+                # Role hierarchy validation: bot must be able to manage this role
+                bot_member = guild.me
+                if bot_member is None:
+                    try:
+                        bot_member = await guild.fetch_member(self.bot.user.id)
+                    except Exception:
+                        logger.warning(f"Could not fetch bot member in guild {guild.id}")
+                        await interaction.followup.send(
+                            "❌ Unable to verify role permissions. Please ensure I have the Manage Roles permission.",
+                            ephemeral=True
+                        )
+                        return
+                if bot_member.top_role.position <= role.position:
+                    await interaction.followup.send(
+                        f"❌ Cannot add rule for @{role.name}.\n"
+                        f"This role is positioned **equal to or higher** than my top role (@{bot_member.top_role.name}).\n"
+                        f"Please move my role higher in Server Settings → Roles, or choose a lower role.",
+                        ephemeral=True
+                    )
                     return
 
                 metric_key = metric.value
@@ -116,7 +141,7 @@ class ConfigCommands:
                 role_rules[metric_key] = rules
 
                 server_config['role_rules'] = role_rules
-                mt_client.set_server_config(str(guild.id), server_config)
+                await asyncio.to_thread(mt_client.set_server_config, str(guild.id), server_config)
 
                 await interaction.followup.send(
                     f"Added rule: {metric.name} {threshold}+ -> @{role.name}",
@@ -145,7 +170,7 @@ class ConfigCommands:
                     return
 
                 server_config['role_rules'] = role_rules
-                mt_client.set_server_config(str(guild.id), server_config)
+                await asyncio.to_thread(mt_client.set_server_config, str(guild.id), server_config)
 
                 await interaction.followup.send(f"Removed custom rules for @{role.name}.", ephemeral=True)
                 return

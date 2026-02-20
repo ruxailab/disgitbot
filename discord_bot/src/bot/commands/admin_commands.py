@@ -4,6 +4,7 @@ Admin Commands Module
 Handles administrative Discord commands like permissions and setup.
 """
 
+import asyncio
 import discord
 from discord import app_commands
 from shared.firestore import get_document, set_document
@@ -18,17 +19,19 @@ class AdminCommands:
         """Register all admin commands with the bot."""
         self.bot.tree.add_command(self._check_permissions_command())
         self.bot.tree.add_command(self._setup_command())
+        self.bot.tree.add_command(self._sync_command())
         self.bot.tree.add_command(self._setup_voice_stats_command())
-        self.bot.tree.add_command(self._add_reviewer_command())
-        self.bot.tree.add_command(self._remove_reviewer_command())
-        self.bot.tree.add_command(self._list_reviewers_command())
+        # PR automation commands disabled - keeping code for future re-enablement
+        # self.bot.tree.add_command(self._add_reviewer_command())
+        # self.bot.tree.add_command(self._remove_reviewer_command())
+        # self.bot.tree.add_command(self._list_reviewers_command())
     
     def _check_permissions_command(self):
         """Create the check_permissions command."""
         @app_commands.command(name="check_permissions", description="Check if bot has required permissions")
         async def check_permissions(interaction: discord.Interaction):
             await interaction.response.defer(ephemeral=True)
-            
+
             guild = interaction.guild
             assert guild is not None, "Command should only work in guilds"
             assert self.bot.user is not None, "Bot user should be available"
@@ -70,7 +73,7 @@ class AdminCommands:
                 # Check existing configuration
                 from shared.firestore import get_mt_client
                 mt_client = get_mt_client()
-                server_config = mt_client.get_server_config(str(guild.id)) or {}
+                server_config = await asyncio.to_thread(mt_client.get_server_config, str(guild.id)) or {}
                 if server_config.get('setup_completed'):
                     github_org = server_config.get('github_org', 'unknown')
                     await interaction.followup.send(
@@ -116,7 +119,111 @@ This setup is required only once per server."""
                 traceback.print_exc()
 
         return setup
-    
+
+    def _sync_command(self):
+        """Create the sync command for manually triggering data sync."""
+        @app_commands.command(name="sync", description="Manually trigger a GitHub data sync for this server")
+        async def sync(interaction: discord.Interaction):
+            """Triggers the data pipeline to refresh GitHub stats."""
+            await interaction.response.defer(ephemeral=True)
+
+            try:
+                # Check if user has administrator permissions
+                if not interaction.user.guild_permissions.administrator:
+                    await interaction.followup.send(
+                        "Only server administrators can trigger a sync.",
+                        ephemeral=True
+                    )
+                    return
+
+                guild = interaction.guild
+                assert guild is not None, "Command should only work in guilds"
+                guild_id = str(guild.id)
+
+                # Check if server is set up
+                from shared.firestore import get_mt_client
+                mt_client = get_mt_client()
+                server_config = await asyncio.to_thread(mt_client.get_server_config, guild_id) or {}
+
+                if not server_config.get('setup_completed'):
+                    await interaction.followup.send(
+                        "This server hasn't been set up yet. Run `/setup` first to connect a GitHub organization.",
+                        ephemeral=True
+                    )
+                    return
+
+                github_org = server_config.get('github_org')
+                if not github_org:
+                    await interaction.followup.send(
+                        "No GitHub organization found for this server. Run `/setup` to configure.",
+                        ephemeral=True
+                    )
+                    return
+
+                installation_id = server_config.get('github_installation_id')
+
+                # Trigger sync (with cooldown enforcement)
+                from src.bot.auth import trigger_sync
+                result = await asyncio.to_thread(
+                    trigger_sync, guild_id, github_org,
+                    installation_id=installation_id, respect_cooldown=True
+                )
+
+                if result["cooldown_remaining"] is not None:
+                    remaining = result["cooldown_remaining"]
+                    hours = remaining // 3600
+                    minutes = (remaining % 3600) // 60
+
+                    if hours > 0:
+                        time_str = f"{hours}h {minutes}m"
+                    else:
+                        time_str = f"{minutes}m"
+
+                    embed = discord.Embed(
+                        title="⏳ Sync on Cooldown",
+                        description=(
+                            f"A sync was already dispatched recently.\n\n"
+                            f"Next manual sync available in **{time_str}**.\n\n"
+                            f"The daily automatic sync also runs at **midnight UTC**.\n\n"
+                            f"_Note: if the pipeline run itself failed, wait for the cooldown or contact the bot maintainer._"
+                        ),
+                        color=0xfee75c  # yellow
+                    )
+                    await interaction.followup.send(embed=embed, ephemeral=True)
+                    return
+
+                if result["triggered"]:
+                    embed = discord.Embed(
+                        title="✅ Sync Triggered",
+                        description=(
+                            f"Data pipeline is now running for **{github_org}**.\n\n"
+                            f"Stats will be updated in approximately **5–10 minutes**.\n\n"
+                            f"_Use `/getstats` after a few minutes to see fresh data._"
+                        ),
+                        color=0x43b581  # green
+                    )
+                    await interaction.followup.send(embed=embed, ephemeral=True)
+                else:
+                    error_msg = result.get("error", "Unknown error")
+                    embed = discord.Embed(
+                        title="❌ Sync Failed",
+                        description=error_msg,
+                        color=0xed4245  # red
+                    )
+                    embed.set_footer(text="If this persists, contact the bot maintainer or check GitHub App settings.")
+                    await interaction.followup.send(embed=embed, ephemeral=True)
+
+            except Exception as e:
+                await interaction.followup.send(
+                    f"Error triggering sync: {str(e)}",
+                    ephemeral=True
+                )
+                print(f"Error in sync command: {e}")
+                import traceback
+                traceback.print_exc()
+
+        return sync
+
     def _setup_voice_stats_command(self):
         """Create the setup_voice_stats command."""
         @app_commands.command(name="setup_voice_stats", description="Sets up voice channels for repository stats display")
@@ -127,9 +234,25 @@ This setup is required only once per server."""
                 guild = interaction.guild
                 assert guild is not None, "Command should only work in guilds"
                 
-                existing_category = discord.utils.get(guild.categories, name="REPOSITORY STATS")
-                
-                if existing_category:
+                all_stats_categories = [c for c in guild.categories if c.name == "REPOSITORY STATS"]
+                if len(all_stats_categories) > 1:
+                    # Clean up duplicates — keep the first, delete the rest
+                    for dup in all_stats_categories[1:]:
+                        for ch in dup.channels:
+                            try:
+                                await ch.delete()
+                            except Exception:
+                                pass
+                        try:
+                            await dup.delete()
+                        except Exception:
+                            pass
+                    await interaction.followup.send(
+                        "⚠️ Found duplicate stats categories — cleaned up. "
+                        "One 'REPOSITORY STATS' category remains. "
+                        "Stats are updated daily via automated workflow."
+                    )
+                elif all_stats_categories:
                     await interaction.followup.send("Repository stats display already exists! Stats are updated daily via automated workflow.")
                 else:
                     await guild.create_category("REPOSITORY STATS")
@@ -153,7 +276,7 @@ This setup is required only once per server."""
             try:
                 # Get current reviewer configuration
                 discord_server_id = str(interaction.guild.id)
-                reviewer_data = get_document('pr_config', 'reviewers', discord_server_id)
+                reviewer_data = await asyncio.to_thread(get_document, 'pr_config', 'reviewers', discord_server_id)
                 if not reviewer_data:
                     reviewer_data = {'reviewers': [], 'manual_reviewers': [], 'top_contributor_reviewers': [], 'count': 0}
                 
@@ -175,7 +298,7 @@ This setup is required only once per server."""
                 reviewer_data['last_updated'] = __import__('time').strftime('%Y-%m-%d %H:%M:%S UTC', __import__('time').gmtime())
                 
                 # Save to Firestore
-                success = set_document('pr_config', 'reviewers', reviewer_data, discord_server_id=discord_server_id)
+                success = await asyncio.to_thread(set_document, 'pr_config', 'reviewers', reviewer_data, discord_server_id=discord_server_id)
                 
                 if success:
                     await interaction.followup.send(f"Successfully added `{username}` to the manual reviewer pool.\nTotal reviewers: {len(all_reviewers)}")
@@ -200,7 +323,7 @@ This setup is required only once per server."""
             try:
                 # Get current reviewer configuration
                 discord_server_id = str(interaction.guild.id)
-                reviewer_data = get_document('pr_config', 'reviewers', discord_server_id)
+                reviewer_data = await asyncio.to_thread(get_document, 'pr_config', 'reviewers', discord_server_id)
                 if not reviewer_data or not reviewer_data.get('reviewers'):
                     await interaction.followup.send("No reviewers found in the database.")
                     return
@@ -224,7 +347,7 @@ This setup is required only once per server."""
                     reviewer_data['last_updated'] = __import__('time').strftime('%Y-%m-%d %H:%M:%S UTC', __import__('time').gmtime())
                     
                     # Save to Firestore
-                    success = set_document('pr_config', 'reviewers', reviewer_data, discord_server_id=discord_server_id)
+                    success = await asyncio.to_thread(set_document, 'pr_config', 'reviewers', reviewer_data, discord_server_id=discord_server_id)
                     
                     if success:
                         await interaction.followup.send(f"Successfully removed `{username}` from the manual reviewer pool.\nTotal reviewers: {len(all_reviewers)}")
@@ -253,8 +376,8 @@ This setup is required only once per server."""
             try:
                 # Get reviewer data
                 discord_server_id = str(interaction.guild.id)
-                reviewer_data = get_document('pr_config', 'reviewers', discord_server_id)
-                contributor_data = get_document('repo_stats', 'contributor_summary', discord_server_id)
+                reviewer_data = await asyncio.to_thread(get_document, 'pr_config', 'reviewers', discord_server_id)
+                contributor_data = await asyncio.to_thread(get_document, 'repo_stats', 'contributor_summary', discord_server_id)
                 
                 embed = discord.Embed(
                     title="PR Reviewer Pool Status",

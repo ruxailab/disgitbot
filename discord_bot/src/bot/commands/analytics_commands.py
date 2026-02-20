@@ -4,6 +4,7 @@ Analytics Commands Module
 Handles analytics and visualization-related Discord commands.
 """
 
+import asyncio
 import discord
 from discord import app_commands
 from ...utils.analytics import create_top_contributors_chart, create_activity_comparison_chart, create_activity_trend_chart, create_time_series_chart
@@ -24,19 +25,20 @@ class AnalyticsCommands:
     
     def _show_top_contributors_command(self):
         """Create the show-top-contributors command."""
+        @app_commands.guild_only()
         @app_commands.command(name="show-top-contributors", description="Show top contributors chart")
         async def show_top_contributors(interaction: discord.Interaction):
             await interaction.response.defer()
             
             try:
                 discord_server_id = str(interaction.guild.id)
-                analytics_data = get_document('repo_stats', 'analytics', discord_server_id)
+                analytics_data = await asyncio.to_thread(get_document, 'repo_stats', 'analytics', discord_server_id)
                 
                 if not analytics_data:
                     await interaction.followup.send("No analytics data available for analysis.", ephemeral=True)
                     return
                 
-                chart_buffer = create_top_contributors_chart(analytics_data, 'prs', "Top Contributors by PRs")
+                chart_buffer = await asyncio.to_thread(create_top_contributors_chart, analytics_data, 'prs', "Top Contributors by PRs")
                 
                 if not chart_buffer:
                     await interaction.followup.send("No data available to generate chart.", ephemeral=True)
@@ -53,19 +55,20 @@ class AnalyticsCommands:
     
     def _show_activity_comparison_command(self):
         """Create the show-activity-comparison command."""
+        @app_commands.guild_only()
         @app_commands.command(name="show-activity-comparison", description="Show activity comparison chart")
         async def show_activity_comparison(interaction: discord.Interaction):
             await interaction.response.defer()
             
             try:
                 discord_server_id = str(interaction.guild.id)
-                analytics_data = get_document('repo_stats', 'analytics', discord_server_id)
+                analytics_data = await asyncio.to_thread(get_document, 'repo_stats', 'analytics', discord_server_id)
                 
                 if not analytics_data:
                     await interaction.followup.send("No analytics data available for analysis.", ephemeral=True)
                     return
                 
-                chart_buffer = create_activity_comparison_chart(analytics_data, "Activity Comparison")
+                chart_buffer = await asyncio.to_thread(create_activity_comparison_chart, analytics_data, "Activity Comparison")
                 
                 if not chart_buffer:
                     await interaction.followup.send("No data available to generate chart.", ephemeral=True)
@@ -82,19 +85,20 @@ class AnalyticsCommands:
     
     def _show_activity_trends_command(self):
         """Create the show-activity-trends command."""
+        @app_commands.guild_only()
         @app_commands.command(name="show-activity-trends", description="Show recent activity trends")
         async def show_activity_trends(interaction: discord.Interaction):
             await interaction.response.defer()
             
             try:
                 discord_server_id = str(interaction.guild.id)
-                analytics_data = get_document('repo_stats', 'analytics', discord_server_id)
+                analytics_data = await asyncio.to_thread(get_document, 'repo_stats', 'analytics', discord_server_id)
                 
                 if not analytics_data:
                     await interaction.followup.send("No analytics data available for analysis.", ephemeral=True)
                     return
                 
-                chart_buffer = create_activity_trend_chart(analytics_data, "Recent Activity Trends")
+                chart_buffer = await asyncio.to_thread(create_activity_trend_chart, analytics_data, "Recent Activity Trends")
                 
                 if not chart_buffer:
                     await interaction.followup.send("No data available to generate chart.", ephemeral=True)
@@ -111,6 +115,7 @@ class AnalyticsCommands:
     
     def _show_time_series_command(self):
         """Create the show-time-series command."""
+        @app_commands.guild_only()
         @app_commands.command(name="show-time-series", description="Show time series chart with customizable metrics and date range")
         @app_commands.describe(
             metrics="Comma-separated metrics to display (prs,issues,commits,total)",
@@ -134,13 +139,14 @@ class AnalyticsCommands:
                     return
                 
                 discord_server_id = str(interaction.guild.id)
-                analytics_data = get_document('repo_stats', 'analytics', discord_server_id)
+                analytics_data = await asyncio.to_thread(get_document, 'repo_stats', 'analytics', discord_server_id)
                 
                 if not analytics_data:
                     await interaction.followup.send("No analytics data available for analysis.", ephemeral=True)
                     return
                 
-                chart_buffer = create_time_series_chart(
+                chart_buffer = await asyncio.to_thread(
+                    create_time_series_chart,
                     analytics_data, 
                     metrics=selected_metrics, 
                     days=days,

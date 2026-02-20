@@ -124,14 +124,13 @@ cp discord_bot/config/.env.example discord_bot/config/.env
 
 **Your `.env` file needs these values:**
 - `DISCORD_BOT_TOKEN=` (Discord bot authentication)
-- `GITHUB_TOKEN=` (Github API access)
 - `GITHUB_CLIENT_ID=` (GitHub OAuth app ID)
 - `GITHUB_CLIENT_SECRET=` (GitHub OAuth app secret)
+- `OAUTH_BASE_URL=` (Your Cloud Run URL - set in Step 3)
+- `DISCORD_BOT_CLIENT_ID=` (Discord application ID)
 - `GITHUB_APP_ID=` (GitHub App ID)
 - `GITHUB_APP_PRIVATE_KEY_B64=` (GitHub App private key, base64)
 - `GITHUB_APP_SLUG=` (GitHub App slug)
-- `OAUTH_BASE_URL=` (Your Cloud Run URL - set in Step 4)
-- `REPO_OWNER=` (Owner of the Disgitbot repo that hosts the workflow dispatch. Ex: ruxailab)
 
 **Additional files you need:**
 - `discord_bot/config/credentials.json` (Firebase/Google Cloud credentials)
@@ -139,9 +138,7 @@ cp discord_bot/config/.env.example discord_bot/config/.env
 **GitHub repository secrets you need to configure:**
 Go to your GitHub repository → Settings → Secrets and variables → Actions → Click "New repository secret" for each:
 - `DISCORD_BOT_TOKEN`
-- `GH_TOKEN`
 - `GOOGLE_CREDENTIALS_JSON`
-- `REPO_OWNER`
 - `CLOUD_RUN_URL`
 - `GH_APP_ID`
 - `GH_APP_PRIVATE_KEY_B64`
@@ -150,7 +147,6 @@ If you plan to run GitHub Actions from branches other than `main`, also add the 
 - `DEV_GOOGLE_CREDENTIALS_JSON`
 - `DEV_CLOUD_RUN_URL`
 
-> The workflows only reference `GH_TOKEN`, so you can reuse the same PAT for all branches.
 
 ---
 
@@ -250,25 +246,7 @@ If you plan to run GitHub Actions from branches other than `main`, also add the 
    - **Add to GitHub Secrets:** Create secret named `GOOGLE_CREDENTIALS_JSON` with the base64 string
    - *(Do this for non-main branches)* Create another secret named `DEV_GOOGLE_CREDENTIALS_JSON` with the same base64 string so development branches can run GitHub Actions.
 
-### Step 3: Get GITHUB_TOKEN (.env) + GH_TOKEN (GitHub Secret)
-
-**What this configures:** 
-- `.env` file: `GITHUB_TOKEN=your_token_here`
-- GitHub Secret: `GH_TOKEN`
-
-**What this does:** Allows the bot to access dispatch the Github Actions Workflow
-
-1. **Go to GitHub Token Settings:** https://github.com/settings/tokens
-2. **Create New Token:**
-   - Click "Generate new token" → "Generate new token (classic)"
-3. **Set Permissions:**
-   - Check only: [x] `repo` (this gives full repository access)
-4. **Generate and Save:**
-   - Click "Generate token" → Copy the token
-   - **Add to `.env`:** `GITHUB_TOKEN=your_token_here`
-   - **Add to GitHub Secrets:** Create secret named `GH_TOKEN`
-
-### Step 4: Get Cloud Run URL (Placeholder Deployment)
+### Step 3: Get Cloud Run URL (Placeholder Deployment)
 
 **What this configures:** 
 - `.env` file: `OAUTH_BASE_URL=YOUR_CLOUD_RUN_URL` 
@@ -305,7 +283,7 @@ If you plan to run GitHub Actions from branches other than `main`, also add the 
    - **Example:** `https://discord-bot-abcd1234-uc.a.run.app/setup`
    - Click **Save Changes**
 
-### Step 5: Get GITHUB_CLIENT_ID (.env) + GITHUB_CLIENT_SECRET (.env)
+### Step 4: Get GITHUB_CLIENT_ID (.env) + GITHUB_CLIENT_SECRET (.env)
 
 **What this configures:** 
 - `.env` file: `GITHUB_CLIENT_ID=your_client_id`
@@ -318,7 +296,7 @@ If you plan to run GitHub Actions from branches other than `main`, also add the 
    - Click "New OAuth App"
 3. **Fill in Application Details:**
    - **Application name:** `Your Bot Name` (anything you want)
-   - **Homepage URL:** `YOUR_CLOUD_RUN_URL` (from Step 4)
+   - **Homepage URL:** `YOUR_CLOUD_RUN_URL` (from Step 3)
    - **Authorization callback URL:** `YOUR_CLOUD_RUN_URL/login/github/authorized`
    
    **Example URLs:** If your Cloud Run URL is `https://discord-bot-abcd1234-uc.a.run.app`, then:
@@ -331,7 +309,7 @@ If you plan to run GitHub Actions from branches other than `main`, also add the 
    - Copy the "Client ID" → **Add to `.env`:** `GITHUB_CLIENT_ID=your_client_id`
    - Click "Generate a new client secret" → Copy it → **Add to `.env`:** `GITHUB_CLIENT_SECRET=your_secret`
 
-### Step 5b: Create GitHub App (GITHUB_APP_ID / PRIVATE_KEY / SLUG)
+### Step 5: Create GitHub App (GITHUB_APP_ID / PRIVATE_KEY / SLUG)
 
 **What this configures:**
 - `.env` file: `GITHUB_APP_ID=...`, `GITHUB_APP_PRIVATE_KEY_B64=...`, `GITHUB_APP_SLUG=...`
@@ -368,21 +346,6 @@ If you plan to run GitHub Actions from branches other than `main`, also add the 
 
 **Security note:** Never commit the private key or base64 value to git. Treat it like a password.
 
-### Step 6: Get REPO_OWNER (.env) + REPO_OWNER (GitHub Secret)
-
-**What this configures:** 
-- `.env` file: `REPO_OWNER=your_org_name`
-- GitHub Secret: `REPO_OWNER`
-
-**What this does:** Tells the bot which Disgitbot repo owns the GitHub Actions workflow (used for workflow dispatch). The org you track comes from GitHub App installation during `/setup`.
-
-1. **Find the Disgitbot repo owner:**
-   - Example repo: `https://github.com/ruxailab/disgitbot`
-   - The owner is the first path segment (`ruxailab`)
-2. **Set in Configuration:**
-   - **Add to `.env`:** `REPO_OWNER=your_repo_owner` (example: `REPO_OWNER=ruxailab`)
-   - **Add to GitHub Secrets:** Create secret named `REPO_OWNER` with the same value
-   - **Important:** Use ONLY the organization name, NOT the full URL
 
 ---
 
@@ -770,7 +733,6 @@ async def link(interaction: discord.Interaction):
 # Check required environment variables
 required_vars = [
     "DISCORD_BOT_TOKEN", 
-    "GITHUB_TOKEN", 
     "GITHUB_CLIENT_ID", 
     "GITHUB_CLIENT_SECRET",
     "OAUTH_BASE_URL"      # ← This is your Cloud Run URL

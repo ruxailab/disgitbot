@@ -7,7 +7,11 @@ import logging
 import json
 from typing import Dict, Any, List
 import google.generativeai as genai
-from config import GOOGLE_API_KEY
+
+try:
+    from pr_review.config import GOOGLE_API_KEY
+except ImportError:
+    from config import GOOGLE_API_KEY
 
 logger = logging.getLogger(__name__)
 

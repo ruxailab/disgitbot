@@ -74,7 +74,7 @@ class GitHubAppService:
             return None
 
     def get_installation_access_token(self, installation_id: int) -> Optional[str]:
-        """Create a short-lived installation access token."""
+        """Create a short-lived installation access_token."""
         try:
             url = f"{self.api_url}/app/installations/{installation_id}/access_tokens"
             resp = requests.post(url, headers=self._app_headers(), json={}, timeout=30)
@@ -86,4 +86,25 @@ class GitHubAppService:
         except Exception as e:
             print(f"Error creating access token for installation {installation_id}: {e}")
             return None
+
+    def find_installation_id(self, account_name: str) -> Optional[int]:
+        """Find installation ID for a specific account name (org or user)."""
+        for inst in self.list_installations():
+            if inst.get('account', {}).get('login') == account_name:
+                return inst.get('id')
+        return None
+
+    def list_installations(self) -> list:
+        """Return all current installations of this GitHub App."""
+        try:
+            url = f"{self.api_url}/app/installations"
+            params = {"per_page": 100}
+            resp = requests.get(url, headers=self._app_headers(), params=params, timeout=30)
+            if resp.status_code != 200:
+                print(f"Failed to list installations: {resp.status_code} {resp.text[:200]}")
+                return []
+            return resp.json()
+        except Exception as e:
+            print(f"Error listing installations: {e}")
+            return []
 

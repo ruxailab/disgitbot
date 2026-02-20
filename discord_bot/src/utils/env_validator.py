@@ -35,11 +35,6 @@ FIELD_CONFIG = {
         'required': True,
         'description': 'Discord bot token for authentication'
     },
-    'GITHUB_TOKEN': {
-        'required': False,
-        'warning_if_empty': 'GITHUB_TOKEN is optional when using a GitHub App; required only for legacy PAT-based features like workflow dispatch.',
-        'description': 'GitHub personal access token for legacy API access'
-    },
     'GITHUB_CLIENT_ID': {
         'required': True,
         'description': 'GitHub OAuth application client ID'
@@ -48,33 +43,44 @@ FIELD_CONFIG = {
         'required': True,
         'description': 'GitHub OAuth application client secret'
     },
-    'REPO_OWNER': {
-        'required': True,
-        'description': 'GitHub repository owner/organization name'
-    },
     'OAUTH_BASE_URL': {
-        'required': False,
-        'warning_if_empty': "OAUTH_BASE_URL is empty - if you're deploying to get an initial URL, this is OK. You can update it later after deployment.",
-        'description': 'Base URL for OAuth redirects (auto-detected on Cloud Run if empty)'
+        'required': True,
+        'description': 'Base URL for OAuth redirects (your Cloud Run URL)'
     },
     'DISCORD_BOT_CLIENT_ID': {
         'required': True,
         'description': 'Discord application ID (client ID)'
     },
     'GITHUB_APP_ID': {
-        'required': False,
-        'warning_if_empty': 'GITHUB_APP_ID is optional for legacy OAuth/PAT mode; required for the invite-only GitHub App installation flow.',
-        'description': 'GitHub App ID (for GitHub App auth)'
+        'required': True,
+        'description': 'GitHub App ID (required for SaaS mode)'
     },
     'GITHUB_APP_PRIVATE_KEY_B64': {
-        'required': False,
-        'warning_if_empty': 'GITHUB_APP_PRIVATE_KEY_B64 is required for GitHub App auth unless GITHUB_APP_PRIVATE_KEY is provided.',
+        'required': True,
         'description': 'Base64-encoded GitHub App private key PEM'
     },
     'GITHUB_APP_SLUG': {
-        'required': False,
-        'warning_if_empty': 'GITHUB_APP_SLUG is required to generate the GitHub App install URL in /setup.',
+        'required': True,
         'description': 'GitHub App slug (the /apps/<slug> part)'
+    },
+    'SECRET_KEY': {
+        'required': True,
+        'description': 'Flask session signing secret key (generate with: python3 -c "import secrets; print(secrets.token_hex(32))")'
+    },
+    'REPO_OWNER': {
+        'required': False,
+        'description': 'GitHub account/org that owns the disgitbot repo and has the GitHub App installed with Actions (read & write). Required for /sync to work. Defaults to ruxailab if not set.',
+        'warning_if_empty': 'REPO_OWNER is empty — defaulting to ruxailab. Set this if your pipeline repo lives under a different org/user.'
+    },
+    'REPO_NAME': {
+        'required': False,
+        'description': 'Repository name hosting the pipeline workflow. Defaults to disgitbot.',
+        'warning_if_empty': 'REPO_NAME is empty — defaulting to disgitbot. Set this if your repo has a different name.'
+    },
+    'WORKFLOW_REF': {
+        'required': False,
+        'description': 'Branch or tag to dispatch the pipeline workflow on. Defaults to main.',
+        'warning_if_empty': 'WORKFLOW_REF is empty — defaulting to main. Set this if your active branch is not main (e.g. feature/saas-ready during testing).'
     }
 }
 
@@ -206,23 +212,18 @@ def validate_env_strict(env_example_path: str, env_path: str) -> dict:
             result['errors'].append(f"Failed to read .env: {e}")
             return result
         
-        # 1. CHECK LINE COUNT MATCHES EXACTLY
-        if len(example_lines) != len(env_lines):
+        # 1. CHECK LINE COUNT
+        # Extra lines beyond .env.example are always an error.
+        # Fewer lines are allowed — optional vars at the end can be omitted;
+        # FIELD_CONFIG handles missing optional fields as warnings below.
+        if len(env_lines) > len(example_lines):
+            extra_count = len(env_lines) - len(example_lines)
             result['format_errors'].append(
-                f"Line count mismatch: expected {len(example_lines)} lines, found {len(env_lines)} lines"
+                f"Line count mismatch: expected at most {len(example_lines)} lines, found {len(env_lines)} lines"
             )
-            
-            # Show which lines are extra/missing
-            if len(env_lines) > len(example_lines):
-                extra_count = len(env_lines) - len(example_lines)
-                result['format_errors'].append(
-                    f"Found {extra_count} extra line(s) at the end (lines {len(example_lines)+1}-{len(env_lines)})"
-                )
-            else:
-                missing_count = len(example_lines) - len(env_lines)
-                result['format_errors'].append(
-                    f"Missing {missing_count} line(s) at the end"
-                )
+            result['format_errors'].append(
+                f"Found {extra_count} extra line(s) at the end (lines {len(example_lines)+1}-{len(env_lines)})"
+            )
         
         # 2. FOR EACH LINE: COMPARE VARIABLE NAMES (left of =) ONLY
         max_lines = min(len(example_lines), len(env_lines))  # Only compare existing lines
@@ -279,8 +280,8 @@ def validate_env_strict(env_example_path: str, env_path: str) -> dict:
             if env_data.get('format_issues'):
                 result['format_errors'].extend(env_data['format_issues'])
             
-            # Only validate field requirements if structure matches
-            if len(example_lines) == len(env_lines) and len(result['line_mismatches']) == 0:
+            # Only validate field requirements if structure matches (no extra lines, no key mismatches)
+            if len(env_lines) <= len(example_lines) and len(result['line_mismatches']) == 0:
                 # Check all configured fields based on their requirements
                 for field_name, field_config in FIELD_CONFIG.items():
                     is_required = field_config.get('required', True)

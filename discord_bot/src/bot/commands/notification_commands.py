@@ -4,11 +4,13 @@ Notification Commands Module
 Handles Discord commands for managing GitHub to Discord notifications.
 """
 
+import asyncio
 import discord
 from discord import app_commands
 from typing import Literal
 import re
 from src.services.notification_service import WebhookManager
+from shared.firestore import get_mt_client
 
 class NotificationCommands:
     """Handles notification management Discord commands."""
@@ -18,56 +20,17 @@ class NotificationCommands:
     
     def register_commands(self):
         """Register all notification commands with the bot."""
-        self.bot.tree.add_command(self._set_webhook_command())
-        self.bot.tree.add_command(self._add_repo_command())
-        self.bot.tree.add_command(self._remove_repo_command())
-        self.bot.tree.add_command(self._list_repos_command())
-        self.bot.tree.add_command(self._webhook_status_command())
+        # CI/CD monitoring commands disabled - webhook handler inactive
+        # To re-enable: uncomment below and re-enable /github/webhook handler in auth.py
+        # self.bot.tree.add_command(self._add_repo_command())
+        # self.bot.tree.add_command(self._remove_repo_command())
+        # self.bot.tree.add_command(self._list_repos_command())
+        # PR automation commands disabled - keeping code for future re-enablement
+        # self.bot.tree.add_command(self._webhook_status_command())
+        pass
     
-    def _set_webhook_command(self):
-        """Create the set_webhook command."""
-        @app_commands.command(name="set_webhook", description="Set Discord webhook URL for notifications")
-        @app_commands.describe(
-            notification_type="Type of notifications",
-            webhook_url="Discord webhook URL"
-        )
-        async def set_webhook(
-            interaction: discord.Interaction, 
-            notification_type: Literal["pr_automation", "cicd"],
-            webhook_url: str
-        ):
-            await interaction.response.defer(ephemeral=True)
-            
-            try:
-                # Validate webhook URL format
-                if not self._is_valid_webhook_url(webhook_url):
-                    await interaction.followup.send(
-                        "Invalid webhook URL format. Please provide a valid Discord webhook URL.",
-                        ephemeral=True
-                    )
-                    return
-                
-                # Set the webhook URL
-                success = WebhookManager.set_webhook_url(notification_type, webhook_url)
-                
-                if success:
-                    await interaction.followup.send(
-                        f"Successfully configured {notification_type} webhook URL.",
-                        ephemeral=True
-                    )
-                else:
-                    await interaction.followup.send(
-                        "Failed to save webhook configuration. Please try again.",
-                        ephemeral=True
-                    )
-                    
-            except Exception as e:
-                await interaction.followup.send(f"Error setting webhook: {str(e)}", ephemeral=True)
-                print(f"Error in set_webhook: {e}")
-                import traceback
-                traceback.print_exc()
-        
-        return set_webhook
+    # /set_webhook command removed - PR automation feature disabled
+    # To re-enable, restore the _set_webhook_command method and register it above
     
     def _add_repo_command(self):
         """Create the add_repo command."""
@@ -84,8 +47,32 @@ class NotificationCommands:
                     )
                     return
                 
+                # Validate repo belongs to the configured GitHub org
+                repo_owner = repository.split('/')[0]
+                mt_client = get_mt_client()
+                github_org = await asyncio.to_thread(
+                    mt_client.get_org_from_server,
+                    str(interaction.guild_id)
+                )
+                if not github_org:
+                    await interaction.followup.send(
+                        "This server hasn't been set up yet. Run `/setup` first to connect a GitHub organization."
+                    )
+                    return
+                if repo_owner.lower() != github_org.lower():
+                    await interaction.followup.send(
+                        f"You can only monitor repositories within your configured organization **{github_org}**.\n"
+                        f"The repository `{repository}` belongs to `{repo_owner}`, not `{github_org}`.\n\n"
+                        f"Use the format: `{github_org}/repo-name`"
+                    )
+                    return
+                
                 # Add repository to monitoring list
-                success = WebhookManager.add_monitored_repository(repository)
+                success = await asyncio.to_thread(
+                    WebhookManager.add_monitored_repository,
+                    repository, 
+                    discord_server_id=str(interaction.guild_id)
+                )
                 
                 if success:
                     await interaction.followup.send(
@@ -120,8 +107,31 @@ class NotificationCommands:
                     )
                     return
                 
+                # Validate repo belongs to the configured GitHub org
+                repo_owner = repository.split('/')[0]
+                mt_client = get_mt_client()
+                github_org = await asyncio.to_thread(
+                    mt_client.get_org_from_server,
+                    str(interaction.guild_id)
+                )
+                if not github_org:
+                    await interaction.followup.send(
+                        "This server hasn't been set up yet. Run `/setup` first to connect a GitHub organization."
+                    )
+                    return
+                if repo_owner.lower() != github_org.lower():
+                    await interaction.followup.send(
+                        f"You can only manage repositories within your configured organization **{github_org}**.\n"
+                        f"The repository `{repository}` belongs to `{repo_owner}`, not `{github_org}`."
+                    )
+                    return
+                
                 # Remove repository from monitoring list
-                success = WebhookManager.remove_monitored_repository(repository)
+                success = await asyncio.to_thread(
+                    WebhookManager.remove_monitored_repository,
+                    repository,
+                    discord_server_id=str(interaction.guild_id)
+                )
                 
                 if success:
                     await interaction.followup.send(
@@ -148,7 +158,10 @@ class NotificationCommands:
             await interaction.response.defer()
             
             try:
-                repositories = WebhookManager.get_monitored_repositories()
+                repositories = await asyncio.to_thread(
+                    WebhookManager.get_monitored_repositories,
+                    discord_server_id=str(interaction.guild_id)
+                )
                 
                 embed = discord.Embed(
                     title="CI/CD Monitoring Status",
@@ -194,15 +207,29 @@ class NotificationCommands:
             try:
                 from shared.firestore import get_document
                 
-                webhook_config = get_document('notification_config', 'webhooks')
+                webhook_config = await asyncio.to_thread(
+                    get_document,
+                    'pr_config', 
+                    'webhooks', 
+                    discord_server_id=str(interaction.guild_id)
+                )
                 
                 embed = discord.Embed(
                     title="Webhook Configuration Status",
                     color=discord.Color.blue()
                 )
                 
-                # Check PR automation webhook
-                pr_webhook = webhook_config.get('pr_automation_webhook_url') if webhook_config else None
+                # New logic: Look in the webhooks list for this specific server
+                webhooks_list = webhook_config.get('webhooks', []) if webhook_config else []
+                
+                # Find PR automation webhook for THIS server
+                pr_webhook_entry = next((w for w in webhooks_list if w.get('type') == 'pr_automation' and w.get('server_id') == str(interaction.guild_id)), None)
+                pr_webhook = None
+                if pr_webhook_entry:
+                    pr_webhook = pr_webhook_entry.get('url')
+                elif webhook_config:
+                    pr_webhook = webhook_config.get('pr_automation_webhook_url')
+                
                 pr_status = "Configured" if pr_webhook else "Not configured"
                 embed.add_field(
                     name="PR Automation Notifications",
@@ -210,8 +237,14 @@ class NotificationCommands:
                     inline=True
                 )
                 
-                # Check CI/CD webhook
-                cicd_webhook = webhook_config.get('cicd_webhook_url') if webhook_config else None
+                # Find CI/CD webhook for THIS server
+                cicd_webhook_entry = next((w for w in webhooks_list if w.get('type') == 'cicd' and w.get('server_id') == str(interaction.guild_id)), None)
+                cicd_webhook = None
+                if cicd_webhook_entry:
+                    cicd_webhook = cicd_webhook_entry.get('url')
+                elif webhook_config:
+                    cicd_webhook = webhook_config.get('cicd_webhook_url')
+                
                 cicd_status = "Configured" if cicd_webhook else "Not configured"
                 embed.add_field(
                     name="CI/CD Notifications",
@@ -219,11 +252,18 @@ class NotificationCommands:
                     inline=True
                 )
                 
-                # Last updated
-                if webhook_config and webhook_config.get('last_updated'):
+                # Last updated - show most recent webhook update for THIS server
+                webhook_updates = []
+                if pr_webhook_entry and pr_webhook_entry.get('last_updated'):
+                    webhook_updates.append(pr_webhook_entry['last_updated'])
+                if cicd_webhook_entry and cicd_webhook_entry.get('last_updated'):
+                    webhook_updates.append(cicd_webhook_entry['last_updated'])
+                
+                if webhook_updates:
+                    latest_update = max(webhook_updates)
                     embed.add_field(
                         name="Last Updated",
-                        value=webhook_config['last_updated'],
+                        value=latest_update,
                         inline=False
                     )
                 
