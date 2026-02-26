@@ -92,36 +92,19 @@ class DiscordBot:
                         system_channel = next((ch for ch in guild.text_channels if ch.permissions_for(guild.me).send_messages), None)
 
                     if system_channel:
-                        base_url = os.getenv("OAUTH_BASE_URL")
-                        from urllib.parse import urlencode
-                        setup_url = f"{base_url}/setup?{urlencode({'guild_id': guild.id, 'guild_name': guild.name})}"
+                        setup_message = """**DisgitBot Added Successfully!** 🎉
 
-                        setup_message = f"""**DisgitBot Added Successfully!**
+A server **admin** needs to run `/setup` to connect this server to a GitHub organization.
 
-This server needs to be configured to track GitHub contributions.
+**After setup, members can use:**
+• `/link` — Connect your GitHub account
+• `/getstats` — View contribution statistics
+• `/halloffame` — Top contributors leaderboard
+• `/configure roles` — Auto-assign roles based on contributions
 
-**Quick Setup (30 seconds):**
-1. Visit: {setup_url}
-2. Install the GitHub App and select repositories
-3. Use `/link` in Discord to connect GitHub accounts
-4. Customize roles with `/configure roles`
-
-**Or use this command:** `/setup`
-
-After setup, try these commands:
-• `/getstats` - View contribution statistics
-• `/halloffame` - Top contributors leaderboard
-• `/link` - Connect your GitHub account
-
-*This message will only appear once during setup.*"""
+*This message will only appear once.*"""
 
                         await system_channel.send(setup_message)
-                        
-                        # Mark reminder as sent
-                        await asyncio.to_thread(mt_client.set_server_config, str(guild.id), {
-                            **server_config,
-                            'setup_reminder_sent_at': datetime.now(timezone.utc).isoformat()
-                        })
                         print(f"Sent setup guidance to server: {guild.name} (ID: {guild.id})")
 
             except Exception as e:

@@ -231,6 +231,11 @@ This setup is required only once per server."""
             await interaction.response.defer(ephemeral=True)
             
             try:
+                # Check if user has administrator permissions
+                if not interaction.user.guild_permissions.administrator:
+                    await interaction.followup.send("Only server administrators can use this command.", ephemeral=True)
+                    return
+
                 guild = interaction.guild
                 assert guild is not None, "Command should only work in guilds"
                 
@@ -265,7 +270,7 @@ This setup is required only once per server."""
                 traceback.print_exc()
         
         return setup_voice_stats
-    
+
     def _add_reviewer_command(self):
         """Create the add_reviewer command."""
         @app_commands.command(name="add_reviewer", description="Add a GitHub username to the PR reviewer pool")

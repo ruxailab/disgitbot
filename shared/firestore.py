@@ -94,6 +94,87 @@ class FirestoreMultiTenant:
         server_config = self.get_server_config(discord_server_id)
         return server_config.get('github_org') if server_config else None
 
+    def set_pending_setup(self, guild_id: str, guild_name: str) -> bool:
+        """Store a short-lived pending setup record before GitHub redirect.
+        
+        This lets /github/app/setup recover the guild_id when GitHub drops the
+        state param (e.g. app already installed, setup_action=update).
+        """
+        from datetime import datetime, timezone
+        try:
+            self.db.collection('pending_setups').document(str(guild_id)).set({
+                'guild_id': str(guild_id),
+                'guild_name': guild_name,
+                'initiated_at': datetime.now(timezone.utc).isoformat(),
+            })
+            return True
+        except Exception as e:
+            print(f"Error storing pending setup for guild {guild_id}: {e}")
+            return False
+
+    def pop_recent_pending_setup(self, max_age_seconds: int = 600) -> Optional[Dict[str, Any]]:
+        """Return and delete the most recent pending setup within max_age_seconds.
+
+        Returns None if no recent pending setup exists.
+        ISO 8601 strings sort lexicographically, so >= on the cutoff string works.
+        """
+        from datetime import datetime, timezone, timedelta
+        try:
+            cutoff = (datetime.now(timezone.utc) - timedelta(seconds=max_age_seconds)).isoformat()
+            docs = list(
+                self.db.collection('pending_setups')
+                .where('initiated_at', '>=', cutoff)
+                .order_by('initiated_at', direction=firestore.Query.DESCENDING)
+                .limit(1)
+                .stream()
+            )
+            if not docs:
+                return None
+            data = docs[0].to_dict()
+            docs[0].reference.delete()
+            return data
+        except Exception as e:
+            print(f"Error popping recent pending setup: {e}")
+            return None
+
+    def find_guild_by_installation_id(self, installation_id: int) -> Optional[str]:
+        """Return the Discord guild_id that has the given GitHub App installation_id, or None."""
+        try:
+            docs = list(
+                self.db.collection('discord_servers')
+                .where('github_installation_id', '==', installation_id)
+                .limit(1)
+                .stream()
+            )
+            return docs[0].id if docs else None
+        except Exception as e:
+            print(f"Error finding guild by installation_id {installation_id}: {e}")
+            return None
+
+    def complete_setup_atomically(self, guild_id: str, config: Dict[str, Any]) -> bool:
+        """Atomically complete setup — returns True only for the FIRST caller.
+
+        Uses a Firestore transaction to read setup_completed and write config
+        in one atomic operation.  If two GitHub callbacks race, only one wins.
+        """
+        doc_ref = self.db.collection('discord_servers').document(str(guild_id))
+
+        @firestore.transactional
+        def _txn(transaction):
+            snapshot = doc_ref.get(transaction=transaction)
+            existing = snapshot.to_dict() if snapshot.exists else {}
+            if existing.get('setup_completed'):
+                return False  # already completed by a racing request
+            transaction.set(doc_ref, {**existing, **config})
+            return True
+
+        try:
+            transaction = self.db.transaction()
+            return _txn(transaction)
+        except Exception as e:
+            print(f"Error in atomic setup for guild {guild_id}: {e}")
+            return False
+
 def _get_credentials_path() -> str:
     """Get the path to Firebase credentials file.
     

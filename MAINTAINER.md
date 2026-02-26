@@ -16,7 +16,7 @@ This document explains how to manage the environment variables and how to re-ena
 | Scenario | Steps | Approval needed? |
 |---|---|---|
 | **Owner/Admin runs `/setup`** | `/setup` → click link → Install on GitHub → done | No (owner installs directly) |
-| **Member runs `/setup`** | `/setup` → click link → "Request" on GitHub → owner approves from GitHub notification → owner runs `/setup` in Discord | Yes (first time only) |
+| **Member runs `/setup`** | `/setup` → click link → "Request" on GitHub → owner approves from GitHub notification → an admin or the owner runs `/setup` in Discord | Yes (first time only) |
 | **Second Discord server, same org** | Anyone runs `/setup` → click link → app already installed → done | No (already installed) |
 
 ### Key Points

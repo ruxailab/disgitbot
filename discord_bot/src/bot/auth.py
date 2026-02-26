@@ -919,6 +919,15 @@ def create_oauth_app():
 
         state = state_serializer.dumps({'guild_id': str(guild_id), 'guild_name': guild_name})
         install_url = f"https://github.com/apps/{app_slug}/installations/new?state={state}"
+
+        # Store pending setup so /github/app/setup can recover guild_id if GitHub
+        # drops the state param (app already installed → setup_action=update flow).
+        try:
+            from shared.firestore import get_mt_client as _get_mt
+            _get_mt().set_pending_setup(str(guild_id), guild_name)
+        except Exception as _e:
+            print(f"Warning: could not store pending setup for guild {guild_id}: {_e}")
+
         return redirect(install_url)
 
     @app.route("/github/app/setup")
@@ -926,7 +935,7 @@ def create_oauth_app():
         """GitHub App 'Setup URL' callback: stores installation ID for a Discord server."""
         from flask import request, render_template_string
         from shared.firestore import get_mt_client
-        from datetime import datetime, timedelta
+        from datetime import datetime, timedelta, timezone
         from src.services.github_app_service import GitHubAppService
 
         installation_id = request.args.get('installation_id')
@@ -934,27 +943,114 @@ def create_oauth_app():
         state = request.args.get('state', '')
 
         # --- CASE 1: No state parameter ---
-        # This happens when an org owner approves a request from GitHub directly.
-        # GitHub redirects the owner to the Setup URL WITHOUT state, because state
-        # was generated in the non-owner's session.
+        # GitHub drops state in two situations:
+        #   (a) Org owner approves a request from the GitHub notification email
+        #   (b) App was already installed → GitHub redirects to settings page →
+        #       user adds/removes repos → clicks Save → setup_action=update, no state
+        # Fix: before redirecting to GitHub we store a pending_setup record in
+        # Firestore.  Here we try to recover guild_id from that record and complete
+        # setup directly, avoiding an infinite "run /setup again" loop.
         if not state:
             if installation_id:
-                # Owner approved the installation from GitHub.
-                # Tell them to run /setup in Discord to complete the link.
                 gh_app = GitHubAppService()
                 installation = gh_app.get_installation(int(installation_id))
-                github_org = ''
-                if installation:
-                    account = installation.get('account') or {}
-                    github_org = account.get('login', '')
+                account = (installation.get('account') or {}) if installation else {}
+                github_org = account.get('login', '')
+                github_account_type = account.get('type', '')
 
+                mt_client = get_mt_client()
+
+                # --- SUB-CASE A: installation already linked to a guild ---
+                existing_guild_id = mt_client.find_guild_by_installation_id(int(installation_id))
+                if existing_guild_id:
+                    if setup_action == 'update':
+                        # User updated repo access on an existing installation — nothing to do
+                        discord_url = f"https://discord.com/channels/{existing_guild_id}"
+                        return render_status_page(
+                            title="Repository Access Updated",
+                            subtitle=f"<strong>DisgitBot</strong>'s repository access on <strong>{github_org}</strong> has been updated." if github_org else "<strong>DisgitBot</strong>'s repository access has been updated.",
+                            icon_type="success",
+                            instructions=[
+                                "Your Discord server is still connected — no further action needed.",
+                                "Run <code>/sync</code> to refresh stats with the updated repository list.",
+                            ],
+                            button_text="Open Discord",
+                            button_url=discord_url
+                        )
+                    # Already linked, no update action — just confirm
+                    discord_url = f"https://discord.com/channels/{existing_guild_id}"
+                    return render_status_page(
+                        title="Already Connected",
+                        subtitle=f"<strong>DisgitBot</strong> is already connected to <strong>{github_org}</strong>.",
+                        icon_type="success",
+                        instructions=["Your Discord server is already set up. No further action needed."],
+                        button_text="Open Discord",
+                        button_url=discord_url
+                    )
+
+                # --- SUB-CASE B: not yet linked — check for recent pending setup ---
+                pending = mt_client.pop_recent_pending_setup(max_age_seconds=600)
+                if pending:
+                    guild_id = str(pending['guild_id'])
+                    guild_name = pending.get('guild_name', 'your server')
+
+                    if not installation:
+                        # Couldn't verify with GitHub — restore the record so user can retry
+                        mt_client.set_pending_setup(guild_id, guild_name)
+                        return render_status_page(
+                            title="Installation Not Found",
+                            subtitle="We couldn't verify the GitHub installation. Please try again.",
+                            icon_type="error",
+                            button_text="Try Again",
+                            button_url="https://discord.com/app"
+                        ), 500
+
+                    save_ok = mt_client.complete_setup_atomically(guild_id, {
+                        'github_org': github_org,
+                        'github_installation_id': int(installation_id),
+                        'github_account': account.get('login'),
+                        'github_account_type': github_account_type,
+                        'setup_source': 'github_app',
+                        'created_at': datetime.now(timezone.utc).isoformat(),
+                        'setup_completed': True,
+                    })
+                    if not save_ok:
+                        # Transaction returned False — a racing request already completed setup
+                        discord_url = f"https://discord.com/channels/{guild_id}"
+                        return render_status_page(
+                            title="Already Connected",
+                            subtitle=f"<strong>{guild_name}</strong> has already been set up.",
+                            icon_type="success",
+                            instructions=["No further action needed."],
+                            button_text="Open Discord",
+                            button_url=discord_url
+                        )
+
+                    trigger_initial_sync(guild_id, github_org, int(installation_id))
+                    notify_setup_complete(guild_id, github_org)
+
+                    discord_url = f"https://discord.com/channels/{guild_id}"
+                    return render_status_page(
+                        title="Setup Complete!",
+                        subtitle=f"<strong>{guild_name}</strong> is now connected to <strong>{github_org}</strong>.",
+                        icon_type="success",
+                        instructions=[
+                            "Your Discord server is now connected to GitHub.",
+                            "Users can run <code>/link</code> to connect their accounts.",
+                            "Stats will be ready in 5–10 minutes.",
+                        ],
+                        button_text="Open Discord",
+                        button_url=discord_url
+                    )
+
+                # --- SUB-CASE C: no pending setup found (owner approved from email etc.) ---
                 return render_status_page(
                     title="Installation Approved!",
                     subtitle=f"<strong>DisgitBot</strong> has been installed on <strong>{github_org}</strong>." if github_org else "<strong>DisgitBot</strong> has been installed successfully.",
                     icon_type="success",
                     instructions=[
                         "Go back to your Discord server.",
-                        "Run <code>/setup</code> to link this GitHub installation to your server.",
+                        "An admin or the server owner should run <code>/setup</code> to link this GitHub installation to your server.",
                     ],
                     button_text="Open Discord",
                     button_url="https://discord.com/app"
@@ -1073,8 +1169,24 @@ def create_oauth_app():
 
         mt_client = get_mt_client()
         existing_config = mt_client.get_server_config(guild_id) or {}
-        success = mt_client.set_server_config(guild_id, {
-            **existing_config,
+
+        # --- Guard: prevent override if already set up with a DIFFERENT installation ---
+        existing_install_id = existing_config.get('github_installation_id')
+        if existing_config.get('setup_completed') and existing_install_id and existing_install_id != int(installation_id):
+            existing_org = existing_config.get('github_org', 'a GitHub account')
+            return render_status_page(
+                title="Server Already Set Up",
+                subtitle=f"This Discord server is already connected to <strong>{existing_org}</strong>. The existing setup was not changed.",
+                icon_type="warning",
+                instructions=[
+                    "If you intended to reconfigure, please contact the server admin.",
+                    "Only the server admin can reset and reconnect to a different GitHub organization.",
+                ],
+                button_text="Open Discord",
+                button_url=f"https://discord.com/channels/{guild_id}"
+            ), 403
+
+        success = mt_client.complete_setup_atomically(guild_id, {
             'github_org': github_org,
             'github_installation_id': int(installation_id),
             'github_account': github_account,
@@ -1085,13 +1197,16 @@ def create_oauth_app():
         })
 
         if not success:
+            # Transaction returned False — a racing request already completed setup
+            discord_url = f"https://discord.com/channels/{guild_id}"
             return render_status_page(
-                title="Storage Error",
-                subtitle="We couldn't save your server configuration to our database. Please try again in a few moments.",
-                icon_type="error"
-            ), 500
-
-
+                title="Already Connected",
+                subtitle=f"<strong>{guild_name}</strong> has already been set up.",
+                icon_type="success",
+                instructions=["No further action needed."],
+                button_text="Open Discord",
+                button_url=discord_url
+            )
 
         # Trigger initial sync and Discord notification
         sync_triggered = trigger_initial_sync(guild_id, github_org, int(installation_id))
@@ -1300,6 +1415,24 @@ def create_oauth_app():
                 button_url="https://discord.com/app"
             ), 400
 
+        # --- Guard: block re-setup if guild is already fully configured ---
+        from shared.firestore import get_mt_client as _setup_mt
+        _existing = _setup_mt().get_server_config(guild_id) or {}
+        if _existing.get('setup_completed'):
+            discord_url = f"https://discord.com/channels/{guild_id}"
+            existing_org = _existing.get('github_org', 'GitHub')
+            return render_status_page(
+                title="Server Already Set Up",
+                subtitle=f"This Discord server is already connected to <strong>{existing_org}</strong>. Setup cannot be run again from this link.",
+                icon_type="info",
+                instructions=[
+                    "If you need to change the GitHub organization, ask the server admin to run <code>/setup</code> in Discord.",
+                    "To update which repositories are tracked, go to your GitHub App installation settings.",
+                ],
+                button_text="Open Discord",
+                button_url=discord_url
+            ), 400
+
         github_app_install_url = f"{base_url}/github/app/install?{urlencode({'guild_id': guild_id, 'guild_name': guild_name})}"
 
         setup_page = """
@@ -1487,7 +1620,22 @@ def create_oauth_app():
                 button_text="Try Again",
                 button_url=f"https://discord.com/channels/{guild_id}" if guild_id else "https://discord.com/app"
             ), 400
-        
+
+        # --- Guard: block re-setup if guild is already fully configured ---
+        mt_client = get_mt_client()
+        existing_config = mt_client.get_server_config(guild_id) or {}
+        if existing_config.get('setup_completed'):
+            discord_url = f"https://discord.com/channels/{guild_id}"
+            existing_org = existing_config.get('github_org', 'GitHub')
+            return render_status_page(
+                title="Server Already Set Up",
+                subtitle=f"This Discord server is already connected to <strong>{existing_org}</strong>.",
+                icon_type="info",
+                instructions=["Setup cannot be completed again from this route."],
+                button_text="Open Discord",
+                button_url=discord_url
+            ), 400
+
         # Validate GitHub organization name (basic validation)
         if not github_org.replace('-', '').replace('_', '').isalnum():
             return render_status_page(
@@ -1497,10 +1645,8 @@ def create_oauth_app():
                 button_text="Try Again",
                 button_url=f"https://discord.com/channels/{guild_id}"
             ), 400
-        
+
         try:
-            # Store server configuration
-            mt_client = get_mt_client()
             success = mt_client.set_server_config(guild_id, {
                 'github_org': github_org,
                 'setup_source': setup_source,

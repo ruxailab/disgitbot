@@ -317,39 +317,80 @@ jobs:
           
           print(f'Found {len(servers)} registered Discord servers')
           
-          # Update each Discord server with its organization's data
+          # Build all server jobs first, then connect to Discord ONCE
+          server_jobs = []
           for discord_server_id, server_config in servers.items():
             github_org = server_config.get('github_org')
             if not github_org or github_org not in all_processed_data:
               print(f'Skipping server {discord_server_id}: no data for org {github_org}')
               continue
             
-            print(f'Updating Discord server {discord_server_id} with {github_org} data...')
+            print(f'Preparing Discord server {discord_server_id} with {github_org} data...')
             
             org_data = all_processed_data[github_org]
             contributions = org_data['contributions']
             repo_metrics = org_data['repo_metrics']
             
+            # Build case-insensitive lookup for contributions (GitHub usernames are case-insensitive)
+            contributions_lower = {k.lower(): k for k in contributions}
+            print(f'Contributions dict has {len(contributions)} GitHub users: {list(contributions.keys())[:20]}')
+            
             # Get user mappings for this server's organization
-            user_mappings_data = mt_client.db.collection('discord_users').stream()
+            user_mappings_data = list(mt_client.db.collection('discord_users').stream())
             user_mappings = {}
+            auto_repair_count = 0
             for doc in user_mappings_data:
               user_data = doc.to_dict()
               github_id = user_data.get('github_id')
               servers_list = user_data.get('servers', [])
               
-              # Include user if they're in this server and have contributions in this org
-              if github_id and discord_server_id in servers_list and github_id in contributions:
-                user_mappings[doc.id] = github_id
+              if not github_id:
+                continue
+              
+              # Case-insensitive contribution lookup
+              canonical_github_id = contributions_lower.get(github_id.lower())
+              in_server = discord_server_id in servers_list
+              in_contributions = canonical_github_id is not None
+              
+              print(f'  Discord user {doc.id}: github_id={github_id}, servers={servers_list}, in_server={in_server}, in_contributions={in_contributions}')
+              
+              if in_contributions and in_server:
+                user_mappings[doc.id] = canonical_github_id
+              elif in_contributions and not in_server:
+                # Auto-repair: user has contributions for this org but their
+                # servers list is missing this server ID.
+                print(f'  AUTO-REPAIR: Adding server {discord_server_id} to {github_id} servers list (was {servers_list})')
+                servers_list.append(discord_server_id)
+                user_data['servers'] = servers_list
+                try:
+                  mt_client.set_user_mapping(doc.id, user_data)
+                  auto_repair_count += 1
+                except Exception as repair_err:
+                  print(f'  AUTO-REPAIR FAILED for {doc.id}: {repair_err}')
+                user_mappings[doc.id] = canonical_github_id
+              elif not in_contributions:
+                print(f'  SKIP: {github_id} not found in contributions for org {github_org}')
             
+            if auto_repair_count:
+              print(f'Auto-repaired servers list for {auto_repair_count} users')
             print(f'Found {len(user_mappings)} user mappings for server {discord_server_id}')
             
-            # Update Discord roles and channels for this server
-            import asyncio
-            success = asyncio.run(guild_service.update_roles_and_channels(
-              discord_server_id, user_mappings, contributions, repo_metrics
-            ))
-            print(f'Discord updates for server {discord_server_id} completed: {success}')
+            server_jobs.append({
+              'discord_server_id': discord_server_id,
+              'user_mappings': user_mappings,
+              'contributions': contributions,
+              'metrics': repo_metrics,
+            })
+          
+          # Connect to Discord ONCE and update all servers in a single session
+          # (avoids unclosed-connector warnings from repeated connect/disconnect)
+          import asyncio
+          if server_jobs:
+            results = asyncio.run(guild_service.update_multiple_servers(server_jobs))
+            for discord_server_id, success in results.items():
+              print(f'Discord updates for server {discord_server_id} completed: {success}')
+          else:
+            print('No server jobs to process')
           
           print('All Discord server updates completed!')
           "

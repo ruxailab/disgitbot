@@ -184,13 +184,19 @@ class GitHubService:
             'total_count': max(total_count, len(all_items))
         }
     
-    def _paginate_list_results(self, base_url: str, rate_type: str = 'core') -> List[Dict[str, Any]]:
-        """Paginate through all list results (non-search API)."""
+    def _paginate_list_results(self, base_url: str, rate_type: str = 'core', max_pages: int = None) -> List[Dict[str, Any]]:
+        """Paginate through all list results (non-search API).
+        
+        Args:
+            base_url: The API URL to paginate.
+            rate_type: The rate limit bucket ('core' or 'search').
+            max_pages: Optional safety cap on number of pages to fetch.
+        """
         all_items = []
         page = 1
         per_page = 100
         
-        print(f"DEBUG - Starting list pagination for: {base_url}")
+        print(f"DEBUG - Starting list pagination for: {base_url}" + (f" (max_pages={max_pages})" if max_pages else ""))
         
         while True:
             joiner = "&" if "?" in base_url else "?"
@@ -212,6 +218,10 @@ class GitHubService:
             
             if len(items) < per_page:
                 print(f"DEBUG - List pagination complete: {len(all_items)} items collected")
+                break
+            
+            if max_pages and page >= max_pages:
+                print(f"DEBUG - Reached max pages limit ({max_pages}), stopping pagination with {len(all_items)} items")
                 break
             
             page += 1
@@ -307,30 +317,63 @@ class GitHubService:
                 return repos
         return self.fetch_organization_repositories()
     
-    def search_pull_requests(self, owner: str, repo: str) -> Dict[str, Any]:
-        """Search for ALL pull requests in a repository with complete pagination."""
-        pr_url = f"{self.api_url}/search/issues?q=repo:{owner}/{repo}+type:pr+is:merged"
-        print(f"DEBUG - Collecting ALL PRs for {owner}/{repo}")
+    def search_pull_requests(self, owner: str, repo: str, author_filter: str = None) -> Dict[str, Any]:
+        """Search for pull requests in a repository, optionally filtered by author.
+        
+        Args:
+            owner: Repository owner.
+            repo: Repository name.
+            author_filter: If set, only return PRs authored by this GitHub user.
+        """
+        query = f"repo:{owner}/{repo}+type:pr+is:merged"
+        if author_filter:
+            query += f"+author:{author_filter}"
+        pr_url = f"{self.api_url}/search/issues?q={query}"
+        filter_msg = f" (author: {author_filter})" if author_filter else ""
+        print(f"DEBUG - Collecting PRs for {owner}/{repo}{filter_msg}")
         
         results = self._paginate_search_results(pr_url, 'search')
-        print(f"DEBUG - Collected {len(results['items'])} PRs for {owner}/{repo}")
+        print(f"DEBUG - Collected {len(results['items'])} PRs for {owner}/{repo}{filter_msg}")
         
         return results
     
-    def search_issues(self, owner: str, repo: str) -> Dict[str, Any]:
-        """Search for ALL issues in a repository with complete pagination."""
-        issue_url = f"{self.api_url}/search/issues?q=repo:{owner}/{repo}+type:issue"
-        print(f"DEBUG - Collecting ALL issues for {owner}/{repo}")
+    def search_issues(self, owner: str, repo: str, author_filter: str = None) -> Dict[str, Any]:
+        """Search for issues in a repository, optionally filtered by author.
+        
+        Args:
+            owner: Repository owner.
+            repo: Repository name.
+            author_filter: If set, only return issues authored by this GitHub user.
+        """
+        query = f"repo:{owner}/{repo}+type:issue"
+        if author_filter:
+            query += f"+author:{author_filter}"
+        issue_url = f"{self.api_url}/search/issues?q={query}"
+        filter_msg = f" (author: {author_filter})" if author_filter else ""
+        print(f"DEBUG - Collecting issues for {owner}/{repo}{filter_msg}")
         
         results = self._paginate_search_results(issue_url, 'search')
-        print(f"DEBUG - Collected {len(results['items'])} issues for {owner}/{repo}")
+        print(f"DEBUG - Collected {len(results['items'])} issues for {owner}/{repo}{filter_msg}")
         
         return results
     
-    def search_commits(self, owner: str, repo: str) -> Dict[str, Any]:
-        """Get ALL commits for a repository using complete pagination."""
+    def search_commits(self, owner: str, repo: str, author_filter: str = None) -> Dict[str, Any]:
+        """Get commits for a repository, optionally filtered by author.
+        
+        For forked repositories, use author_filter to avoid paginating through
+        the entire upstream commit history (which can be tens of thousands of
+        commits and burn hundreds of API calls).
+        
+        Args:
+            owner: Repository owner.
+            repo: Repository name.
+            author_filter: If set, only return commits by this GitHub user.
+        """
         commits_url = f"{self.api_url}/repos/{owner}/{repo}/commits"
-        print(f"DEBUG - Collecting ALL commits for {owner}/{repo}")
+        if author_filter:
+            commits_url += f"?author={author_filter}"
+        filter_msg = f" (author: {author_filter})" if author_filter else " (all authors)"
+        print(f"DEBUG - Collecting commits for {owner}/{repo}{filter_msg}")
         
         commits_list = self._paginate_list_results(commits_url, 'core')
         
@@ -342,22 +385,68 @@ class GitHubService:
         }
     
     def collect_complete_repository_data(self, owner: str, repo: str) -> Dict[str, Any]:
-        """Collect ALL data for a single repository."""
+        """Collect data for a single repository.
+        
+        Detects forks automatically. For forked repos:
+        - Commits are filtered by the fork owner (avoids paginating upstream history).
+        - PRs/issues are also searched in the parent/upstream repo by the fork owner,
+          since PRs from forks are merged in the upstream, not the fork itself.
+        """
         print(f"DEBUG - Starting complete data collection for {owner}/{repo}")
+        
+        repo_info = self.fetch_repository_data(owner, repo)
+        is_fork = repo_info.get('fork', False)
+        parent_info = repo_info.get('parent', {}) if is_fork else {}
+        
+        if is_fork:
+            parent_owner = parent_info.get('owner', {}).get('login', '?')
+            parent_repo = parent_info.get('name', '?')
+            print(f"DEBUG - {owner}/{repo} is a FORK of {parent_owner}/{parent_repo}")
+            print(f"DEBUG - Filtering contributions by author: {owner}")
+        
+        # For forks: only get the fork owner's commits (not entire upstream history)
+        author_filter = owner if is_fork else None
         
         repo_data = {
             'name': repo,
             'owner': owner,
-            'repo_info': self.fetch_repository_data(owner, repo),
+            'repo_info': repo_info,
             'contributors': self.fetch_contributors(owner, repo),
-            'pull_requests': self.search_pull_requests(owner, repo),
-            'issues': self.search_issues(owner, repo),
-            'commits_search': self.search_commits(owner, repo),
+            'pull_requests': self.search_pull_requests(owner, repo, author_filter=author_filter),
+            'issues': self.search_issues(owner, repo, author_filter=author_filter),
+            'commits_search': self.search_commits(owner, repo, author_filter=author_filter),
             'labels': self.fetch_repository_labels(owner, repo)
         }
         
+        # For forks: also search the parent/upstream repo for this user's PRs and issues.
+        # PRs from forks get merged in the upstream repo, so searching only the fork
+        # will return nearly zero results.
+        if is_fork and parent_info:
+            parent_owner = parent_info.get('owner', {}).get('login')
+            parent_repo = parent_info.get('name')
+            if parent_owner and parent_repo:
+                print(f"DEBUG - Searching parent repo {parent_owner}/{parent_repo} for {owner}'s PRs and issues")
+                
+                parent_prs = self.search_pull_requests(parent_owner, parent_repo, author_filter=owner)
+                parent_issues = self.search_issues(parent_owner, parent_repo, author_filter=owner)
+                
+                # Merge parent results (deduplicate by ID)
+                existing_pr_ids = {pr.get('id') for pr in repo_data['pull_requests']['items']}
+                for pr in parent_prs['items']:
+                    if pr.get('id') not in existing_pr_ids:
+                        repo_data['pull_requests']['items'].append(pr)
+                repo_data['pull_requests']['total_count'] = len(repo_data['pull_requests']['items'])
+                
+                existing_issue_ids = {issue.get('id') for issue in repo_data['issues']['items']}
+                for issue in parent_issues['items']:
+                    if issue.get('id') not in existing_issue_ids:
+                        repo_data['issues']['items'].append(issue)
+                repo_data['issues']['total_count'] = len(repo_data['issues']['items'])
+                
+                print(f"DEBUG - After merging parent data: {len(repo_data['pull_requests']['items'])} PRs, {len(repo_data['issues']['items'])} issues")
+        
         # Log summary of collected data
-        print(f"DEBUG - Data collection summary for {owner}/{repo}:")
+        print(f"DEBUG - Data collection summary for {owner}/{repo}" + (" (FORK)" if is_fork else "") + ":")
         print(f"  - Contributors: {len(repo_data['contributors'])}")
         print(f"  - Pull Requests: {repo_data['pull_requests']['total_count']}")
         print(f"  - Issues: {repo_data['issues']['total_count']}")

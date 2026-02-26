@@ -21,6 +21,15 @@ def process_raw_data(raw_data):
     all_contributions = {}
     repositories = raw_data.get('repositories', {})
     
+    # Ensure the account owner (organization or personal account) is always
+    # present in contributions, even if they have zero activity.  This
+    # prevents the user_mappings lookup from failing for personal accounts
+    # that only have forked repos with no direct contributions yet.
+    account_owner = raw_data.get('organization', '')
+    if account_owner:
+        _initialize_user_if_needed(account_owner, all_contributions)
+        print(f"Pre-initialized account owner: {account_owner}")
+    
     for repo_name, repo_data in repositories.items():
         print(f"Processing repository: {repo_name}")
         _process_repository(repo_data, all_contributions)
@@ -36,6 +45,11 @@ def _process_repository(repo_data, all_contributions):
     commits = repo_data.get('commits_search', {}).get('items', [])
     
     all_usernames = _extract_usernames(contributors, pull_requests, issues, commits)
+    
+    # Also include the repo owner so they always appear in the contributions
+    repo_owner = repo_data.get('owner')
+    if repo_owner:
+        all_usernames.add(repo_owner)
     
     for username in all_usernames:
         if not username:

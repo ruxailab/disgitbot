@@ -19,71 +19,109 @@ class GuildService:
         self._role_service = role_service
     
     async def update_roles_and_channels(self, discord_server_id: str, user_mappings: Dict[str, str], contributions: Dict[str, Any], metrics: Dict[str, Any]) -> bool:
-        """Update Discord roles and channels in a single connection session."""
+        """Update Discord roles and channels for a single server.
+        
+        Delegates to update_multiple_servers() with a single-item list so that
+        the bot only connects to Discord once per pipeline run instead of opening
+        a new client session for every server (which causes unclosed-connector
+        warnings and wastes the connection handshake).
+        """
+        results = await self.update_multiple_servers([
+            {
+                'discord_server_id': discord_server_id,
+                'user_mappings': user_mappings,
+                'contributions': contributions,
+                'metrics': metrics,
+            }
+        ])
+        return results.get(discord_server_id, False)
+
+    async def update_multiple_servers(
+        self,
+        server_jobs: list,
+    ) -> Dict[str, bool]:
+        """Update roles and channels for multiple Discord servers in a SINGLE
+        bot connection, avoiding repeated connect/disconnect overhead and
+        preventing unclosed-connector warnings from leftover aiohttp sessions.
+
+        Args:
+            server_jobs: list of dicts with keys:
+                discord_server_id, user_mappings, contributions, metrics
+        Returns:
+            dict mapping discord_server_id -> success bool
+        """
         intents = discord.Intents.default()
         intents.message_content = True
         intents.members = True
         client = discord.Client(intents=intents)
 
-        # Get server's GitHub organization for organization-specific data
         from shared.firestore import get_mt_client
         mt_client = get_mt_client()
-        server_config = mt_client.get_server_config(discord_server_id)
-        github_org = server_config.get('github_org') if server_config else None
-        role_rules = server_config.get('role_rules') if server_config else {}
-        
-        success = False
-        
+
+        # Build a quick lookup: server_id -> job
+        jobs_by_server = {job['discord_server_id']: job for job in server_jobs}
+        results: Dict[str, bool] = {job['discord_server_id']: False for job in server_jobs}
+
         @client.event
         async def on_ready():
-            nonlocal success
             try:
                 print(f"Connected as {client.user}")
                 print(f"Discord client connected to {len(client.guilds)} guilds")
-                
+
                 if not client.guilds:
                     print("WARNING: Bot is not connected to any Discord servers")
                     return
-                
-                for guild in client.guilds:
-                    if str(guild.id) == discord_server_id:
-                        print(f"Processing guild: {guild.name} (ID: {guild.id})")
 
-                        # Update roles with organization-specific data
+                for guild in client.guilds:
+                    server_id = str(guild.id)
+                    if server_id not in jobs_by_server:
+                        print(f"Skipping guild {guild.name} - not the target server")
+                        continue
+
+                    job = jobs_by_server[server_id]
+                    server_config = mt_client.get_server_config(server_id)
+                    github_org = server_config.get('github_org') if server_config else None
+                    role_rules = (server_config.get('role_rules') if server_config else {}) or {}
+
+                    print(f"Processing guild: {guild.name} (ID: {guild.id})")
+                    try:
                         updated_count = await self._update_roles_for_guild(
                             guild,
-                            user_mappings,
-                            contributions,
+                            job['user_mappings'],
+                            job['contributions'],
                             github_org,
-                            role_rules or {}
+                            role_rules,
                         )
                         print(f"Updated {updated_count} members in {guild.name}")
 
-                        # Update channels
-                        await self._update_channels_for_guild(guild, metrics)
+                        await self._update_channels_for_guild(guild, job['metrics'])
                         print(f"Updated channels in {guild.name}")
-                    else:
-                        print(f"Skipping guild {guild.name} - not the target server {discord_server_id}")
-                
-                success = True
-                print("Discord updates completed successfully")
-                
+
+                        results[server_id] = True
+                        print(f"Discord updates completed successfully for {guild.name}")
+                    except Exception as e:
+                        print(f"Error updating guild {guild.name}: {e}")
+                        import traceback
+                        traceback.print_exc()
+
             except Exception as e:
                 print(f"Error in update process: {e}")
                 import traceback
                 traceback.print_exc()
-                success = False
             finally:
                 await client.close()
-        
+
         try:
             await client.start(self._token)
-            return success
         except Exception as e:
             print(f"Error connecting to Discord: {e}")
             import traceback
             traceback.print_exc()
-            return False
+        finally:
+            if not client.is_closed():
+                await client.close()
+
+        return results
     
     async def _update_roles_for_guild(
         self,
@@ -162,8 +200,13 @@ class GuildService:
                 return existing_roles.get(role_name)
             return None
 
+        # Ensure all members are cached before iterating
+        if not guild.chunked:
+            await guild.chunk()
+        
         # Update users
         updated_count = 0
+        print(f"Guild has {len(guild.members)} members, user_mappings has {len(user_mappings)} entries")
         for member in guild.members:
             github_username = user_mappings.get(str(member.id))
             if not github_username or github_username not in contributions:

@@ -56,36 +56,45 @@ class RoleConfiguration:
             "1+ Bug Hunter", "6+ Bug Hunter", "16+ Bug Hunter", "31+ Bug Hunter", "51+ Bug Hunter",
             "1+ Commit", "51+ Commit", "101+ Commit", "251+ Commit", "501+ Commit",
             "PR Champion", "PR Runner-up", "PR Bronze",
-            # Old emoji versions
+            # Old emoji versions (no "s" suffix, 1/6/16/31/51 scale)
             "🌸 1+ PR", "🌺 6+ PR", "🌻 16+ PR", "🌷 31+ PR", "🌹 51+ PR",
             "🍃 1+ Issue", "🌿 6+ Issue", "🌱 16+ Issue", "🌾 31+ Issue", "🍀 51+ Issue",
             "🍃 1+ Issue Reporter", "🌿 6+ Issue Reporter", "🌱 16+ Issue Reporter", "🌾 31+ Issue Reporter", "🍀 51+ Issue Reporter",
             "🍃 1+ Bug Hunter", "🌿 6+ Bug Hunter", "🌱 16+ Bug Hunter", "🌾 31+ Bug Hunter", "🍀 51+ Bug Hunter",
-            "☁️ 1+ Commit", "🌊 51+ Commit", "🌈 101+ Commit", "🌙 251+ Commit", "⭐ 501+ Commit"
+            "☁️ 1+ Commit", "🌊 51+ Commit", "🌈 101+ Commit", "🌙 251+ Commit", "⭐ 501+ Commit",
+            # Jul 25 2025 emoji+plural names (6/16/31/51 scale PRs, 51/101/251/501 scale Commits)
+            # "🌸 1+ PRs" is still active — only the higher tiers changed
+            "🌺 6+ PRs", "🌻 16+ PRs", "🌷 31+ PRs", "🌹 51+ PRs",
+            # "🍃 1+ GitHub Issues Reported" is still active — only the higher tiers changed
+            "🌿 6+ GitHub Issues Reported", "🌱 16+ GitHub Issues Reported",
+            "🌾 31+ GitHub Issues Reported", "🍀 51+ GitHub Issues Reported",
+            # "☁️ 1+ Commits" is still active — only the higher tiers changed
+            "🌊 51+ Commits", "🌈 101+ Commits", "🌙 251+ Commits", "⭐ 501+ Commits"
         }
         
         # Role Colors (RGB tuples) - Aesthetic pastels
+        # Keys MUST exactly match the names in pr_thresholds / issue_thresholds / commit_thresholds
         self.role_colors = {
             # PR roles - Pink/Rose pastels
             "🌸 1+ PRs": (255, 182, 193),        # Light pink
-            "🌺 6+ PRs": (255, 160, 180),        # Soft rose
-            "🌻 16+ PRs": (255, 140, 167),       # Medium rose
-            "🌷 31+ PRs": (255, 120, 154),       # Deep rose
-            "🌹 51+ PRs": (255, 100, 141),       # Rich rose
+            "🌺 5+ PRs": (255, 160, 180),        # Soft rose
+            "🌻 10+ PRs": (255, 140, 167),       # Medium rose
+            "🌷 25+ PRs": (255, 120, 154),       # Deep rose
+            "🌹 50+ PRs": (255, 100, 141),       # Rich rose
             
             # Issue roles - Green pastels
             "🍃 1+ GitHub Issues Reported": (189, 252, 201),     # Soft mint
-            "🌿 6+ GitHub Issues Reported": (169, 252, 186),     # Light mint
-            "🌱 16+ GitHub Issues Reported": (149, 252, 171),    # Medium mint
-            "🌾 31+ GitHub Issues Reported": (129, 252, 156),    # Deep mint
-            "🍀 51+ GitHub Issues Reported": (109, 252, 141),    # Rich mint
+            "🌿 5+ GitHub Issues Reported": (169, 252, 186),     # Light mint
+            "🌱 10+ GitHub Issues Reported": (149, 252, 171),    # Medium mint
+            "🌾 25+ GitHub Issues Reported": (129, 252, 156),    # Deep mint
+            "🍀 50+ GitHub Issues Reported": (109, 252, 141),    # Rich mint
             
             # Commit roles - Blue/Purple pastels
             "☁️ 1+ Commits": (230, 230, 250),    # Lavender
-            "🌊 51+ Commits": (173, 216, 230),   # Light blue
-            "🌈 101+ Commits": (186, 186, 255),  # Periwinkle
-            "🌙 251+ Commits": (221, 160, 221),  # Plum
-            "⭐ 501+ Commits": (200, 140, 255),  # Soft purple
+            "🌊 25+ Commits": (173, 216, 230),   # Light blue
+            "🌈 50+ Commits": (186, 186, 255),   # Periwinkle
+            "🌙 100+ Commits": (221, 160, 221),  # Plum
+            "⭐ 250+ Commits": (200, 140, 255),  # Soft purple
             
             # Medal roles - Shimmery pastels
             "✨ PR Champion": (255, 215, 180),   # Champagne
