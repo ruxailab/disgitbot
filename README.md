@@ -15,6 +15,82 @@
 
 ---
 
+## Prerequisites
+
+### Python Version Requirements
+This project requires **Python 3.13+** due to the `audioop-lts` dependency used by discord.py voice features.
+
+#### Check your Python version:
+```bash
+python3 --version
+# or
+python --version
+```
+
+#### Install Python 3.13+ if needed:
+
+**macOS (using Homebrew):**
+```bash
+brew install python@3.13
+```
+
+**Ubuntu/Debian:**
+```bash
+sudo apt update
+sudo apt install software-properties-common
+sudo add-apt-repository ppa:deadsnakes/ppa
+sudo apt update
+sudo apt install python3.13 python3.13-venv python3.13-dev
+```
+
+**Windows:**
+Download Python 3.13+ from [python.org](https://www.python.org/downloads/)
+
+### Installation
+
+1. **Clone the repository:**
+```bash
+git clone https://github.com/ruxailab/disgitbot.git
+cd disgitbot
+```
+
+2. **Create a virtual environment with Python 3.13+:**
+```bash
+python3.13 -m venv venv
+# or if python3.13 is your default:
+python -m venv venv
+```
+
+3. **Activate the virtual environment:**
+```bash
+# macOS/Linux:
+source venv/bin/activate
+# Windows:
+venv\Scripts\activate
+```
+
+4. **Install dependencies:**
+```bash
+pip install -r discord_bot/config/discord_bot_requirements.txt
+```
+
+### Alternative Installation (if Python 3.13+ is not available)
+
+If you cannot install Python 3.13+, you can try installing without voice support:
+
+```bash
+# Install discord.py without voice support
+pip install discord.py==2.0.0 --no-deps
+pip install aiohttp
+pip install python-dotenv==1.0.0
+pip install firebase-admin==6.7.0
+# Add other dependencies as needed
+```
+
+**Note:** Voice features will not be available without `audioop-lts`.
+
+---
+
 ## Project Overview
 
 The Disgitbot project aims to create a comprehensive Discord bot that integrates GitHub activity with Discord communities, providing real-time notifications, contribution analytics, and automated workflow management. The project focuses on enhancing community engagement and streamlining development workflows through intelligent automation.
